@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>al present</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+:root{--bg:#E8ECF4;--ink:#10131F;--acc:#2F3DFF}
+body{font:16px/1.5 Onest,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:clamp(16px,4vw,48px)}
+header,.choice{width:100%;max-width:960px;margin:0 auto}
+header{margin-bottom:28px}
+h1,h2{font-family:Unbounded,Onest,sans-serif}
+h1{font-size:clamp(32px,6vw,56px);font-weight:700;letter-spacing:-.03em}
+header p{color:#5B6478;margin-top:8px;max-width:48ch}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.choice{grid-template-columns:1fr}}
+.card{display:flex;flex-direction:column;justify-content:space-between;min-height:260px;padding:clamp(22px,3vw,34px);border-radius:28px;color:#fff;text-decoration:none;transition:transform .15s}
+.card:hover{transform:translateY(-3px)}
+.card:active{transform:scale(.98)}
+.card:focus-visible{outline:3px solid #9EA8FF;outline-offset:3px}
+.screen{background:var(--ink)}
+.remote{background:var(--acc);border-radius:20px}
+h2{font-size:clamp(22px,3vw,28px);font-weight:500;letter-spacing:-.01em}
+.card p{opacity:.78;margin-top:10px;max-width:30ch}
+.go{font-weight:600;margin-top:28px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>al present</h1>
+  <p>Показывайте презентацию на одном устройстве и листайте её с другого.</p>
+</header>
+<nav class="choice">
+  <a class="card screen" href="/screen.html">
+    <div><h2>Создать комнату</h2><p>Это устройство будет экраном: загрузите презентацию и получите код.</p></div>
+    <span class="go">Открыть экран</span>
+  </a>
+  <a class="card remote" href="/remote.html">
+    <div><h2>Войти в комнату</h2><p>Это устройство станет пультом: введите код с экрана.</p></div>
+    <span class="go">Открыть пульт</span>
+  </a>
+</nav>
+<script>
+try {
+  if (sessionStorage.getItem('al-room')) location.replace('/screen.html');
+  else if (sessionStorage.getItem('al-r')) location.replace('/remote.html');
+} catch {}
+</script>
+</body>
+</html>
