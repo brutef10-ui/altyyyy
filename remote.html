@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<title>Пульт</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{height:100%;background:#000;color:#fff;font:16px/1.5 Onest,system-ui,sans-serif;overscroll-behavior:none;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#join{height:100%;display:flex;flex-direction:column;justify-content:center;max-width:420px;margin:0 auto;padding:24px}
+h1{font:700 32px Unbounded,Onest,sans-serif;letter-spacing:-.02em}
+#join p{color:#8F96AD;margin:8px 0 26px}
+input{width:100%;font:700 38px Unbounded,Onest,sans-serif;letter-spacing:.18em;text-align:center;text-transform:uppercase;color:#fff;background:transparent;border:0;border-bottom:2px solid #2B2F44;padding:10px 0;border-radius:0;outline:0;user-select:text;-webkit-user-select:text}
+input:focus{border-color:#4452FF}
+input::placeholder{color:#2B2F44}
+#go{width:100%;margin-top:26px;font:600 17px Onest,sans-serif;color:#fff;background:#2F3DFF;border:0;border-radius:14px;padding:16px;cursor:pointer}
+#go:active{transform:scale(.98)}
+#err{color:#FF7A66!important;min-height:24px;margin:14px 0 0!important}
+#pad{position:fixed;inset:0;display:grid;grid-template-columns:1fr 1fr;background:#000}
+#pad .half{border:0;border-radius:0;background:#000;color:rgba(255,255,255,.2);display:grid;place-items:center;cursor:pointer;transition:background .15s,color .15s}
+#prev{border-right:1px solid #1A1D2C!important}
+.half.hit{background:#0C1030!important;color:rgba(255,255,255,.9)!important;transition:none!important}
+.half svg{width:72px;height:72px}
+#hint,#cnt{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+#hint{top:50%;transform:translateY(-50%);color:#8F96AD;padding:0 24px}
+#cnt{bottom:max(22px,env(safe-area-inset-bottom));font:500 15px Unbounded,Onest,sans-serif;color:#5A5F78}
+#out{position:absolute;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:2;font:inherit;font-size:13px;background:transparent;color:#4A4F68;border:0;padding:8px 14px;cursor:pointer}
+:focus-visible{outline:3px solid #9EA8FF;outline-offset:-3px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main id="join">
+  <h1>Пульт</h1>
+  <p>Введите код комнаты с экрана презентации.</p>
+  <form id="f">
+    <input id="code" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Код комнаты" placeholder="······">
+    <button id="go">Подключиться</button>
+  </form>
+  <p id="err" role="alert"></p>
+</main>
+
+<main id="pad" hidden>
+  <button id="prev" class="half" aria-label="Назад">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <button id="next" class="half" aria-label="Вперёд">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+  </button>
+  <p id="hint"></p>
+  <p id="cnt"></p>
+  <button id="out">Выйти</button>
+</main>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const socket = io();
+let room = null;
+const emit = (ev, data) => new Promise((res) => socket.timeout(6000).emit(ev, data, (e, r) => res(e ? { error: 'Нет связи с сервером.' } : r || {})));
+
+const q = new URLSearchParams(location.search).get('c');
+$('#code').value = (q || localStorage.getItem('al-code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+
+function paint() {
+  const s = room.state;
+  $('#cnt').textContent = s.playing ? `${s.slide + 1} / ${s.total}` : '';
+  $('#hint').textContent = !room.screenOnline ? 'Экран отключён. Ждём, когда он вернётся.' : !s.playing ? 'Запустите презентацию на экране.' : '';
+}
+function show(r) {
+  room = r;
+  sessionStorage.setItem('al-r', r.code);
+  localStorage.setItem('al-code', r.code);
+  if ($('#pad').hidden) {
+    $('#join').hidden = true; $('#pad').hidden = false;
+    document.documentElement.requestFullscreen?.().catch(() => {});
+    lock();
+  }
+  paint();
+}
+function leaveUi(msg) {
+  room = null;
+  sessionStorage.removeItem('al-r');
+  $('#pad').hidden = true; $('#join').hidden = false;
+  $('#err').textContent = msg || '';
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+let wl = null;
+async function lock() { try { wl = await navigator.wakeLock?.request('screen'); } catch {} }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && room) lock(); });
+
+async function resume(n = 0) {
+  const code = sessionStorage.getItem('al-r');
+  if (!code) return;
+  const r = await emit('room:resume', { code, role: 'remote' });
+  if (!r.error) return show(r.room);
+  if (/закрыта/.test(r.error) || n >= 10) return leaveUi(r.error);
+  setTimeout(() => resume(n + 1), 2000);
+}
+socket.on('connect', () => resume());
+socket.on('room:update', (r) => { if (room && r.code === room.code) { room = r; paint(); } });
+socket.on('room:closed', () => leaveUi('Комната закрыта.'));
+
+$('#f').onsubmit = async (e) => {
+  e.preventDefault();
+  $('#err').textContent = '';
+  const r = await emit('room:join', { code: $('#code').value.trim().toUpperCase() });
+  r.error ? ($('#err').textContent = r.error) : show(r.room);
+};
+$('#out').onclick = () => { socket.emit('room:leave'); leaveUi(''); };
+
+const send = (action) => { navigator.vibrate?.(12); socket.emit('presentation:command', { action }); };
+for (const [id, action] of [['#prev', 'prev'], ['#next', 'next']]) {
+  const b = $(id);
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.classList.add('hit'); send(action); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => b.addEventListener(t, () => b.classList.remove('hit')));
+}
+addEventListener('keydown', (e) => {
+  if ($('#pad').hidden) return;
+  if (e.key === 'ArrowRight') send('next');
+  if (e.key === 'ArrowLeft') send('prev');
+});
+</script>
+</body>
+</html>
