@@ -1,0 +1,20 @@
+{
+  "name": "al-present",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Презентации на одном устройстве, управление — на другом.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^2.0.2",
+    "pdfjs-dist": "4.10.38",
+    "socket.io": "^4.8.1"
+  }
+}
