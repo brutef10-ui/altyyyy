@@ -39,7 +39,10 @@ quiz-project/
 │   └── js/ config.js session.js socket.js ui.js join.js camera.js play.js
 └── tools/
     ├── serve.js             # мини-сервер статики без зависимостей
-    └── dev.js               # запуск всех трёх частей одной командой
+    ├── dev.js               # запуск всех трёх частей одной командой
+    └── single.js            # запуск одним процессом (сервер отдаёт оба сайта)
+
+render.yaml                  # (в корне репозитория) деплой на Render одним сервисом
 ```
 
 ## Установка и запуск
@@ -76,6 +79,40 @@ node tools/serve.js player-site 5501
 
 Сайты — обычная статика: вместо `tools/serve.js` подойдёт любой веб-сервер (`npx serve`, nginx, Live Server в VS Code). Открывать HTML-файлы напрямую через `file://` нельзя — нужны ES-модули и HTTP.
 
+### Одним процессом (режим `SERVE_SITES`)
+
+```bash
+cd quiz-project
+npm install
+npm run single
+```
+
+Сервер сам отдаёт оба сайта на одном порту: сайт игрока — http://localhost:3000/, сайт ведущего — http://localhost:3000/host/. CORS настраивать не нужно. Этот же режим используется для деплоя одним сервисом (`render.yaml`) и для запуска на телефоне.
+
+### На Android-телефоне (Termux)
+
+1. Установите **Termux** из F-Droid (https://f-droid.org/packages/com.termux/) — версия в Google Play устарела.
+2. В Termux:
+   ```bash
+   pkg update -y && pkg install -y nodejs-lts git
+   git clone -b claude/interactive-quiz-game-o8s0kx https://github.com/brutef10-ui/altyyyy
+   cd altyyyy/quiz-project
+   npm install
+   npm run single
+   ```
+3. В Chrome откройте http://localhost:3000/host/ — экран ведущего, а в новой вкладке http://localhost:3000/ — экран игрока. На `localhost` камера работает.
+4. Не закрывайте Termux. Чтобы Android не остановил сервер в фоне, в шторке уведомлений Termux нажмите «Acquire wakelock». Остановить сервер — `Ctrl` + `C` (кнопка CTRL на панели Termux, затем C).
+
+Чтобы друзья в той же Wi-Fi сети играли со своих телефонов, узнайте IP телефона (Настройки → Wi-Fi → ваша сеть, например `192.168.1.5`) и запустите так:
+
+```bash
+PLAYER_SITE_URL=http://192.168.1.5:3000 npm run single
+```
+
+Игроки открывают `http://192.168.1.5:3000`. По обычному `http://` браузер не включит камеру на странице, поэтому у них будет кнопка «Загрузить фото» — на телефоне она откроет фронтальную камеру. Для селфи прямо на странице нужен HTTPS — см. деплой на Render.
+
+Обновить код до последней версии: `cd altyyyy && git pull`, затем снова `cd quiz-project && npm install && npm run single`.
+
 ### Настройка `.env`
 
 | Переменная | Назначение | По умолчанию |
@@ -84,6 +121,7 @@ node tools/serve.js player-site 5501
 | `HOST_SITE_ORIGIN` | адрес сайта ведущего (CORS). Несколько — через запятую | `http://localhost:5500,http://127.0.0.1:5500` |
 | `PLAYER_SITE_ORIGIN` | адрес сайта игрока (CORS). Несколько — через запятую | `http://localhost:5501,http://127.0.0.1:5501` |
 | `PLAYER_SITE_URL` | публичный адрес сайта игрока, его видно в лобби и в QR-коде | первый из `PLAYER_SITE_ORIGIN` |
+| `SERVE_SITES` | `true` — сервер сам отдаёт оба сайта (`/` и `/host/`) | `false` |
 | `DATA_FILE` | путь к JSON-файлу с играми | `./data/quizzes.json` |
 | `TRUST_PROXY` | `true`, если сервер за прокси (Render, Railway, nginx) | `false` |
 | `HOST_RECONNECT_MS` | сколько ждать ведущего после отключения, прежде чем закрыть комнату | `15000` |
@@ -106,7 +144,7 @@ node tools/serve.js player-site 5501
 
 ```bash
 cd quiz-project/server
-npm test                               # 14 тестов: валидация, очки, полный цикл игры через Socket.IO
+npm test                               # 18 тестов: валидация, очки, полный цикл игры через Socket.IO, режим SERVE_SITES
 npm start
 curl http://localhost:3000/health      # {"status":"ok","rooms":0,...}
 curl http://localhost:3000/api/quizzes # 401 — без токена ведущего игры не отдаются
@@ -196,9 +234,23 @@ curl http://localhost:3000/api/quizzes # 401 — без токена ведущ�
 
 ## Деплой
 
-Сервер — это Node-сервис с WebSocket, сайты — статика. Деплоятся как три отдельных сервиса.
+Есть два варианта: **один сервис** (сервер сам отдаёт оба сайта — проще всего, можно сделать с телефона) или **три сервиса** (сервер и два статических сайта отдельно).
 
-### Render
+### Render одним сервисом (Blueprint)
+
+В корне репозитория лежит `render.yaml`.
+
+1. Зарегистрируйтесь на https://render.com через GitHub.
+2. **New → Blueprint**, выберите репозиторий и ветку с игрой, нажмите **Apply** / **Deploy Blueprint**.
+3. Через несколько минут сервис `iskra-quiz` получит адрес вида `https://iskra-quiz-xxxx.onrender.com`:
+   * ведущий: `https://iskra-quiz-xxxx.onrender.com/host/`
+   * игроки: `https://iskra-quiz-xxxx.onrender.com/` (адрес и QR-код видны в лобби).
+
+Если Blueprint недоступен, создайте **New → Web Service** вручную: репозиторий и ветка с игрой, Root Directory `quiz-project`, Build Command `npm install`, Start Command `npm start`, переменные `SERVE_SITES=true` и `TRUST_PROXY=true`.
+
+Ограничения бесплатного тарифа: сервис засыпает после 15 минут без запросов (первое открытие — до минуты), а файловая система временная — сохранённые игры пропадут после перезапуска или нового деплоя. Чтобы игры сохранялись, подключите Disk (платно) и задайте `DATA_FILE` на него.
+
+### Render тремя сервисами
 
 **Сервер** — New → Web Service:
 

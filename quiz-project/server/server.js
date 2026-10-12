@@ -1,5 +1,7 @@
 // Сервер квиз-игры «Искра»: REST API для сохранённых игр + Socket.IO для живой игры.
 import http from 'node:http';
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import express from 'express';
 import cors from 'cors';
@@ -17,6 +19,31 @@ import { MAX_PHOTO_BYTES, QUIZ_LIMITS, validateNickname, validateRoomCode } from
 // Фото до 100 КБ в base64 занимает ~137 КБ, игра на 50 вопросов — до ~100 КБ.
 const SOCKET_MAX_MESSAGE_BYTES = 256 * 1024;
 
+// Режим SERVE_SITES: оба сайта отдаёт сам сервер, поэтому адрес сервера для них — тот же, что у страницы.
+function mountSites(app, config) {
+  const hostDir = path.join(config.sitesRoot, 'host-site');
+  const playerDir = path.join(config.sitesRoot, 'player-site');
+
+  const sameOriginConfig = (dir) => async (req, res) => {
+    const source = await fs.readFile(path.join(dir, 'js', 'config.js'), 'utf8');
+    res.type('text/javascript').set('Cache-Control', 'no-cache')
+      .send(source.replace("const PRODUCTION_SERVER_URL = '';", 'const PRODUCTION_SERVER_URL = window.location.origin;'));
+  };
+
+  app.get('/host/js/config.js', sameOriginConfig(hostDir));
+  app.get('/js/config.js', sameOriginConfig(playerDir));
+  app.use('/host', express.static(hostDir));
+  app.use(express.static(playerDir));
+}
+
+function isSameOrigin(origin, host) {
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 function createApp({ config, quizService, rooms, roomLimiter }) {
   const app = express();
   app.disable('x-powered-by');
@@ -33,6 +60,8 @@ function createApp({ config, quizService, rooms, roomLimiter }) {
   const corsBase = { methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'], maxAge: 600 };
   const hostCors = cors({ ...corsBase, origin: config.hostOrigins });
   const anyCors = cors({ ...corsBase, origin: config.allOrigins });
+
+  if (config.serveSites) mountSites(app, config);
 
   app.get('/', (req, res) => res.json({ name: 'Искра — сервер квиз-игры', status: 'ok' }));
   app.get('/health', (req, res) => res.json({ status: 'ok', rooms: rooms.size, uptime: Math.round(process.uptime()) }));
@@ -140,11 +169,12 @@ export async function startServer(overrides = {}) {
     maxHttpBufferSize: SOCKET_MAX_MESSAGE_BYTES,
     pingInterval: 10_000,
     pingTimeout: 8_000,
-    // WebSocket не подчиняется CORS, поэтому Origin проверяем сами.
-    // Запросы без Origin (не из браузера, например тесты) пропускаем: права проверяются на уровне событий.
+    // WebSocket не подчиняется CORS, поэтому Origin проверяем сами: разрешены сайты из .env
+    // и страницы, которые отдал сам сервер (SERVE_SITES). Запросы без Origin (не из браузера,
+    // например тесты) пропускаем: права проверяются на уровне событий.
     allowRequest: (req, callback) => {
       const origin = req.headers.origin;
-      callback(null, !origin || config.allOrigins.includes(origin));
+      callback(null, !origin || config.allOrigins.includes(origin) || isSameOrigin(origin, req.headers.host));
     },
   });
   const sockets = registerSocketHandlers(io, { rooms, quizService, config });
@@ -183,8 +213,13 @@ if (isMain) {
   const instance = await startServer();
   const { config } = instance;
   console.log(`Искра: сервер запущен на порту ${instance.port}`);
-  console.log(`  Сайт ведущего: ${config.hostOrigins.join(', ')}`);
-  console.log(`  Сайт игрока:   ${config.playerOrigins.join(', ')}`);
+  if (config.serveSites) {
+    console.log(`  Сайт ведущего: http://localhost:${instance.port}/host/`);
+    console.log(`  Сайт игрока:   http://localhost:${instance.port}/`);
+  } else {
+    console.log(`  Сайт ведущего: ${config.hostOrigins.join(', ')}`);
+    console.log(`  Сайт игрока:   ${config.playerOrigins.join(', ')}`);
+  }
   console.log(`  Данные игр:    ${config.dataFile}`);
 
   const shutdown = async (signal) => {

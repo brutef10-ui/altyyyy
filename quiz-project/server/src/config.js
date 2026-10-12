@@ -22,6 +22,15 @@ function integer(value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {
   return Math.min(max, Math.max(min, number));
 }
 
+const trimUrl = (value) => String(value ?? '').trim().replace(/\/+$/, '');
+
+// Публичный адрес сервиса, который хостинги подставляют сами.
+function platformUrl(env) {
+  if (env.RENDER_EXTERNAL_URL) return trimUrl(env.RENDER_EXTERNAL_URL);
+  if (env.RAILWAY_PUBLIC_DOMAIN) return `https://${trimUrl(env.RAILWAY_PUBLIC_DOMAIN)}`;
+  return '';
+}
+
 function trustProxy(value) {
   if (value === undefined || value === '' || value === 'false') return false;
   if (value === 'true') return 1;
@@ -38,7 +47,10 @@ export function loadConfig(overrides = {}) {
     port: integer(env.PORT, 3000, { min: 0, max: 65535 }),
     hostOrigins,
     playerOrigins,
-    playerSiteUrl: (env.PLAYER_SITE_URL || '').trim().replace(/\/+$/, '') || playerOrigins[0],
+    // SERVE_SITES=true: сервер сам отдаёт оба сайта (игрок — «/», ведущий — «/host/»).
+    // Удобно для деплоя одним сервисом и для запуска на телефоне.
+    serveSites: env.SERVE_SITES === 'true',
+    sitesRoot: path.resolve(SERVER_ROOT, '..'),
     dataFile: path.resolve(SERVER_ROOT, env.DATA_FILE || 'data/quizzes.json'),
     trustProxy: trustProxy(env.TRUST_PROXY),
     hostReconnectMs: integer(env.HOST_RECONNECT_MS, 15_000, { min: 1_000, max: 300_000 }),
@@ -52,6 +64,10 @@ export function loadConfig(overrides = {}) {
     ...overrides,
   };
 
+  if (config.playerSiteUrl === undefined) {
+    // Без адреса в режиме SERVE_SITES лобби покажет адрес, с которого открыт сайт ведущего.
+    config.playerSiteUrl = trimUrl(env.PLAYER_SITE_URL) || (config.serveSites ? platformUrl(env) : config.playerOrigins[0]) || null;
+  }
   config.allOrigins = [...new Set([...config.hostOrigins, ...config.playerOrigins])];
   return Object.freeze(config);
 }

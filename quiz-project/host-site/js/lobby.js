@@ -93,9 +93,10 @@ function renderJoinInfo(snapshot) {
   document.getElementById('quiz-title').textContent = snapshot.title;
   document.title = `Искра — ${formatCode(snapshot.code)}`;
 
-  const url = snapshot.playerSiteUrl;
-  document.getElementById('join-url').textContent = url ? url.replace(/^https?:\/\//, '') : 'сайт игрока';
-  if (url) renderQr(`${url}/?code=${snapshot.code}`);
+  // Если сервер не знает свой публичный адрес (оба сайта отдаёт он сам), сайт игрока — на этом же адресе.
+  const url = snapshot.playerSiteUrl || location.origin;
+  document.getElementById('join-url').textContent = url.replace(/^https?:\/\//, '');
+  renderQr(`${url}/?code=${snapshot.code}`);
 }
 
 function loadQrLibrary() {

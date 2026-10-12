@@ -1,0 +1,19 @@
+# Blueprint для Render: квиз-игра «Искра» одним сервисом (сервер + оба сайта).
+# Render → New → Blueprint → выберите этот репозиторий и ветку с игрой.
+# После деплоя: сайт игрока — https://<адрес>/, сайт ведущего — https://<адрес>/host/
+services:
+  - type: web
+    name: iskra-quiz
+    runtime: node
+    plan: free
+    rootDir: quiz-project
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: SERVE_SITES
+        value: "true"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: NODE_VERSION
+        value: "22"
