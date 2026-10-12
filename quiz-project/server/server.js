@@ -1,4 +1,4 @@
-// Сервер квиз-игры «Искра»: REST API для сохранённых игр + Socket.IO для живой игры.
+// Сервер квиз-игры «AL Studio»: REST API для сохранённых игр + Socket.IO для живой игры.
 import http from 'node:http';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -63,7 +63,7 @@ function createApp({ config, quizService, rooms, roomLimiter }) {
 
   if (config.serveSites) mountSites(app, config);
 
-  app.get('/', (req, res) => res.json({ name: 'Искра — сервер квиз-игры', status: 'ok' }));
+  app.get('/', (req, res) => res.json({ name: 'AL Studio — сервер квиз-игры', status: 'ok' }));
   app.get('/health', (req, res) => res.json({ status: 'ok', rooms: rooms.size, uptime: Math.round(process.uptime()) }));
 
   app.get('/api/config', anyCors, (req, res) => {
@@ -212,7 +212,7 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv
 if (isMain) {
   const instance = await startServer();
   const { config } = instance;
-  console.log(`Искра: сервер запущен на порту ${instance.port}`);
+  console.log(`AL Studio: сервер запущен на порту ${instance.port}`);
   if (config.serveSites) {
     console.log(`  Сайт ведущего: http://localhost:${instance.port}/host/`);
     console.log(`  Сайт игрока:   http://localhost:${instance.port}/`);

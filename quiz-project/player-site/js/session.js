@@ -2,8 +2,8 @@
 // Всё хранится в sessionStorage вкладки: код комнаты, фото, ник, токен для переподключения.
 import { SERVER_URL } from './config.js';
 
-const STATE_KEY = 'iskra.player';
-const FLASH_KEY = 'iskra.player.flash';
+const STATE_KEY = 'alstudio.player';
+const FLASH_KEY = 'alstudio.player.flash';
 
 function read(key) {
   try {

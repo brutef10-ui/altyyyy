@@ -26,7 +26,7 @@ function podiumPlace(row, player, place) {
 function render(final, playersById) {
   document.getElementById('quiz-title').textContent = final.title;
   document.getElementById('player-total').textContent = `${final.playerCount} ${plural(final.playerCount, ['игрок', 'игрока', 'игроков'])}`;
-  document.title = `Искра — итоги: ${final.title}`;
+  document.title = `AL Studio — итоги: ${final.title}`;
 
   const top = final.leaderboard.slice(0, 3);
   // Порядок на пьедестале: 2-е место, 1-е, 3-е.

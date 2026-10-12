@@ -1,7 +1,7 @@
 // REST API сервера: сохранённые игры ведущего.
 import { SERVER_URL } from './config.js';
 
-const TOKEN_KEY = 'iskra.host.token';
+const TOKEN_KEY = 'alstudio.host.token';
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
 // Секретный токен браузера ведущего. Заменяет аккаунт: по нему сервер понимает, чьи это игры.

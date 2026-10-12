@@ -1,8 +1,8 @@
 {
-  "name": "iskra-quiz-server",
+  "name": "al-studio-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Сервер квиз-игры «Искра»: Express + Socket.IO. Вся игровая логика, таймер и подсчёт очков выполняются здесь.",
+  "description": "Сервер квиз-игры «AL Studio»: Express + Socket.IO. Вся игровая логика, таймер и подсчёт очков выполняются здесь.",
   "type": "module",
   "main": "server.js",
   "engines": {

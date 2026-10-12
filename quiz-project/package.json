@@ -1,8 +1,8 @@
 {
-  "name": "iskra-quiz",
+  "name": "al-studio",
   "version": "1.0.0",
   "private": true,
-  "description": "Квиз-игра «Искра»: сервер, сайт ведущего и сайт игрока.",
+  "description": "Квиз-игра «AL Studio»: сервер, сайт ведущего и сайт игрока.",
   "type": "module",
   "scripts": {
     "postinstall": "npm install --prefix server",

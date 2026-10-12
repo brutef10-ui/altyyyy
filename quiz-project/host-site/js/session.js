@@ -31,7 +31,7 @@ function slot(storage, key) {
  * quizId — id сохранённой игры (если есть), draft — несохранённая версия вопросов (если есть).
  */
 export const hostSession = {
-  ...slot(sessionStorage, 'iskra.host.session'),
+  ...slot(sessionStorage, 'alstudio.host.session'),
   patch(changes) {
     const next = { ...(this.get() || {}), ...changes };
     this.set(next);
@@ -40,13 +40,13 @@ export const hostSession = {
 };
 
 /** Что запустить в лобби: { quizId } — сохранённую игру, { quiz, quizId? } — черновик из редактора. */
-export const launchRequest = slot(sessionStorage, 'iskra.host.launch');
+export const launchRequest = slot(sessionStorage, 'alstudio.host.launch');
 
 /** Автосохранение новой (ещё не сохранённой на сервере) игры в редакторе. */
-export const editorDraft = slot(localStorage, 'iskra.editor.draft');
+export const editorDraft = slot(localStorage, 'alstudio.editor.draft');
 
 /** Короткое сообщение для следующей страницы. */
-const flashSlot = slot(sessionStorage, 'iskra.host.flash');
+const flashSlot = slot(sessionStorage, 'alstudio.host.flash');
 export const flash = {
   set: (message, type = 'info') => flashSlot.set({ message, type }),
   take() {

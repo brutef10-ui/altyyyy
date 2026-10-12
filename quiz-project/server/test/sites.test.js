@@ -11,7 +11,7 @@ let server;
 let tempDir;
 
 before(async () => {
-  tempDir = await mkdtemp(path.join(os.tmpdir(), 'iskra-sites-'));
+  tempDir = await mkdtemp(path.join(os.tmpdir(), 'alstudio-sites-'));
   server = await startServer({ port: 0, dataFile: path.join(tempDir, 'quizzes.json'), serveSites: true });
 });
 

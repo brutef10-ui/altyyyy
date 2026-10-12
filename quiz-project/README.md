@@ -1,4 +1,4 @@
-# Искра — квиз-игра в реальном времени
+# AL Studio — квиз-игра в реальном времени
 
 Ведущий выводит вопросы на большой экран, игроки отвечают с телефонов. Проект состоит из трёх независимых частей:
 
@@ -242,9 +242,9 @@ curl http://localhost:3000/api/quizzes # 401 — без токена ведущ�
 
 1. Зарегистрируйтесь на https://render.com через GitHub.
 2. **New → Blueprint**, выберите репозиторий и ветку с игрой, нажмите **Apply** / **Deploy Blueprint**.
-3. Через несколько минут сервис `iskra-quiz` получит адрес вида `https://iskra-quiz-xxxx.onrender.com`:
-   * ведущий: `https://iskra-quiz-xxxx.onrender.com/host/`
-   * игроки: `https://iskra-quiz-xxxx.onrender.com/` (адрес и QR-код видны в лобби).
+3. Через несколько минут сервис `al-studio` получит адрес вида `https://al-studio-xxxx.onrender.com`:
+   * ведущий: `https://al-studio-xxxx.onrender.com/host/`
+   * игроки: `https://al-studio-xxxx.onrender.com/` (адрес и QR-код видны в лобби).
 
 Если Blueprint недоступен, создайте **New → Web Service** вручную: репозиторий и ветка с игрой, Root Directory `quiz-project`, Build Command `npm install`, Start Command `npm start`, переменные `SERVE_SITES=true` и `TRUST_PROXY=true`.
 
@@ -258,8 +258,8 @@ curl http://localhost:3000/api/quizzes # 401 — без токена ведущ�
 * Build Command: `npm install`
 * Start Command: `npm start`
 * Environment:
-  * `HOST_SITE_ORIGIN=https://iskra-host.onrender.com`
-  * `PLAYER_SITE_ORIGIN=https://iskra-play.onrender.com`
+  * `HOST_SITE_ORIGIN=https://al-studio-host.onrender.com`
+  * `PLAYER_SITE_ORIGIN=https://al-studio-play.onrender.com`
   * `TRUST_PROXY=true`
   * `DATA_FILE=/var/data/quizzes.json` и подключите **Disk** с путём `/var/data` (диски доступны на платных тарифах). Без диска сохранённые игры пропадут при перезапуске или новом деплое: файловая система Render временная.
 
@@ -271,7 +271,7 @@ curl http://localhost:3000/api/quizzes # 401 — без токена ведущ�
   ```bash
   sed -i "s#const PRODUCTION_SERVER_URL = '';#const PRODUCTION_SERVER_URL = '$SERVER_URL';#" js/config.js
   ```
-* Environment: `SERVER_URL=https://iskra-server.onrender.com`
+* Environment: `SERVER_URL=https://al-studio-server.onrender.com`
 
 ### Railway
 

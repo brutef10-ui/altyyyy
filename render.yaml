@@ -1,9 +1,9 @@
-# Blueprint для Render: квиз-игра «Искра» одним сервисом (сервер + оба сайта).
+# Blueprint для Render: квиз-игра «AL Studio» одним сервисом (сервер + оба сайта).
 # Render → New → Blueprint → выберите этот репозиторий и ветку с игрой.
 # После деплоя: сайт игрока — https://<адрес>/, сайт ведущего — https://<адрес>/host/
 services:
   - type: web
-    name: iskra-quiz
+    name: al-studio
     runtime: node
     plan: free
     rootDir: quiz-project

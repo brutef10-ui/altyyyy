@@ -44,7 +44,7 @@ const request = (socket, event, payload) => socket.timeout(3000).emitWithAck(eve
 const once = (socket, event) => new Promise((resolve) => socket.once(event, resolve));
 
 before(async () => {
-  tempDir = await mkdtemp(path.join(os.tmpdir(), 'iskra-test-'));
+  tempDir = await mkdtemp(path.join(os.tmpdir(), 'alstudio-test-'));
   server = await startServer({
     port: 0,
     dataFile: path.join(tempDir, 'quizzes.json'),

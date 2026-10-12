@@ -91,7 +91,7 @@ function renderJoinInfo(snapshot) {
   roomCode = snapshot.code;
   codeButton.textContent = formatCode(snapshot.code);
   document.getElementById('quiz-title').textContent = snapshot.title;
-  document.title = `Искра — ${formatCode(snapshot.code)}`;
+  document.title = `AL Studio — ${formatCode(snapshot.code)}`;
 
   // Если сервер не знает свой публичный адрес (оба сайта отдаёт он сам), сайт игрока — на этом же адресе.
   const url = snapshot.playerSiteUrl || location.origin;
