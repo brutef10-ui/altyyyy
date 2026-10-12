@@ -1,5 +1,5 @@
 // Шаги входа: 1 — код комнаты (index.html), 3 — ник (name.html).
-// Шаг 2 (селфи) — в camera.js. Данные уходят на сервер одним событием player:join на play.html.
+// Шаг 2 (фото) — в camera.js. Данные уходят на сервер одним событием player:join на play.html.
 import { api, flash, goTo, NICKNAME_MAX, nicknameError, normalizeNickname, playerState } from './session.js';
 import { showError } from './ui.js';
 
@@ -66,7 +66,7 @@ function initNameStep() {
     return;
   }
   if (!state.photo) {
-    goTo('photo.html', 'Сначала сделайте селфи');
+    goTo('photo.html', 'Сначала добавьте фото');
     return;
   }
 

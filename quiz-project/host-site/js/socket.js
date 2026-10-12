@@ -3,6 +3,12 @@
 // Лобби, игра и итоги — разные страницы, поэтому при каждом переходе соединение создаётся заново.
 // Новая страница «возвращает» себе комнату событием host:resume с секретным ключом комнаты,
 // а сервер ждёт ведущего несколько секунд, прежде чем закрыть комнату.
+//
+// Надёжность: временные ошибки (сервер занят, не ответил, внутренняя ошибка) не считаются тупиком —
+// страница повторяет попытку с растущей паузой (1, 2, 4, 8, 10 с…), показывая «Переподключаемся…».
+// Когда вкладка снова видна или вернулась сеть, переподключаемся сразу, не дожидаясь паузы.
+// Пока комната открыта, страница раз в 4 минуты «будит» сервер (бесплатный хостинг иначе засыпает)
+// и не даёт экрану телефона погаснуть посреди игры.
 import { SERVER_URL } from './config.js';
 import { getHostToken } from './api.js';
 import { flash, hostSession, launchRequest } from './session.js';
@@ -16,9 +22,22 @@ const STATE_PAGES = {
 };
 
 const FATAL_CODES = new Set(['ROOM_NOT_FOUND', 'NO_ROOM', 'INVALID_QUIZ', 'NOT_FOUND', 'UNAUTHORIZED', 'BAD_CODE']);
+// Ошибки, после которых имеет смысл просто попробовать ещё раз.
+const TRANSIENT_CODES = new Set(['TIMEOUT', 'RATE_LIMIT', 'INTERNAL', 'UNKNOWN']);
+
+const RETRY_BASE_MS = 1_000;
+const RETRY_MAX_MS = 10_000;
+const KEEP_ALIVE_MS = 4 * 60_000;
 
 let clientLoader = null;
 let closingOnPurpose = false;
+// Страница сама отказалась от соединения (комнату закрыли, её открыли в другой вкладке, уходим домой).
+let stopped = false;
+let keepAliveTimer = null;
+let wakeLock = null;
+
+const retryDelay = (attempt) => Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** attempt);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Клиент Socket.IO отдаёт сам сервер — так версии клиента и сервера всегда совпадают.
 function loadClient() {
@@ -36,6 +55,20 @@ function loadClient() {
     document.head.append(script);
   });
   return clientLoader;
+}
+
+/** Загружает клиент Socket.IO, повторяя попытки: сервер мог «проснуться» не сразу или сеть моргнула. */
+async function loadClientWithRetry() {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await loadClient();
+    } catch (error) {
+      const delay = retryDelay(attempt);
+      // После нескольких неудач показываем кнопку «Обновить страницу», но продолжаем пробовать сами.
+      showOverlay(`${error.message} Пробуем ещё раз через ${Math.round(delay / 1000)} с…`, { retry: attempt >= 2 });
+      await wait(delay);
+    }
+  }
 }
 
 /** Отправляет событие и ждёт ответа сервера. Бросает Error с полем code, если сервер вернул ошибку. */
@@ -57,6 +90,7 @@ export function pageForState(state) {
 }
 
 export function goHome(message, type = 'info') {
+  stop();
   if (message) flash.set(message, type);
   hostSession.clear();
   location.href = 'index.html';
@@ -93,6 +127,42 @@ async function attach(socket, allowCreate) {
   return { snapshot: created.snapshot, session: next };
 }
 
+// ---------- Поддержка сервера и экрана «в живых» ----------
+
+function startKeepAlive() {
+  if (keepAliveTimer) return;
+  keepAliveTimer = setInterval(() => {
+    // no-cors: ответ нам не нужен, важно лишь, чтобы запрос дошёл до сервера.
+    fetch(`${SERVER_URL}/health`, { cache: 'no-store', mode: 'no-cors' }).catch(() => {});
+  }, KEEP_ALIVE_MS);
+}
+
+async function keepScreenOn() {
+  if (stopped || wakeLock || document.visibilityState !== 'visible' || !navigator.wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => {
+      wakeLock = null;
+    });
+  } catch {
+    wakeLock = null; // не поддерживается или запрещено — не страшно
+  }
+}
+
+function stop() {
+  stopped = true;
+  clearInterval(keepAliveTimer);
+  keepAliveTimer = null;
+  wakeLock?.release().catch(() => {});
+  wakeLock = null;
+}
+
+function transientMessage(error, delay) {
+  const seconds = Math.max(1, Math.round(delay / 1000));
+  const reason = error.code === 'RATE_LIMIT' ? 'Сервер сейчас перегружен.' : 'Связь с сервером нестабильна.';
+  return `${reason} Переподключаемся через ${seconds} с…`;
+}
+
 /**
  * Подключает страницу ведущего к комнате.
  * @param {object} options
@@ -102,13 +172,7 @@ async function attach(socket, allowCreate) {
  */
 export async function openHostRoom({ page, allowCreate = false, onReady }) {
   showOverlay('Подключение к серверу…');
-  let io;
-  try {
-    io = await loadClient();
-  } catch (error) {
-    showOverlay(`${error.message} Проверьте, что сервер запущен.`, { error: true, retry: true });
-    throw error;
-  }
+  const io = await loadClientWithRetry();
 
   const socket = io(SERVER_URL, {
     auth: { token: getHostToken() },
@@ -116,29 +180,85 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
     reconnectionDelayMax: 3000,
   });
 
-  socket.on('connect', async () => {
+  let attempt = 0; // номер повтора после временной ошибки
+  let retryTimer = null;
+  let generation = 0; // отличает актуальную попытку от устаревших
+
+  const cancelRetry = () => {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
+  // Переподключиться прямо сейчас (новое соединение), не дожидаясь паузы Socket.IO.
+  const reconnectNow = () => {
+    if (stopped) return;
+    cancelRetry();
+    socket.disconnect().connect();
+  };
+
+  async function attachAndRender() {
+    cancelRetry();
+    const current = ++generation;
     try {
       const { snapshot, session } = await attach(socket, allowCreate);
+      if (current !== generation || stopped) return;
+      attempt = 0;
       const target = pageForState(snapshot.state);
       if (target !== page) {
         location.replace(target);
         return;
       }
       hideOverlay();
+      startKeepAlive();
+      keepScreenOn();
       onReady(snapshot, session);
     } catch (error) {
-      if (FATAL_CODES.has(error.code)) goHome(error.message, 'error');
-      else showOverlay(error.message, { error: true, retry: true });
+      if (current !== generation || stopped) return;
+      if (FATAL_CODES.has(error.code)) {
+        goHome(error.message, 'error');
+      } else if (TRANSIENT_CODES.has(error.code)) {
+        const delay = retryDelay(attempt);
+        attempt += 1;
+        showOverlay(transientMessage(error, delay));
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          // Сервер не ответил — соединение, скорее всего, «повисло»: открываем новое.
+          // Иначе повторяем запрос по живому соединению (или дождёмся события connect).
+          if (error.code === 'TIMEOUT' || !socket.connected) reconnectNow();
+          else attachAndRender();
+        }, delay);
+      } else {
+        showOverlay(error.message, { error: true, retry: true });
+      }
+    }
+  }
+
+  socket.on('connect', attachAndRender);
+
+  socket.on('connect_error', () => {
+    if (!stopped && !retryTimer) showOverlay('Нет связи с сервером. Пробуем переподключиться…');
+  });
+  socket.on('disconnect', (reason) => {
+    generation += 1; // ответ на запрос по старому соединению уже не важен
+    if (reason !== 'io client disconnect' && !stopped) {
+      cancelRetry();
+      showOverlay('Связь потеряна. Переподключаемся…');
     }
   });
 
-  socket.on('connect_error', () => showOverlay('Нет связи с сервером. Пробуем переподключиться…'));
-  socket.on('disconnect', (reason) => {
-    if (reason !== 'io client disconnect') showOverlay('Связь потеряна. Переподключаемся…');
+  // Телефон ведущего проснулся или вкладка снова на экране — не ждём следующей попытки Socket.IO.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || stopped) return;
+    keepScreenOn();
+    if (!socket.connected) reconnectNow();
+  });
+  window.addEventListener('online', () => {
+    if (!socket.connected && !stopped) reconnectNow();
   });
 
   socket.on('room:closed', ({ message, reason }) => {
     if (closingOnPurpose) return;
+    stop();
     if (reason === 'replaced') {
       socket.disconnect();
       showOverlay(message, { error: true });
@@ -154,6 +274,7 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
 /** Закрывает комнату по воле ведущего (игроки получат уведомление). */
 export async function closeRoom(socket) {
   closingOnPurpose = true;
+  stop();
   try {
     await request(socket, 'host:close', {}, 4_000);
   } catch {

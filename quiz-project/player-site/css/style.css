@@ -312,18 +312,25 @@ a {
   font-size: 15px;
 }
 
-/* ---------- Селфи ---------- */
+/* ---------- Фото ---------- */
 
 .camera {
   position: relative;
-  width: min(280px, 72vw);
+  width: min(250px, 64vw);
   aspect-ratio: 1;
-  margin: 6px auto;
+  margin: 4px auto;
   border-radius: 50%;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.35);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.08), transparent 65%),
+    rgba(0, 0, 0, 0.35);
   border: 5px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 0 0 8px rgba(255, 106, 61, 0.25), var(--shadow);
+  transition: box-shadow 0.3s ease;
+}
+
+.photo-panel[data-mode='camera'] .camera {
+  box-shadow: 0 0 0 8px rgba(47, 140, 255, 0.3), var(--shadow);
 }
 
 .camera video,
@@ -339,7 +346,7 @@ a {
   transform: scaleX(-1); /* зеркало, как в обычной фронтальной камере */
 }
 
-.camera img {
+.camera img.is-new {
   animation: pop-in 0.4s ease both;
 }
 
@@ -347,14 +354,22 @@ a {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-items: end center;
 }
 
 .camera-placeholder svg {
-  width: 72px;
-  height: 72px;
-  fill: rgba(255, 255, 255, 0.35);
-  animation: pulse 1.6s ease-in-out infinite;
+  width: 78%;
+  height: 78%;
+  fill: rgba(255, 255, 255, 0.16);
+}
+
+.camera-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 6, 30, 0.45);
+  animation: fade-in 0.2s ease both;
 }
 
 .camera-flash {
@@ -369,15 +384,135 @@ a {
   animation: camera-flash 0.45s ease-out;
 }
 
-.camera-actions {
+/* Два равных способа: крупные плитки, после выбора фото — компактная строка */
+.photo-choices {
   display: grid;
-  justify-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
+.photo-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 98px;
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  animation: tile-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  transition: transform 0.12s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.photo-choice + .photo-choice {
+  animation-delay: 60ms;
+}
+
+.photo-choice:active {
+  transform: scale(0.97);
+}
+
+.photo-choice-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.photo-choice:first-child .photo-choice-icon {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.photo-choice:last-child .photo-choice-icon {
+  background: color-mix(in srgb, var(--a1) 30%, transparent);
+}
+
+.photo-choice.is-suggested {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(255, 106, 61, 0.22);
+  animation: nudge 0.5s ease 2;
+}
+
+.photo-panel[data-mode='preview'] .photo-choice {
+  flex-direction: row;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 10px;
+  background: var(--surface);
+  font-size: 15px;
+  animation: none;
+}
+
+.photo-panel[data-mode='preview'] .photo-choice-icon {
+  width: 30px;
+  height: 30px;
+  font-size: 17px;
+}
+
+/* Камера включена: галерея — затвор — отмена */
+.camera-live {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-items: center;
+  gap: 10px;
+  animation: fade-in 0.25s ease both;
+}
+
+.round-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 72px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.round-action-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+
+.round-action:active .round-action-icon {
+  transform: scale(0.92);
+}
+
 .btn-shutter {
-  width: 78px;
-  height: 78px;
+  width: 80px;
+  height: 80px;
   min-height: 0;
   padding: 0;
   border-radius: 50%;
@@ -386,8 +521,8 @@ a {
 }
 
 .shutter-ring {
-  width: 62px;
-  height: 62px;
+  width: 64px;
+  height: 64px;
   border: 4px solid var(--bg);
   border-radius: 50%;
   background: var(--accent-gradient);
@@ -401,8 +536,20 @@ a {
 .file-button input {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   opacity: 0;
   cursor: pointer;
+  font-size: 0;
+}
+
+.file-button:focus-within {
+  outline: 3px solid #ffd166;
+  outline-offset: 3px;
+}
+
+.file-button:focus-within:not(:has(:focus-visible)) {
+  outline: none;
 }
 
 /* ---------- Ник ---------- */
@@ -468,6 +615,8 @@ a {
 }
 
 .player-bar {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -486,11 +635,13 @@ a {
 }
 
 .player-bar-score {
+  flex: none;
   padding: 4px 12px;
   border-radius: 999px;
   background: var(--surface-strong);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .player-bar-score small {
@@ -498,12 +649,36 @@ a {
   font-weight: 600;
 }
 
+/* Очки скрыты до церемонии награждения */
+.player-bar-score.is-hidden {
+  background: rgba(255, 209, 102, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.45);
+  color: #ffd166;
+}
+
+/* Плашка «Переподключаемся…» висит поверх экрана и не сдвигает его */
 .reconnect-banner {
-  padding: 8px 14px;
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 9px 16px;
+  border-radius: 999px;
   background: #b45309;
+  box-shadow: 0 10px 28px rgba(4, 2, 18, 0.5);
   font-weight: 700;
   font-size: 14px;
-  text-align: center;
+  transform: translateX(-50%);
+  animation: banner-in 0.3s ease both;
+}
+
+.reconnect-banner > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .views {
@@ -519,6 +694,7 @@ a {
   flex-direction: column;
   gap: 16px;
   padding: 18px 14px calc(18px + var(--safe-bottom));
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -528,8 +704,22 @@ a {
 
 .view-center {
   align-items: center;
-  justify-content: center;
   text-align: center;
+}
+
+/* Центр по вертикали через «пружины»: если содержимое не влезает, верх не обрезается, а прокручивается */
+.view-center::before,
+.view-center::after {
+  content: '';
+  flex: none;
+}
+
+.view-center::before {
+  margin-top: auto;
+}
+
+.view-center::after {
+  margin-bottom: auto;
 }
 
 .view-text {
@@ -539,12 +729,36 @@ a {
 }
 
 .spinner {
+  flex: none;
   width: 54px;
   height: 54px;
   border: 5px solid rgba(255, 255, 255, 0.15);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
+}
+
+.spinner-sm {
+  width: 40px;
+  height: 40px;
+  border-width: 4px;
+}
+
+.spinner-xs {
+  width: 16px;
+  height: 16px;
+  border-width: 2.5px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .waiting-avatar {
@@ -561,7 +775,7 @@ a {
   animation: ripple 2s ease-out infinite;
 }
 
-/* Вопрос */
+/* ---------- Вопрос ---------- */
 
 .view-question {
   gap: 12px;
@@ -571,6 +785,40 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  min-height: 52px;
+}
+
+.q-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kind-shapes {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.kind-shapes .shape {
+  display: block;
+  width: 13px;
+  height: 13px;
+  color: var(--tone);
+}
+
+.kind-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--accent);
 }
 
 .q-seconds {
@@ -585,11 +833,23 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+.view-question[data-phase='reading'] .q-seconds,
+.view-question[data-phase='answering'] .q-kind {
+  display: none;
+}
+
 .timebar {
+  flex: none;
   height: 10px;
   border-radius: 999px;
   background: var(--surface);
   overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+
+/* Во время чтения полоса времени прячется, но место под ней остаётся — экран не прыгает */
+.view-question[data-phase='reading'] .timebar {
+  opacity: 0;
 }
 
 .timebar-fill {
@@ -603,20 +863,192 @@ a {
   background: var(--danger);
 }
 
-.q-text {
-  font-size: 19px;
-  font-weight: 700;
-  text-align: center;
-  overflow-wrap: anywhere;
+/* На телефоне картинка и текст — прямые участники колонки: картинка ужимается первой,
+   а кнопки ответа и поле ввода не становятся меньше удобного размера. */
+.q-body {
+  display: contents;
 }
 
+/* Чтение и ответ вручную: вопрос стоит по центру свободного места */
+.view-question[data-phase='reading'] .q-media,
+.view-question[data-phase='reading'] .q-media[hidden] + .q-text,
+.view-question[data-type='text'][data-phase='answering'] .q-media,
+.view-question[data-type='text'][data-phase='answering'] .q-media[hidden] + .q-text {
+  margin-top: auto;
+}
+
+.view-question[data-phase='reading'] .q-text {
+  margin-bottom: auto;
+}
+
+/* Картинка: высота зарезервирована заранее, сама картинка проявляется после загрузки */
+.q-media {
+  position: relative;
+  flex: 0 1 auto;
+  width: 100%;
+  height: min(34vh, 300px);
+  min-height: 84px;
+  margin: 0;
+  transition: height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.view-question[data-phase='answering'] .q-media {
+  height: min(22vh, 190px);
+  min-height: 64px;
+}
+
+.q-media::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%) 0 0 / 200% 100%,
+    var(--surface);
+  transform: translateX(-50%);
+  animation: shimmer 1.4s linear infinite;
+  transition: opacity 0.3s ease;
+}
+
+.q-media img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 30px rgba(4, 2, 18, 0.45);
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.q-media.is-loaded::before {
+  opacity: 0;
+  animation: none;
+}
+
+.q-media.is-loaded img {
+  opacity: 1;
+  transform: none;
+}
+
+.q-media.is-broken::before {
+  animation: none;
+}
+
+.q-media.is-broken img {
+  display: none;
+}
+
+.q-media.is-broken::after {
+  content: 'Картинка не загрузилась';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.q-text {
+  flex-shrink: 0;
+  align-self: center;
+  max-width: 640px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  transition: font-size 0.3s ease;
+}
+
+.view-question[data-phase='reading'] .q-text {
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Длинный вопрос — шрифт чуть меньше, чтобы осталось место кнопкам */
+.view-question[data-long='true'] .q-text {
+  font-size: 16px;
+}
+
+.view-question[data-long='true'][data-phase='reading'] .q-text {
+  font-size: 19px;
+}
+
+/* Время на обдумывание: кольцо с обратным отсчётом */
+.q-reading {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 4px;
+  animation: fade-in 0.4s ease both;
+}
+
+.read-caption {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.read-ring {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  animation: breathe 1s ease-in-out infinite;
+}
+
+.read-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.read-ring circle {
+  fill: none;
+  stroke-width: 9;
+}
+
+.read-ring-track {
+  stroke: var(--surface-strong);
+}
+
+.read-ring-fill {
+  stroke: url(#read-gradient);
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+}
+
+.read-ring-value {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Варианты ответа */
 .answer-buttons {
   display: grid;
-  flex: 1;
+  flex: 1 0 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(110px, 1fr);
+  grid-auto-rows: 1fr;
   gap: 12px;
-  min-height: 0;
 }
 
 .answers-2 {
@@ -633,7 +1065,8 @@ a {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 0;
+  min-width: 0;
+  min-height: 96px;
   padding: 12px;
   border: 0;
   border-radius: var(--radius);
@@ -673,6 +1106,7 @@ a {
 }
 
 .answer-shape {
+  flex: none;
   width: 48px;
   height: 48px;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.25));
@@ -687,12 +1121,77 @@ a {
   -webkit-line-clamp: 3;
 }
 
+/* Длинные варианты: фигура меньше, текст помещается в три строки */
+.has-long-answers .answer-button {
+  gap: 6px;
+  padding: 10px;
+  font-size: 15px;
+}
+
+.has-long-answers .answer-shape {
+  width: 30px;
+  height: 30px;
+}
+
 .answer-0 { --tone: var(--a0); }
 .answer-1 { --tone: var(--a1); }
 .answer-2 { --tone: var(--a2); }
 .answer-3 { --tone: var(--a3); }
 
-/* Ответ принят */
+/* Ответ вручную */
+.text-answer {
+  display: grid;
+  flex: none;
+  gap: 10px;
+  width: min(480px, 100%);
+  margin: 4px auto 0;
+  animation: rise-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.view-question[data-type='text'][data-phase='answering'] .text-answer {
+  margin-bottom: auto;
+}
+
+.text-answer-input {
+  min-height: 64px;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.text-answer.is-sending .text-answer-input {
+  opacity: 0.7;
+}
+
+/* Пока поле пустое, кнопка приглушена, но нажимается — и подсказывает, что нужно написать ответ */
+.text-answer.is-empty .btn-primary {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+.text-answer-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -2px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+
+.text-answer-counter {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-answer-hint.is-error {
+  color: #ffb4b4;
+  font-weight: 700;
+}
+
+/* ---------- Ответ принят ---------- */
 
 .answered-badge {
   display: grid;
@@ -711,7 +1210,30 @@ a {
   height: 64px;
 }
 
-/* Результат вопроса */
+.answered-badge-text {
+  --tone: var(--accent-2);
+  background: var(--accent-gradient);
+}
+
+.answered-badge-text .shape {
+  width: 58px;
+  height: 58px;
+}
+
+.answered-quote {
+  max-width: min(360px, 100%);
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  animation: rise-in 0.45s 0.1s ease both;
+}
+
+/* ---------- Результат вопроса ---------- */
 
 body[data-mood='correct'] {
   background-color: #0f5132;
@@ -728,15 +1250,23 @@ body[data-mood='timeout'] {
   background-image: radial-gradient(500px 400px at 50% 30%, rgba(232, 154, 12, 0.4), transparent 70%);
 }
 
-body[data-mood='winner'] {
+body[data-mood='ceremony'] {
   background-image:
-    radial-gradient(500px 400px at 50% 20%, rgba(255, 209, 102, 0.4), transparent 70%),
+    radial-gradient(520px 420px at 50% 26%, rgba(255, 209, 102, 0.2), transparent 70%),
+    radial-gradient(600px 500px at 0% 110%, rgba(255, 77, 109, 0.22), transparent 60%),
+    radial-gradient(600px 500px at 110% 100%, rgba(47, 140, 255, 0.2), transparent 60%);
+}
+
+body[data-mood~='winner'] {
+  background-image:
+    radial-gradient(520px 440px at 50% 22%, rgba(255, 209, 102, 0.4), transparent 70%),
     radial-gradient(600px 500px at 110% 100%, rgba(255, 77, 109, 0.3), transparent 60%);
 }
 
 .result-icon,
 .message-icon {
   display: grid;
+  flex: none;
   place-items: center;
   width: 110px;
   height: 110px;
@@ -759,58 +1289,373 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 .result-points {
   font-size: 46px;
   font-weight: 800;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
   animation: rise-in 0.5s 0.15s ease both;
+}
+
+.result-details {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 360px;
+  animation: rise-in 0.5s 0.22s ease both;
+}
+
+.result-details:empty {
+  display: none;
+}
+
+.result-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.result-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.answer-quote {
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.answer-quote.is-wrong {
+  color: #ffd0d0;
+  text-decoration: line-through 2px rgba(255, 208, 208, 0.55);
+}
+
+.answer-quote.is-correct {
+  color: #d1fae5;
+}
+
+.result-also {
+  margin-top: -4px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.result-total {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .correct-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 6px;
-  padding: 4px 12px;
+  max-width: 100%;
+  padding: 6px 14px;
   border-radius: 999px;
   background: var(--tone);
   color: #fff;
+  font-size: 17px;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .correct-chip .shape {
+  flex: none;
   width: 18px;
   height: 18px;
 }
 
-/* Финал */
+.correct-chip-text {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--bg);
+  font-size: 19px;
+}
+
+.pill-gold {
+  background: rgba(255, 209, 102, 0.16);
+  border: 1px solid rgba(255, 209, 102, 0.5);
+  color: #ffe3a3;
+  animation: rise-in 0.5s 0.3s ease both;
+}
+
+/* ---------- Церемония: место ещё не показано ---------- */
+
+.drumroll {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 230px;
+  height: 214px;
+}
+
+.drumroll-glow {
+  position: absolute;
+  inset: -24px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(255, 209, 102, 0.38), transparent 62%);
+  animation: glow-pulse 1.8s ease-in-out infinite;
+}
+
+.drumroll-trophy {
+  position: relative;
+  width: 86px;
+  height: 86px;
+  margin-bottom: 8px;
+  color: #ffd166;
+  filter: drop-shadow(0 6px 18px rgba(255, 209, 102, 0.55));
+  transform-origin: 50% 90%;
+  animation: trophy-wiggle 0.5s ease-in-out infinite;
+}
+
+.drumroll-trophy svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.trophy-cup {
+  fill: currentColor;
+}
+
+.trophy-handles {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.trophy-shine {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.drumroll-podium {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.drum-step {
+  display: grid;
+  place-items: start center;
+  width: 64px;
+  padding-top: 8px;
+  border-radius: 12px 12px 4px 4px;
+  font-size: 22px;
+  font-weight: 800;
+  box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.15);
+  animation: drum 0.9s ease-in-out infinite;
+}
+
+.drum-step-1 {
+  height: 88px;
+  background: linear-gradient(180deg, #ffd166, #e89a0c);
+  color: #4a3000;
+  animation-delay: 0.3s;
+}
+
+.drum-step-2 {
+  height: 64px;
+  background: linear-gradient(180deg, #eef0f8, #9ea7c6);
+  color: #262c4c;
+  animation-delay: 0.15s;
+}
+
+.drum-step-3 {
+  height: 48px;
+  background: linear-gradient(180deg, #f3ae7a, #b9652b);
+  color: #3f1d06;
+  animation-delay: 0.45s;
+}
+
+.ceremony-note {
+  max-width: 300px;
+  font-size: 15px;
+}
+
+/* ---------- Финал ---------- */
+
+.view-final {
+  gap: 14px;
+}
 
 .final-caption {
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 14px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
 }
 
 .final-place {
+  position: relative;
   display: grid;
-  justify-items: center;
-  gap: 4px;
-  animation: pop-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.5) both;
+  flex: none;
+  place-items: center;
+  width: 210px;
+  height: 200px;
+  margin-top: 6px;
 }
 
-.final-medal {
-  font-size: 84px;
+.final-rays {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.final-place.is-podium .final-rays {
+  opacity: 1;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 209, 102, 0.34) 0deg 9deg, transparent 9deg 24deg);
+  -webkit-mask: radial-gradient(circle, #000 28%, transparent 68%);
+  mask: radial-gradient(circle, #000 28%, transparent 68%);
+  animation: fade-in 0.8s 0.3s ease both, spin 16s linear infinite;
+}
+
+.medal {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  animation: medal-in 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+
+.medal-disc {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #fff7d6, #ffd166 34%, #e89a0c 74%, #b06a00);
+  box-shadow:
+    inset 0 0 0 6px rgba(255, 255, 255, 0.35),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.2),
+    0 0 44px rgba(255, 209, 102, 0.6),
+    var(--shadow);
+}
+
+.medal-number {
+  font-size: 64px;
+  font-weight: 800;
   line-height: 1;
+  color: #5a3600;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+
+.medal-silver .medal-disc {
+  background: radial-gradient(circle at 34% 28%, #ffffff, #e2e6f2 34%, #a9b1cb 74%, #78819f);
+  box-shadow:
+    inset 0 0 0 6px rgba(255, 255, 255, 0.4),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.18),
+    0 0 40px rgba(214, 222, 255, 0.45),
+    var(--shadow);
+}
+
+.medal-silver .medal-number { color: #2b3150; }
+
+.medal-bronze .medal-disc {
+  background: radial-gradient(circle at 34% 28%, #ffe3c8, #f2a56c 34%, #c26b2d 74%, #874213);
+  box-shadow:
+    inset 0 0 0 6px rgba(255, 255, 255, 0.3),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.2),
+    0 0 40px rgba(242, 165, 108, 0.45),
+    var(--shadow);
+}
+
+.medal-bronze .medal-number { color: #4a2306; }
+
+.medal-plain .medal-disc {
+  width: 124px;
+  height: 124px;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.22), transparent 60%),
+    var(--surface-solid);
+  border: 3px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.06), var(--shadow);
+}
+
+.medal-plain .medal-number {
+  color: var(--text);
+  font-size: 54px;
+  text-shadow: none;
+}
+
+/* Лента медали — буква V из двух полос за диском */
+.medal-ribbon {
+  position: absolute;
+  top: -42px;
+  left: 50%;
+  width: 84px;
+  height: 70px;
+  transform: translateX(-50%);
+}
+
+.medal-ribbon::before,
+.medal-ribbon::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 32px;
+  height: 70px;
+  border-radius: 3px;
+}
+
+.medal-ribbon::before {
+  left: 6px;
+  background: linear-gradient(180deg, var(--a0), #b8213f);
+  transform: skewX(20deg);
+}
+
+.medal-ribbon::after {
+  right: 6px;
+  background: linear-gradient(180deg, var(--a1), #1c5bbd);
+  transform: skewX(-20deg);
 }
 
 .final-rank {
   font-size: 42px;
   font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  animation: rise-in 0.5s 0.45s ease both;
+}
+
+.view-final .view-text {
+  animation: rise-in 0.5s 0.55s ease both;
+}
+
+.final-podium-wrap {
+  display: grid;
+  gap: 8px;
+  width: min(360px, 100%);
+  animation: rise-in 0.5s ease both;
+}
+
+.final-podium-title {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .final-podium {
   display: grid;
   gap: 8px;
-  width: min(360px, 100%);
-  margin: 4px 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -826,22 +1671,25 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   animation: rise-in 0.4s ease both;
 }
 
-.final-podium li:nth-child(2) { animation-delay: 100ms; }
-.final-podium li:nth-child(3) { animation-delay: 200ms; }
+.final-podium li.is-me {
+  background: var(--surface-strong);
+  box-shadow: inset 0 0 0 2px rgba(255, 209, 102, 0.6);
+}
 
 .podium-rank {
   display: grid;
+  flex: none;
   place-items: center;
   width: 30px;
   height: 30px;
   border-radius: 50%;
   background: var(--surface-strong);
+  font-weight: 800;
 }
 
-.final-podium li:first-child .podium-rank {
-  background: linear-gradient(135deg, #ffd166, #f2a516);
-  color: #2a1a00;
-}
+.podium-rank-gold { background: linear-gradient(135deg, #ffd166, #f2a516); color: #2a1a00; }
+.podium-rank-silver { background: linear-gradient(135deg, #f1f3fa, #a7afc9); color: #23284a; }
+.podium-rank-bronze { background: linear-gradient(135deg, #f3ae7a, #b9652b); color: #2f1504; }
 
 .podium-name {
   flex: 1;
@@ -854,6 +1702,36 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 
 .podium-score {
   font-variant-numeric: tabular-nums;
+}
+
+#final-note {
+  max-width: 320px;
+}
+
+/* Конфетти для призёров */
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti span {
+  position: absolute;
+  top: -18px;
+  left: var(--x);
+  width: 9px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--color);
+  opacity: 0;
+  animation: confetti-fall var(--fall) var(--delay) cubic-bezier(0.25, 0.6, 0.45, 1) forwards;
+}
+
+.confetti span:nth-child(3n) {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
 .message-actions {
@@ -871,12 +1749,15 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   left: 50%;
   bottom: calc(20px + var(--safe-bottom));
   z-index: 50;
+  width: max-content;
   max-width: calc(100% - 32px);
   padding: 12px 18px;
   border-radius: var(--radius-sm);
   background: var(--surface-solid);
   border: 1px solid rgba(239, 68, 68, 0.6);
+  box-shadow: var(--shadow);
   font-weight: 700;
+  text-align: center;
   transform: translateX(-50%);
   animation: toast-in 0.3s ease both;
 }
@@ -889,6 +1770,10 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 
 @keyframes view-in {
   from { opacity: 0; transform: translateY(20px) scale(0.98); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
 }
 
 @keyframes pop-in {
@@ -905,12 +1790,12 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   from { opacity: 0; transform: translate(-50%, 12px); }
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+@keyframes banner-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
 }
 
-@keyframes pulse {
-  50% { transform: scale(1.1); opacity: 0.7; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes ripple {
@@ -933,6 +1818,48 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   40%, 80% { transform: translateX(6px); }
 }
 
+@keyframes nudge {
+  50% { transform: scale(1.04); }
+}
+
+@keyframes shimmer {
+  to { background-position: -200% 0, 0 0; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  12% { transform: scale(1.06); }
+  30% { transform: scale(1); }
+}
+
+@keyframes drum {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes trophy-wiggle {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes medal-in {
+  0% { opacity: 0; transform: scale(0.2) rotate(-30deg); }
+  55% { opacity: 1; transform: scale(1.18) rotate(8deg); }
+  75% { transform: scale(0.95) rotate(-3deg); }
+  100% { transform: none; }
+}
+
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--drift), 105vh, 0) rotate(var(--spin)); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -940,6 +1867,10 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .confetti {
+    display: none;
   }
 }
 
@@ -961,18 +1892,320 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   }
 }
 
-/* Низкий экран телефона в альбомной ориентации */
+/* ---------- Низкий экран: телефон боком или открыта клавиатура ---------- */
+
 @media (max-height: 520px) {
+  .logo {
+    margin-top: 0;
+  }
+
+  .camera {
+    width: min(170px, 38vh);
+  }
+
+  .photo-choice {
+    min-height: 84px;
+  }
+
+  .view {
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: calc(10px + var(--safe-bottom));
+  }
+
+  .question-top {
+    min-height: 40px;
+  }
+
+  .q-seconds {
+    min-width: 40px;
+    height: 40px;
+    font-size: 19px;
+  }
+
+  .q-kind {
+    padding: 5px 12px;
+  }
+
+  .timebar {
+    height: 8px;
+  }
+
+  .q-media {
+    height: min(30vh, 140px);
+  }
+
+  .view-question[data-phase='answering'] .q-media {
+    height: min(18vh, 96px);
+  }
+
+  .q-text {
+    font-size: 17px;
+  }
+
+  .view-question[data-phase='reading'] .q-text {
+    font-size: 19px;
+  }
+
+  .read-ring {
+    width: 72px;
+    height: 72px;
+  }
+
+  .read-ring-value {
+    font-size: 28px;
+  }
+
   .answer-buttons {
-    grid-auto-rows: minmax(70px, 1fr);
+    gap: 8px;
+  }
+
+  .answer-button {
+    min-height: 60px;
+    flex-direction: row;
+    gap: 10px;
+    padding: 8px 12px;
+    font-size: 16px;
+    box-shadow: 0 5px 0 color-mix(in srgb, var(--tone) 60%, black);
+  }
+
+  .answer-text {
+    -webkit-line-clamp: 2;
   }
 
   .answer-shape {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
   }
 
-  .logo {
-    margin-top: 0;
+  .text-answer-input {
+    min-height: 54px;
+    font-size: 21px;
+  }
+
+  .avatar-hero {
+    width: 110px;
+    height: 110px;
+  }
+
+  .result-icon,
+  .message-icon,
+  .answered-badge {
+    width: 76px;
+    height: 76px;
+    font-size: 40px;
+  }
+
+  .answered-badge .shape {
+    width: 42px;
+    height: 42px;
+  }
+
+  .result-points {
+    font-size: 34px;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  .drumroll {
+    width: 180px;
+    height: 150px;
+  }
+
+  .drumroll-trophy {
+    width: 60px;
+    height: 60px;
+  }
+
+  .drum-step {
+    width: 50px;
+    font-size: 18px;
+  }
+
+  .drum-step-1 { height: 62px; }
+  .drum-step-2 { height: 46px; }
+  .drum-step-3 { height: 34px; }
+
+  .final-place {
+    width: 150px;
+    height: 140px;
+  }
+
+  .medal-disc,
+  .medal-plain .medal-disc {
+    width: 92px;
+    height: 92px;
+  }
+
+  .medal-number,
+  .medal-plain .medal-number {
+    font-size: 44px;
+  }
+
+  .medal-ribbon {
+    top: -30px;
+    width: 60px;
+    height: 50px;
+  }
+
+  .medal-ribbon::before,
+  .medal-ribbon::after {
+    width: 24px;
+    height: 50px;
+  }
+
+  .final-rank {
+    font-size: 32px;
+  }
+}
+
+/* Телефон боком: вопрос слева, ответы справа */
+@media (max-height: 520px) and (min-width: 560px) {
+  .view-question {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    column-gap: 18px;
+    row-gap: 8px;
+  }
+
+  .question-top,
+  .timebar {
+    grid-column: 1 / -1;
+  }
+
+  .q-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    grid-column: 1;
+    grid-row: 3;
+    min-height: 0;
+    max-height: 100%;
+  }
+
+  .q-reading,
+  .text-answer,
+  .view-question[data-type='text'][data-phase='answering'] .text-answer {
+    grid-column: 2;
+    grid-row: 3;
+    align-self: center;
+    margin: 0;
+  }
+
+  .answer-buttons {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .q-media,
+  .view-question[data-phase='answering'] .q-media {
+    height: min(34vh, 130px);
+    min-height: 56px;
+  }
+
+  /* Шаг «Фото»: круг слева, кнопки справа */
+  .screen {
+    width: min(760px, 100%);
+    gap: 12px;
+  }
+
+  .photo-panel {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 24px;
+    row-gap: 10px;
+    padding: 18px 22px;
+    text-align: left;
+  }
+
+  .photo-panel > * {
+    grid-column: 2;
+  }
+
+  .photo-panel > .camera {
+    grid-column: 1;
+    grid-row: 1 / span 5;
+    width: min(210px, 52vh);
+    margin: 0;
+  }
+
+  .photo-panel > .muted {
+    font-size: 14px;
+  }
+
+  /* Результат и финал: две колонки, чтобы всё помещалось без прокрутки */
+  .view-result,
+  .view-final {
+    display: grid;
+    align-content: center;
+    align-content: safe center;
+    justify-content: center;
+    column-gap: 32px;
+    row-gap: 6px;
+  }
+
+  .view-result::before,
+  .view-result::after,
+  .view-final::before,
+  .view-final::after {
+    display: none;
+  }
+
+  .view-result {
+    grid-template-columns: auto minmax(0, 360px);
+    row-gap: 0;
+  }
+
+  .view-result > * {
+    grid-column: 2;
+    justify-self: start;
+    margin-block: 4px;
+    text-align: left;
+  }
+
+  /* Пустые строки без промежутков: значок остаётся ровно по центру текста */
+  .view-result > .result-icon {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+    align-self: center;
+  }
+
+  .view-result .result-details,
+  .view-result .result-line {
+    justify-items: start;
+    align-items: flex-start;
+  }
+
+  .view-final {
+    grid-template-columns: minmax(0, 420px);
+    justify-items: center;
+  }
+
+  .view-final:has(.final-podium-wrap:not([hidden])) {
+    grid-template-columns: minmax(0, 340px) minmax(0, 340px);
+    align-items: center;
+  }
+
+  .view-final:has(.final-podium-wrap:not([hidden])) > .final-caption { grid-area: 1 / 1; }
+  .view-final:has(.final-podium-wrap:not([hidden])) > .final-place { grid-area: 2 / 1; }
+  .view-final:has(.final-podium-wrap:not([hidden])) > .final-rank { grid-area: 3 / 1; }
+  .view-final:has(.final-podium-wrap:not([hidden])) > .view-text { grid-area: 4 / 1; }
+  .view-final:has(.final-podium-wrap:not([hidden])) > .final-podium-wrap { grid-area: 1 / 2 / 4 / 3; width: 100%; }
+  .view-final:has(.final-podium-wrap:not([hidden])) > #play-again { grid-area: 4 / 2; width: 100%; }
+  .view-final:has(.final-podium-wrap:not([hidden])) > #final-note { grid-area: 5 / 2; }
+
+  .view-final .view-text {
+    font-size: 16px;
+    text-wrap: balance;
+  }
+
+  .final-podium li {
+    padding: 8px 12px;
   }
 }

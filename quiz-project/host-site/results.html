@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>AL Studio — итоги</title>
+  <title>AL Studio — награждение</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ff6a3d' d='M16 1l3.6 11.4L31 16l-11.4 3.6L16 31l-3.6-11.4L1 16l11.4-3.6z'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,13 +21,29 @@
       AL Studio
     </span>
     <div class="topbar-title" id="quiz-title"></div>
-    <span class="pill" id="player-total"></span>
+    <div class="topbar-tools">
+      <span class="pill" id="player-total"></span>
+      <button class="icon-btn sound-toggle" id="sound" type="button" aria-pressed="true" title="Выключить звук">🔊</button>
+    </div>
   </header>
 
-  <main class="results" id="results" hidden>
-    <h1 class="results-title">Итоги игры</h1>
-    <section class="podium" id="podium" aria-label="Пьедестал"></section>
-    <section class="card ranking">
+  <main class="ceremony" id="ceremony" data-stage="intro" hidden>
+    <section class="ceremony-intro" id="intro" aria-labelledby="intro-kicker">
+      <div class="intro-rays" aria-hidden="true"></div>
+      <div class="intro-trophy" aria-hidden="true">🏆</div>
+      <p class="intro-kicker" id="intro-kicker">Церемония награждения</p>
+      <h1 class="intro-title" id="intro-title"></h1>
+      <p class="intro-meta" id="intro-meta"></p>
+      <button class="btn btn-primary btn-xl intro-start" id="start" type="button">Начать награждение</button>
+      <p class="intro-hint muted">🔊 Включите звук — будет барабанная дробь</p>
+    </section>
+
+    <section class="ceremony-stage" id="stage" aria-label="Пьедестал">
+      <h1 class="ceremony-caption" id="caption" aria-live="polite"></h1>
+      <div class="podium" id="podium"></div>
+    </section>
+
+    <section class="card ranking" id="ranking-card">
       <h2>Все игроки</h2>
       <ol class="ranking-list" id="ranking"></ol>
     </section>
@@ -35,10 +51,16 @@
 
   <footer class="action-bar stage-bar">
     <div class="action-bar-inner">
-      <button class="btn btn-ghost" id="home" type="button">← На главную</button>
-      <div class="action-bar-buttons">
-        <button class="btn btn-ghost" id="replay" type="button">↻ Сыграть ещё раз</button>
-        <button class="btn btn-primary btn-lg" id="save" type="button" hidden>Сохранить игру</button>
+      <div class="ceremony-controls" id="ceremony-controls">
+        <span class="muted" id="ceremony-hint">Места объявляются по очереди: 3 → 2 → 1</span>
+        <button class="btn btn-ghost btn-small skip-button" id="skip" type="button">Показать сразу ⏭</button>
+      </div>
+      <div class="final-actions" id="final-actions" hidden>
+        <button class="btn btn-ghost" id="home" type="button">← На главную</button>
+        <div class="action-bar-buttons">
+          <button class="btn btn-ghost" id="replay" type="button">↻ Сыграть ещё раз</button>
+          <button class="btn btn-primary btn-lg" id="save" type="button" hidden>Сохранить игру</button>
+        </div>
       </div>
     </div>
   </footer>

@@ -30,6 +30,7 @@
 
   <main class="game" id="game" hidden>
     <section class="question-banner" id="question-banner">
+      <span class="question-tag" id="question-tag" hidden>✍️ Ответ пишут своими словами</span>
       <h1 id="question-text"></h1>
     </section>
 
@@ -42,16 +43,55 @@
         <span class="timer-value" id="timer-value">0</span>
       </div>
 
-      <div class="results-panel" id="results-panel" hidden>
+      <figure class="question-media" id="question-media">
+        <img id="question-image" alt="Картинка к вопросу" decoding="async" draggable="false">
+      </figure>
+
+      <div class="answers-live" aria-hidden="true">
+        <b id="answers-live-count">0</b>
+        <span id="answers-live-label">ответов</span>
+      </div>
+
+      <div class="results-panel" id="results-panel">
         <div class="bars" id="bars"></div>
-        <div class="leaderboard card">
+        <div class="leaderboard card" id="leaderboard-card">
           <h3>Лидеры</h3>
           <ol class="leader-list" id="leaderboard"></ol>
+        </div>
+        <div class="finale-teaser card" id="finale-teaser" hidden>
+          <div class="finale-trophy" aria-hidden="true">🏆</div>
+          <h3>Итоги — на церемонии награждения</h3>
+          <p class="muted">Места объявим по очереди: третье, второе и, наконец, победителя</p>
         </div>
       </div>
     </section>
 
-    <section class="answer-grid" id="answers"></section>
+    <section class="game-bottom">
+      <div class="reading" id="reading">
+        <p class="reading-label">
+          <span class="reading-kicker">💭 Время подумать</span>
+          <span><span id="reading-text">Варианты появятся через</span> <b id="reading-seconds">0</b> <span id="reading-unit">секунд</span></span>
+        </p>
+        <div class="reading-track" aria-hidden="true"><span class="reading-fill" id="reading-fill"></span></div>
+      </div>
+
+      <div class="answer-grid" id="answers"></div>
+
+      <div class="text-wait" id="text-wait">
+        <span class="text-wait-icon" aria-hidden="true">✍️</span>
+        <div class="text-wait-body">
+          <p class="text-wait-title">Игроки пишут ответ на телефонах</p>
+          <p class="muted">Правильный ответ покажем, когда время выйдет</p>
+        </div>
+        <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+
+      <div class="text-answer" id="text-answer">
+        <span class="text-answer-label">✓ Правильный ответ</span>
+        <strong class="text-answer-main" id="text-answer-main"></strong>
+        <p class="text-answer-also" id="text-answer-also"></p>
+      </div>
+    </section>
   </main>
 
   <footer class="action-bar stage-bar">

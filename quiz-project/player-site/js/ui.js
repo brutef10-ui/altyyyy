@@ -41,6 +41,23 @@ export function shapeIcon(index, className = 'shape') {
   return svg;
 }
 
+// Карандаш — значок вопроса, на который отвечают вручную.
+export function pencilIcon(className = 'shape') {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', className);
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', 'M3.5 20.5l1.2-4.6L15.6 5a2.2 2.2 0 0 1 3.1 0l.3.3a2.2 2.2 0 0 1 0 3.1L8.1 19.3zM14 7.6l2.4 2.4');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '2.2');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.append(path);
+  return svg;
+}
+
 export function showError(element, message) {
   element.textContent = message || '';
   element.hidden = !message;

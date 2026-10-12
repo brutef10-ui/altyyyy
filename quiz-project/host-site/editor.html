@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/editor.css">
   <script type="module" src="js/editor.js"></script>
 </head>
 <body class="page-editor">
@@ -24,7 +25,11 @@
   <main class="container editor">
     <div class="page-intro">
       <h1 id="editor-heading">Новая игра</h1>
-      <p class="muted">От 2 до 4 вариантов ответа в каждом вопросе. Отметьте правильный кружком справа.</p>
+      <p class="muted editor-intro">
+        <span><b>Варианты ответа</b> — от 2 до 4 вариантов, правильный отметьте кружком справа.</span>
+        <span><b>Ввод ответа</b> — игрок пишет ответ сам, а вы указываете, какие ответы засчитать.</span>
+        <span>К любому вопросу можно добавить картинку.</span>
+      </p>
     </div>
 
     <div id="draft-banner" class="banner" hidden>

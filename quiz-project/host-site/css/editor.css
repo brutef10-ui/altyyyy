@@ -1,0 +1,553 @@
+/* AL Studio — редактор игры: типы вопросов, картинки, время на чтение и на ответ.
+   Подключается после css/style.css и использует его переменные и компоненты. */
+
+.editor-intro {
+  display: grid;
+  gap: 2px;
+}
+
+.editor-intro b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ui-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Карточка вопроса ---------- */
+
+.question-card {
+  gap: 16px;
+}
+
+/* Карточки появляются с анимацией только при открытии редактора и при добавлении вопроса. */
+.question-list.is-ready .question-card:not(.is-new) {
+  animation: none;
+}
+
+.question-head {
+  flex-wrap: nowrap;
+  gap: 12px 18px;
+}
+
+.question-number {
+  flex: none;
+  white-space: nowrap;
+}
+
+.question-head .question-tools {
+  margin-left: auto;
+}
+
+/* ---------- Тип вопроса: сегментированный переключатель ---------- */
+
+.segmented {
+  display: inline-grid;
+  min-width: 0;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.segment {
+  position: relative;
+  display: block;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.segment input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segment-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.segment-face .ui-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.segment-face > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segment:hover .segment-face {
+  color: var(--text);
+}
+
+.segment input:checked + .segment-face {
+  background: var(--surface-strong);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 16px rgba(4, 2, 18, 0.35);
+}
+
+.segment input:checked + .segment-face .ui-icon {
+  color: var(--accent);
+}
+
+.segment input:focus-visible + .segment-face {
+  outline: 3px solid #ffd166;
+  outline-offset: 2px;
+}
+
+/* ---------- Текст вопроса и картинка ---------- */
+
+.question-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+}
+
+.question-body .question-text {
+  height: 100%;
+  min-height: 148px;
+}
+
+.image-slot {
+  position: relative;
+  min-height: 148px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.image-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px;
+  border: 2px dashed var(--border);
+  background: rgba(0, 0, 0, 0.14);
+  color: var(--muted);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.image-add:hover,
+.image-slot.is-dragover {
+  border-color: var(--accent);
+  background: rgba(255, 106, 61, 0.08);
+  color: var(--text);
+}
+
+.image-add-icon {
+  width: 30px;
+  height: 30px;
+  stroke-width: 1.7;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.image-add:hover .image-add-icon,
+.image-slot.is-dragover .image-add-icon {
+  color: var(--accent);
+  transform: translateY(-2px) scale(1.06);
+}
+
+.image-add-text {
+  display: grid;
+  gap: 2px;
+}
+
+.image-add-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.image-add-hint {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.image-preview {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: var(--bg-deep);
+}
+
+.image-preview.is-uploading {
+  animation: fade-in 0.2s ease both;
+}
+
+.image-preview.is-fresh {
+  animation: image-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1.2) both;
+}
+
+@keyframes image-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+.image-backdrop {
+  position: absolute;
+  inset: -24px;
+  width: calc(100% + 48px);
+  height: calc(100% + 48px);
+  object-fit: cover;
+  filter: blur(18px) brightness(0.5) saturate(1.2);
+}
+
+.image-main {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.image-actions {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 26px 8px 8px;
+  background: linear-gradient(to bottom, transparent, rgba(8, 6, 24, 0.88));
+}
+
+.image-action {
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(18, 13, 43, 0.72);
+  backdrop-filter: blur(8px);
+  font-size: 14px;
+}
+
+.image-action:hover:not(:disabled) {
+  background: rgba(40, 32, 84, 0.9);
+}
+
+.image-action .ui-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.image-action[data-action='remove-image']:hover:not(:disabled) {
+  border-color: rgba(239, 68, 68, 0.7);
+}
+
+.image-broken {
+  display: none;
+}
+
+.image-slot.is-broken .image-main,
+.image-slot.is-broken .image-backdrop {
+  visibility: hidden;
+}
+
+.image-slot.is-broken .image-broken {
+  position: relative;
+  display: block;
+  padding: 0 16px 44px;
+  color: #ffb4b4;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.image-slot.is-broken {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Загрузка: превью приглушено, поверх — индикатор. */
+.image-slot.is-uploading .image-main {
+  filter: brightness(0.45) saturate(0.6);
+}
+
+.image-progress {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.image-progress .spinner {
+  width: 34px;
+  height: 34px;
+  border-width: 4px;
+}
+
+/* ---------- Варианты ответа и «Ввод ответа» ---------- */
+
+.question-answers.is-switched {
+  animation: rise-in 0.3s ease both;
+}
+
+.answer-edit.is-accepted {
+  --tone: var(--success);
+}
+
+.accepted-icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 3;
+}
+
+.accepted-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.accepted-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.accepted-hint .ui-icon {
+  margin-top: 1px;
+  color: var(--success);
+}
+
+/* ---------- Низ карточки: добавить вариант + время ---------- */
+
+.question-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.question-foot .add-answer {
+  justify-self: auto;
+}
+
+.question-timing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.timing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.timing:hover {
+  background: var(--surface-strong);
+}
+
+.timing:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(255, 106, 61, 0.2);
+}
+
+.timing .ui-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.timing-select.select {
+  min-height: 32px;
+  padding: 2px 6px;
+  border: 0;
+  background-color: transparent;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.timing-select.select:focus {
+  box-shadow: none;
+}
+
+.timing-select option {
+  background: var(--surface-solid);
+  color: var(--text);
+}
+
+/* ---------- Ноутбук, планшет ---------- */
+
+@media (max-width: 900px) {
+  .question-body {
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+}
+
+/* Узкий экран: переключатель типа — отдельной строкой под номером вопроса. */
+@media (max-width: 760px) {
+  .question-head {
+    flex-wrap: wrap;
+    gap: 12px 8px;
+  }
+
+  .question-head .segmented {
+    order: 3;
+    flex: 1 1 100%;
+  }
+}
+
+/* ---------- Телефон ---------- */
+
+@media (max-width: 600px) {
+  .question-card {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .question-tools {
+    gap: 4px;
+  }
+
+  .segment-face {
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+
+  .question-body {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .question-body .question-text {
+    min-height: 96px;
+  }
+
+  .image-slot {
+    min-height: 0;
+  }
+
+  .image-add {
+    flex-direction: row;
+    gap: 12px;
+    min-height: 56px;
+    padding: 10px 14px;
+  }
+
+  .image-add-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .image-add-hint {
+    display: none;
+  }
+
+  .image-preview {
+    aspect-ratio: 16 / 10;
+  }
+
+  .accepted-hint {
+    font-size: 14px;
+  }
+
+  .question-foot .add-answer {
+    flex: 1 1 100%;
+  }
+
+  /* Два «поля» времени рядом: подпись сверху, значение снизу. */
+  .question-timing {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .timing {
+    display: grid;
+    grid-template-areas: 'icon label' 'icon value';
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0 10px;
+    min-width: 0;
+    min-height: 54px;
+    padding: 6px 6px 6px 12px;
+  }
+
+  .timing .ui-icon {
+    grid-area: icon;
+    width: 20px;
+    height: 20px;
+  }
+
+  .timing-label {
+    grid-area: label;
+    font-size: 12.5px;
+    line-height: 1.2;
+  }
+
+  .timing-select.select {
+    grid-area: value;
+    width: 100%;
+    min-width: 0;
+    min-height: 26px;
+    padding: 0;
+    font-size: 16px;
+  }
+}
+
+/* Самые узкие телефоны (360 px): подписи типов важнее значков. */
+@media (max-width: 400px) {
+  .segment-face .ui-icon {
+    display: none;
+  }
+}
+
+/* На сенсорных экранах перетаскивания нет — подсказку не показываем. */
+@media (hover: none) {
+  .image-add-hint {
+    display: none;
+  }
+}

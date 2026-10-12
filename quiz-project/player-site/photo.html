@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#120d2b">
   <meta name="color-scheme" content="dark">
-  <title>AL Studio — селфи</title>
+  <title>AL Studio — фото</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ff6a3d' d='M16 1l3.6 11.4L31 16l-11.4 3.6L16 31l-3.6-11.4L1 16l11.4-3.6z'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,36 +19,57 @@
       <a class="back-link" href="index.html" aria-label="Назад к вводу кода">←</a>
       <ol class="steps" aria-label="Шаги входа">
         <li class="is-done">Код</li>
-        <li class="is-active" aria-current="step">Селфи</li>
+        <li class="is-active" aria-current="step">Фото</li>
         <li>Ник</li>
       </ol>
     </header>
 
-    <section class="panel">
-      <h1>Сделайте селфи</h1>
+    <section class="panel photo-panel" id="photo-panel" data-mode="empty">
+      <h1>Ваше фото</h1>
       <p class="muted">Фото появится на экране ведущего рядом с вашим ником. После игры оно не сохраняется.</p>
 
       <div class="camera" id="camera">
-        <video id="video" playsinline muted autoplay aria-label="Изображение с камеры"></video>
-        <img id="preview" alt="Ваше фото" hidden>
         <div class="camera-placeholder" id="placeholder" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M9 4h6l1.8 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.2zm3 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 12.2a4.6 4.6 0 1 0 0-9.2 4.6 4.6 0 0 0 0 9.2zm0 2.3c-4.3 0-8.6 2.2-8.6 5.4V21h17.2v-1.1c0-3.2-4.3-5.4-8.6-5.4z"/></svg>
         </div>
+        <video id="video" playsinline muted autoplay aria-label="Изображение с камеры" hidden></video>
+        <img id="preview" alt="Ваше фото" hidden>
+        <div class="camera-busy" id="camera-busy" hidden><span class="spinner spinner-sm" aria-hidden="true"></span></div>
         <div class="camera-flash" id="flash"></div>
       </div>
 
       <p class="form-error" id="error" role="alert" hidden></p>
 
-      <div class="camera-actions">
+      <!-- Камера включена: затвор по центру, слева — галерея, справа — отмена -->
+      <div class="camera-live" id="camera-live" hidden>
+        <label class="round-action file-button" title="Выбрать из галереи">
+          <span class="round-action-icon" aria-hidden="true">🖼</span>
+          <span class="round-action-label">Галерея</span>
+          <input type="file" accept="image/*" data-source="gallery" aria-label="Выбрать из галереи">
+        </label>
         <button class="btn btn-shutter" id="shoot" type="button" disabled aria-label="Сделать снимок">
           <span class="shutter-ring"></span>
         </button>
-        <button class="btn btn-ghost btn-block" id="retake" type="button" hidden>↻ Переснять</button>
-        <label class="btn btn-ghost btn-block file-button" id="file-label" hidden>
-          🖼 Загрузить фото
-          <input type="file" id="file" accept="image/*" capture="user">
+        <button class="round-action" id="cancel-camera" type="button">
+          <span class="round-action-icon" aria-hidden="true">✕</span>
+          <span class="round-action-label">Отмена</span>
+        </button>
+      </div>
+
+      <!-- Два равных способа добавить фото -->
+      <div class="photo-choices" id="choices">
+        <button class="photo-choice" id="take-selfie" type="button">
+          <span class="photo-choice-icon" aria-hidden="true">📷</span>
+          <span class="photo-choice-label" id="selfie-label">Сделать селфи</span>
+        </button>
+        <label class="photo-choice file-button" id="gallery-choice">
+          <span class="photo-choice-icon" aria-hidden="true">🖼</span>
+          <span class="photo-choice-label" id="gallery-label">Выбрать из галереи</span>
+          <input type="file" id="gallery-input" accept="image/*" data-source="gallery" aria-label="Выбрать из галереи">
         </label>
       </div>
+      <!-- Запасной вариант без камеры на странице (http://): системная камера телефона -->
+      <input type="file" id="capture-input" accept="image/*" capture="user" data-source="capture" hidden tabindex="-1" aria-hidden="true">
 
       <button class="btn btn-primary btn-block" id="continue" type="button" disabled>Продолжить</button>
     </section>

@@ -933,16 +933,71 @@ textarea.input {
   font-size: 14px;
 }
 
+/*
+ * Раскладку задают атрибуты #game:
+ *   data-phase — reading (только вопрос) | answering (варианты и таймер) | results;
+ *   data-type  — choice | text; класс has-image — у вопроса есть картинка.
+ */
 .game {
   display: grid;
+  grid-template-areas: 'banner' 'middle' 'bottom';
   grid-template-rows: auto minmax(0, 1fr) minmax(0, 42%);
   gap: 20px;
   padding: 22px 28px 18px;
 }
 
+/* Вопрос с вводом текста: внизу не плитки, а компактная панель */
+.game[data-type='text'] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* С картинкой плитки чуть ниже, чтобы картинка была крупнее */
+.game.has-image[data-phase='answering'][data-type='choice'] {
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 36%);
+}
+
+/* Результаты: вопрос компактнее, больше места статистике и лидерам */
+.game[data-phase='results'][data-type='choice'] {
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 32%);
+}
+
+/* Чтение: картинка занимает всё свободное место, внизу — полоса ожидания */
+.game[data-phase='reading'] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* Чтение без картинки: вопрос и полоса ожидания по центру экрана */
+.game[data-phase='reading']:not(.has-image) {
+  grid-template-areas: 'banner' 'bottom';
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 36px;
+  padding-bottom: 7vh;
+}
+
+.game[data-phase='reading']:not(.has-image) .game-middle {
+  display: none;
+}
+
+/* Что видно на каждом этапе */
+.game:not([data-phase='answering']) .timer,
+.game:not(.has-image) .question-media,
+.game[data-phase='results'] .question-media,
+.game:not([data-phase='results']) .results-panel,
+.game:not([data-phase='reading']) .reading,
+.game[data-phase='reading'] .answer-grid,
+.game[data-type='text'] .answer-grid,
+.game:not([data-phase='answering'][data-type='text']) .text-wait,
+.game:not([data-phase='results'][data-type='text']) .text-answer {
+  display: none;
+}
+
 .question-banner {
+  grid-area: banner;
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
   min-height: 120px;
   padding: 24px 36px;
   border-radius: var(--radius);
@@ -950,6 +1005,11 @@ textarea.input {
   color: #18122f;
   box-shadow: var(--shadow);
   text-align: center;
+  transition: min-height 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.game[data-phase='reading']:not(.has-image) .question-banner {
+  min-height: min(34vh, 300px);
 }
 
 .question-banner h1 {
@@ -963,18 +1023,197 @@ textarea.input {
   animation: question-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 
+.game[data-phase='results'] .question-banner {
+  min-height: 0;
+  padding: 14px 32px;
+}
+
+.game[data-phase='results'] .question-banner h1 {
+  font-size: clamp(22px, 2.4vw, 38px);
+}
+
+.game[data-phase='results'] .question-tag {
+  display: none;
+}
+
+.question-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(255, 106, 61, 0.12);
+  color: #d4471c;
+  font-size: clamp(14px, 1.1vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 .game-middle {
+  grid-area: middle;
   display: grid;
-  place-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
   min-height: 0;
 }
 
+.game-middle > * {
+  grid-row: 1;
+}
+
+.game-bottom {
+  grid-area: bottom;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.game-bottom > * {
+  grid-area: 1 / 1;
+  min-height: 0;
+}
+
+/* Картинка вопроса */
+
+.question-media {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+.game[data-phase='reading'] .question-media {
+  grid-column: 1 / -1;
+  animation: fade-in 0.5s ease 0.1s both;
+}
+
+.question-media img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+/* Крупный счётчик ответов справа от картинки */
+
+.answers-live {
+  grid-column: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  width: clamp(130px, 20vh, 220px);
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.4) 0.1s both;
+}
+
+.game:not(.has-image) .answers-live,
+.game:not([data-phase='answering']) .answers-live {
+  display: none;
+}
+
+.answers-live b {
+  font-size: clamp(44px, 7vh, 76px);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.answers-live span {
+  color: var(--muted);
+  font-size: clamp(15px, 1.3vw, 20px);
+  font-weight: 700;
+}
+
+/* Время на чтение */
+
+.reading {
+  display: grid;
+  gap: 14px;
+  justify-self: center;
+  align-self: center;
+  width: min(860px, 100%);
+  padding: 2px 0 6px;
+  animation: rise-in 0.5s ease 0.2s both;
+}
+
+.reading-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 18px;
+  color: var(--muted);
+  font-size: clamp(18px, 1.6vw, 25px);
+  font-weight: 700;
+}
+
+.reading-kicker {
+  color: #ffd166;
+}
+
+.reading-label b {
+  color: var(--text);
+  font-size: 1.3em;
+  font-variant-numeric: tabular-nums;
+}
+
+.reading-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.reading-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--accent-gradient);
+  box-shadow: 0 0 22px rgba(255, 106, 61, 0.55);
+  transform-origin: left center;
+}
+
+.reading-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent) no-repeat;
+  background-size: 35% 100%;
+  animation: reading-shine 1.6s linear infinite;
+}
+
+/* Таймер */
+
 .timer {
   position: relative;
+  grid-column: 1 / -1;
   display: grid;
   place-items: center;
   width: clamp(130px, 20vh, 220px);
   aspect-ratio: 1;
+}
+
+.game.has-image .timer {
+  grid-column: 1;
+}
+
+.timer.enter {
+  animation: pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
 }
 
 .timer svg {
@@ -1014,6 +1253,8 @@ textarea.input {
   animation: pulse 1s ease-in-out infinite;
 }
 
+/* Плитки вариантов */
+
 .answer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1038,8 +1279,12 @@ textarea.input {
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   box-shadow: 0 8px 0 color-mix(in srgb, var(--tone) 60%, black), var(--shadow);
   overflow: hidden;
-  animation: tile-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  animation: tile-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+}
+
+.answer-tile.no-enter {
+  animation: none;
 }
 
 .tile-shape {
@@ -1089,9 +1334,123 @@ textarea.input {
   margin-right: 24px;
 }
 
+/* Вопрос с вводом текста: ждём ответов */
+
+.text-wait {
+  display: flex;
+  align-items: center;
+  justify-self: center;
+  align-self: center;
+  gap: clamp(16px, 2vw, 28px);
+  width: min(1040px, 100%);
+  padding: clamp(16px, 2vw, 28px) clamp(18px, 2.6vw, 36px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(255, 106, 61, 0.16), rgba(47, 140, 255, 0.14));
+  box-shadow: var(--shadow);
+}
+
+.text-wait.enter {
+  animation: rise-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.1s both;
+}
+
+.text-wait-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: clamp(64px, 6vw, 96px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  font-size: clamp(32px, 3.2vw, 50px);
+  animation: writing 1.8s ease-in-out infinite;
+}
+
+.text-wait-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.text-wait-title {
+  font-size: clamp(22px, 2.3vw, 36px);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.text-wait-body .muted {
+  font-size: clamp(15px, 1.2vw, 19px);
+  font-weight: 600;
+}
+
+.typing-dots {
+  display: inline-flex;
+  flex: none;
+  gap: 8px;
+  margin-left: auto;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.typing-dots i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+  animation: typing 1.2s ease-in-out infinite;
+}
+
+.typing-dots i:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.3s; }
+
+/* Вопрос с вводом текста: правильный ответ */
+
+.text-answer {
+  display: grid;
+  justify-items: center;
+  justify-self: center;
+  align-self: center;
+  gap: 6px;
+  width: min(1100px, 100%);
+  padding: clamp(14px, 1.8vw, 24px) clamp(18px, 3vw, 40px);
+  border: 2px solid rgba(34, 197, 94, 0.7);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.22), rgba(34, 197, 94, 0.07));
+  box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.08), 0 0 48px rgba(34, 197, 94, 0.22), var(--shadow);
+  text-align: center;
+}
+
+.text-answer.enter {
+  animation: answer-reveal 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+
+.text-answer-label {
+  color: #86efac;
+  font-size: clamp(14px, 1.15vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.text-answer-main {
+  font-size: clamp(34px, 4.4vw, 68px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.text-answer-also {
+  font-size: clamp(16px, 1.4vw, 22px);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 /* Результаты вопроса */
 
 .results-panel {
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 28px;
@@ -1160,6 +1519,32 @@ textarea.input {
   height: 30px;
 }
 
+/* Верно / Неверно / Без ответа (вопрос с вводом текста) */
+
+.bars-stats .bar {
+  width: clamp(84px, 8vw, 130px);
+}
+
+.bar-stat.stat-correct { --tone: var(--success); }
+.bar-stat.stat-wrong { --tone: var(--danger); }
+.bar-stat.stat-none { --tone: #6c6796; }
+
+.bar-stat .bar-label {
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text);
+  font-size: clamp(15px, 1.2vw, 19px);
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.bar-stat .bar-icon {
+  color: var(--tone);
+  font-size: 1.45em;
+  line-height: 1;
+}
+
 .leaderboard {
   display: flex;
   flex-direction: column;
@@ -1173,9 +1558,23 @@ textarea.input {
   color: var(--muted);
 }
 
+.leaderboard .leader-list {
+  gap: 6px;
+}
+
+.leaderboard .leader-row {
+  padding-block: 5px;
+}
+
+.leader-row .avatar-sm {
+  width: 36px;
+  height: 36px;
+}
+
 .leader-list,
 .ranking-list {
   display: grid;
+  align-content: start;
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -1209,9 +1608,19 @@ textarea.input {
 }
 
 .leader-row:first-child .leader-rank,
-.ranking-row:first-child .ranking-rank {
+.ranking-row.rank-1 .ranking-rank {
   background: linear-gradient(135deg, #ffd166, #f2a516);
   color: #2a1a00;
+}
+
+.ranking-row.rank-2 .ranking-rank {
+  background: linear-gradient(135deg, #f1f2f8, #a9adc4);
+  color: #23243a;
+}
+
+.ranking-row.rank-3 .ranking-rank {
+  background: linear-gradient(135deg, #f0a77a, #c56b3c);
+  color: #2b1306;
 }
 
 .leader-name,
@@ -1233,20 +1642,217 @@ textarea.input {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Итоги ---------- */
+/* После последнего вопроса вместо таблицы лидеров — анонс церемонии */
 
-.results {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  padding: 24px 28px;
-  overflow-y: auto;
+.finale-teaser {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 20px 28px;
+  overflow: hidden;
+  border-color: rgba(255, 209, 102, 0.45);
+  background: radial-gradient(120% 90% at 50% 0%, rgba(255, 209, 102, 0.22), transparent 62%), var(--surface);
+  text-align: center;
 }
 
-.results-title {
-  font-size: clamp(36px, 4vw, 56px);
-  animation: question-in 0.6s ease both;
+.finale-teaser::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180%;
+  aspect-ratio: 1;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 209, 102, 0.08) 0deg 9deg, transparent 9deg 24deg);
+  -webkit-mask-image: radial-gradient(circle, #000 10%, transparent 60%);
+  mask-image: radial-gradient(circle, #000 10%, transparent 60%);
+  transform: translate(-50%, -50%);
+  animation: rays-spin 50s linear infinite;
+  pointer-events: none;
+}
+
+.finale-teaser > * {
+  position: relative;
+}
+
+.finale-teaser.enter {
+  animation: rise-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) 0.15s both;
+}
+
+.finale-trophy {
+  font-size: clamp(48px, 5vw, 84px);
+  line-height: 1;
+  filter: drop-shadow(0 0 28px rgba(255, 209, 102, 0.65));
+  animation: trophy-float 3.2s ease-in-out infinite;
+}
+
+.finale-teaser h3 {
+  font-size: clamp(22px, 2.2vw, 34px);
+}
+
+.finale-teaser p {
+  max-width: 460px;
+  font-size: clamp(16px, 1.3vw, 20px);
+  font-weight: 600;
+}
+
+/* ---------- Церемония награждения ---------- */
+
+.topbar-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.sound-toggle {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  font-size: 20px;
+}
+
+.ceremony {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 28px;
+  padding: 20px 28px 0;
+  overflow: hidden;
+}
+
+.ceremony > * {
+  min-height: 0;
+}
+
+.ceremony[data-stage='intro'] .ceremony-stage,
+.ceremony:not([data-stage='done']) .ranking,
+.ceremony:not([data-stage='intro']) .ceremony-intro {
+  display: none;
+}
+
+.ceremony[data-stage='done'].has-ranking {
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr);
+  padding-bottom: 20px;
+}
+
+/* Заставка */
+
+.ceremony-intro {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding-bottom: 20px;
+  text-align: center;
+  animation: rise-in 0.6s ease both;
+}
+
+.intro-rays {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  width: min(1200px, 150vw);
+  aspect-ratio: 1;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 209, 102, 0.08) 0deg 8deg, transparent 8deg 22deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0, transparent 60%);
+  mask-image: radial-gradient(circle, #000 0, transparent 60%);
+  transform: translate(-50%, -50%);
+  animation: rays-spin 70s linear infinite;
+  pointer-events: none;
+}
+
+.ceremony-intro > :not(.intro-rays) {
+  position: relative;
+}
+
+.intro-trophy {
+  font-size: clamp(84px, 13vh, 140px);
+  line-height: 1.05;
+  filter: drop-shadow(0 0 40px rgba(255, 209, 102, 0.7));
+  animation: trophy-float 3.2s ease-in-out infinite;
+}
+
+.intro-kicker {
+  color: #ffd166;
+  font-size: clamp(15px, 1.3vw, 20px);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.intro-title {
+  max-width: min(1100px, 100%);
+  font-size: clamp(36px, 5vw, 76px);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.intro-meta {
+  color: var(--muted);
+  font-size: clamp(17px, 1.5vw, 22px);
+  font-weight: 700;
+}
+
+.intro-start {
+  margin-top: 16px;
+  animation: cta-pulse 2.2s ease-in-out infinite;
+}
+
+.intro-hint {
+  font-size: 15px;
+}
+
+/* Сцена с пьедесталом */
+
+.ceremony-stage {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  gap: 14px;
+  min-height: 0;
+  animation: fade-in 0.6s ease both;
+}
+
+.ceremony-stage::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: min(1100px, 100%);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.ceremony-caption {
+  z-index: 2;
+  min-height: 1.2em;
+  font-size: clamp(30px, 3.6vw, 56px);
+  font-weight: 800;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.ceremony-caption.enter {
+  animation: question-in 0.5s ease both;
+}
+
+.ceremony-caption.is-suspense {
+  color: #fff4d6;
+  text-shadow: 0 0 30px rgba(255, 244, 214, 0.35);
+}
+
+.ceremony-caption.is-winner,
+.ceremony-caption.is-final {
+  color: #ffd166;
+  text-shadow: 0 0 34px rgba(255, 209, 102, 0.55);
 }
 
 .podium {
@@ -1254,74 +1860,298 @@ textarea.input {
   align-items: flex-end;
   justify-content: center;
   gap: clamp(12px, 2vw, 28px);
-  width: min(900px, 100%);
+  width: min(960px, 100%);
+  height: 100%;
+  min-height: 0;
 }
 
 .podium-place {
+  position: relative;
   display: flex;
-  flex: 1;
+  flex: 1 1 0;
   flex-direction: column;
   align-items: center;
-  max-width: 280px;
-  animation: podium-rise 0.8s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 290px;
+  height: 100%;
 }
 
-.podium-person {
+.podium-place.is-pair {
+  flex-grow: 1.35;
+  max-width: 380px;
+}
+
+.podium-place.is-crowd {
+  flex-grow: 1.9;
+  max-width: 470px;
+}
+
+.place-1 {
+  --block-h: clamp(150px, 26vh, 240px);
+  --block: linear-gradient(180deg, #ffd166, #f2a516);
+  --glow: rgba(255, 209, 102, 0.75);
+}
+
+.place-2 {
+  --block-h: clamp(110px, 19vh, 175px);
+  --block: linear-gradient(180deg, #f1f2f8, #a9adc4);
+  --glow: rgba(229, 231, 240, 0.6);
+}
+
+.place-3 {
+  --block-h: clamp(80px, 14vh, 130px);
+  --block: linear-gradient(180deg, #f0a77a, #c56b3c);
+  --glow: rgba(240, 167, 122, 0.6);
+}
+
+/* Луч прожектора над местом */
+.podium-light {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 170%;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(255, 244, 214, 0.5), rgba(255, 244, 214, 0.07) 85%, transparent);
+  clip-path: polygon(43% 0, 57% 0, 100% 100%, 0 100%);
+  filter: blur(6px);
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+
+.podium-place[data-state='suspense'] .podium-light {
+  opacity: 1;
+  animation: spotlight 1.1s ease-in-out infinite;
+}
+
+.podium-place[data-state='revealed'] .podium-light {
+  opacity: 0.3;
+}
+
+.podium-place.is-winner .podium-light {
+  background: linear-gradient(180deg, rgba(255, 209, 102, 0.65), rgba(255, 209, 102, 0.08) 85%, transparent);
+  opacity: 0.7;
+}
+
+.podium-people {
+  position: relative;
+  z-index: 1;
   display: grid;
   justify-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 14px;
   text-align: center;
 }
 
-.podium-name {
-  max-width: 240px;
-  overflow: hidden;
-  font-size: clamp(20px, 2vw, 28px);
+.podium-ghost {
+  display: grid;
+  place-items: center;
+  width: clamp(84px, 9vw, 130px);
+  aspect-ratio: 1;
+  border: 3px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.35);
+  font-size: clamp(36px, 4vw, 56px);
   font-weight: 800;
+  transition: all 0.4s ease;
+}
+
+.podium-place[data-state='suspense'] .podium-ghost {
+  border-color: rgba(255, 244, 214, 0.9);
+  background: rgba(255, 244, 214, 0.12);
+  color: #fff;
+  box-shadow: 0 0 44px rgba(255, 244, 214, 0.35);
+  animation: ghost-pulse 0.8s ease-in-out infinite;
+}
+
+.podium-group {
+  --face: 120px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px 12px;
+  width: 100%;
+}
+
+.podium-group.size-1 { --face: clamp(96px, 10vw, 150px); }
+.podium-group.size-few { --face: clamp(58px, 5.6vw, 92px); }
+.podium-group.size-many { --face: clamp(46px, 4.2vw, 66px); }
+.podium-group.size-crowd { --face: 44px; }
+
+.podium-person {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  animation: winner-pop 0.75s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+.size-few .podium-person { width: calc(var(--face) + 26px); }
+.size-many .podium-person { width: calc(var(--face) + 14px); }
+
+.podium-avatar {
+  width: var(--face);
+  height: var(--face);
+  border-width: 4px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.45);
+  font-size: calc(var(--face) * 0.4);
+}
+
+.size-many .podium-avatar,
+.size-crowd .podium-avatar {
+  border-width: 2px;
+}
+
+.place-1 .podium-avatar {
+  border-color: #ffd166;
+  box-shadow: 0 0 0 6px rgba(255, 209, 102, 0.22), 0 0 46px rgba(255, 209, 102, 0.5), 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+
+.place-1 .size-1 .podium-person::before,
+.place-1 .size-few .podium-person::before {
+  content: '👑';
+  position: absolute;
+  top: calc(var(--face) * -0.32);
+  left: 50%;
+  font-size: calc(var(--face) * 0.36);
+  line-height: 1;
+  transform: translateX(-50%) rotate(-8deg);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+}
+
+.podium-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(20px, 2vw, 30px);
+  font-weight: 800;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.size-few .podium-name { font-size: clamp(15px, 1.3vw, 19px); }
+.size-many .podium-name { font-size: 13px; }
+.size-crowd .podium-name { display: none; }
+
 .podium-score {
   color: var(--muted);
-  font-weight: 700;
+  font-size: clamp(16px, 1.5vw, 22px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  animation: rise-in 0.5s ease 0.5s both;
+}
+
+.place-1 .podium-score {
+  color: #ffd166;
+}
+
+.podium-column {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 100%;
+  height: var(--block-h);
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+}
+
+.podium-frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: start center;
+  padding-top: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-bottom: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.2);
+  font-size: clamp(36px, 4.4vw, 64px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.podium-place[data-state='suspense'] .podium-frame {
+  border-color: rgba(255, 244, 214, 0.75);
+  background: rgba(255, 244, 214, 0.09);
+  color: rgba(255, 244, 214, 0.85);
+  animation: frame-pulse 0.8s ease-in-out infinite;
 }
 
 .podium-block {
+  position: absolute;
+  inset: 0;
   display: grid;
-  place-items: start center;
-  width: 100%;
-  padding-top: 14px;
-  border-radius: 16px 16px 0 0;
+  align-content: start;
+  justify-items: center;
+  padding-top: 10px;
+  background: var(--block);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.55);
+  color: rgba(0, 0, 0, 0.38);
   font-size: clamp(40px, 5vw, 72px);
   font-weight: 800;
-  color: rgba(0, 0, 0, 0.35);
+  line-height: 1;
+  transform: translateY(101%);
+  transition: transform 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.12);
 }
 
-.place-1 .podium-block {
-  height: clamp(150px, 22vh, 220px);
-  background: linear-gradient(180deg, #ffd166, #f2a516);
+.podium-medal {
+  font-size: 0.55em;
+  line-height: 1.25;
 }
 
-.place-2 .podium-block {
-  height: clamp(110px, 16vh, 160px);
-  background: linear-gradient(180deg, #e5e7f0, #a9adc4);
+.podium-place[data-state='revealed'] .podium-block {
+  transform: none;
 }
 
-.place-3 .podium-block {
-  height: clamp(80px, 12vh, 120px);
-  background: linear-gradient(180deg, #f0a77a, #c56b3c);
+.podium-place[data-state='revealed'] .podium-column {
+  filter: drop-shadow(0 0 26px var(--glow));
 }
 
-.place-1 .avatar-xl {
-  border-color: #ffd166;
-  box-shadow: 0 0 0 6px rgba(255, 209, 102, 0.25), 0 14px 40px rgba(0, 0, 0, 0.45);
+.podium-place.is-winner .podium-column {
+  filter: drop-shadow(0 0 40px var(--glow));
 }
+
+/* Перезагрузка посреди церемонии: уже объявленные места — без анимаций */
+.podium-place.no-anim,
+.podium-place.no-anim * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.podium-empty {
+  display: grid;
+  align-self: center;
+  justify-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: clamp(18px, 1.6vw, 24px);
+  font-weight: 700;
+  text-align: center;
+}
+
+.podium-empty-icon {
+  font-size: 64px;
+}
+
+/* Итоговый рейтинг */
 
 .ranking {
-  width: min(900px, 100%);
-  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  min-height: 0;
+  max-height: 100%;
+  width: 100%;
+  padding: 20px 22px;
+  animation: slide-in 0.6s ease 0.2s both;
 }
 
 .ranking h2 {
@@ -1330,13 +2160,34 @@ textarea.input {
   color: var(--muted);
 }
 
-.ranking-list {
-  overflow: visible;
+.ranking-correct {
+  font-size: 0.72em;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.ranking-correct {
-  font-size: 0.75em;
-  font-weight: 600;
+.ranking-row.rank-1 {
+  background: linear-gradient(90deg, rgba(255, 209, 102, 0.16), var(--surface));
+}
+
+/* Нижняя панель церемонии */
+
+.ceremony-controls,
+.final-actions {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.skip-button {
+  opacity: 0.75;
+}
+
+.skip-button:hover:not(:disabled) {
+  opacity: 1;
 }
 
 .confetti {
@@ -1538,6 +2389,63 @@ textarea.input {
   from { opacity: 0; transform: translateY(120px); }
 }
 
+@keyframes reading-shine {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.25; transform: none; }
+  30% { opacity: 1; transform: translateY(-6px); }
+}
+
+@keyframes writing {
+  0%, 100% { transform: none; }
+  25% { transform: translate(-3px, 2px) rotate(-8deg); }
+  75% { transform: translate(3px, -1px) rotate(6deg); }
+}
+
+@keyframes answer-reveal {
+  0% { opacity: 0; transform: scale(0.86); }
+  60% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes trophy-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-8px) rotate(3deg); }
+}
+
+@keyframes rays-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes cta-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 106, 61, 0.45), 0 12px 32px rgba(255, 77, 109, 0.4); }
+  50% { box-shadow: 0 0 0 16px rgba(255, 106, 61, 0), 0 12px 32px rgba(255, 77, 109, 0.55); }
+}
+
+@keyframes spotlight {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@keyframes ghost-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+@keyframes frame-pulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+@keyframes winner-pop {
+  0% { opacity: 0; transform: translateY(36px) scale(0.4); }
+  60% { opacity: 1; transform: translateY(-6px) scale(1.08); }
+  100% { opacity: 1; transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1579,9 +2487,30 @@ textarea.input {
   }
 
   .lobby,
-  .game,
-  .results {
+  .game {
     padding: 16px;
+  }
+
+  /* Церемония: сцена и рейтинг друг под другом, область прокручивается */
+  .ceremony {
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    padding: 16px 16px 0;
+    overflow-y: auto;
+  }
+
+  .ceremony[data-stage='done'].has-ranking {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: 16px;
+  }
+
+  .ceremony-intro,
+  .ceremony-stage {
+    min-height: max(420px, calc(100dvh - var(--topbar-h) - var(--bar-h) - 24px));
+  }
+
+  .ceremony-stage {
+    height: max(420px, calc(100dvh - var(--topbar-h) - var(--bar-h) - 24px));
   }
 
   .results-panel {
@@ -1593,11 +2522,13 @@ textarea.input {
     padding: 12px 16px;
   }
 
-  .action-bar-inner > .muted {
+  .action-bar-inner > .muted,
+  .ceremony-controls > .muted {
     display: none;
   }
 
-  .action-bar-inner {
+  .action-bar-inner,
+  .ceremony-controls {
     justify-content: flex-end;
   }
 }
@@ -1710,9 +2641,24 @@ textarea.input {
   }
 
   /* Игра */
-  .game {
-    grid-template-rows: auto auto auto;
+  .game,
+  .game[data-phase],
+  .game[data-type='text'],
+  .game[data-phase='results'][data-type='choice'],
+  .game.has-image[data-phase='answering'][data-type='choice'] {
+    grid-template-rows: auto;
+    grid-auto-rows: auto;
     gap: 14px;
+  }
+
+  /* На результатах сначала правильный ответ, затем статистика и лидеры */
+  .game[data-phase='results'] {
+    grid-template-areas: 'banner' 'bottom' 'middle';
+  }
+
+  .game[data-phase='reading']:not(.has-image) {
+    gap: 22px;
+    padding-bottom: 16px;
   }
 
   .question-banner {
@@ -1720,8 +2666,97 @@ textarea.input {
     padding: 16px;
   }
 
+  .game[data-phase='reading']:not(.has-image) .question-banner {
+    min-height: 24vh;
+  }
+
   .question-banner h1 {
     font-size: 21px;
+  }
+
+  .game[data-phase='reading'] .question-banner h1 {
+    font-size: 24px;
+  }
+
+  .question-tag {
+    font-size: 13px;
+  }
+
+  .game-middle {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 14px;
+  }
+
+  .game-bottom {
+    grid-template-rows: auto;
+  }
+
+  .page-game .brand {
+    font-size: 0;
+    gap: 0;
+  }
+
+  .page-game .game-meta .pill {
+    white-space: nowrap;
+  }
+
+  .question-media {
+    height: auto;
+  }
+
+  .answers-live {
+    display: none;
+  }
+
+  .question-media img {
+    max-height: 190px;
+  }
+
+  .game[data-phase='reading'] .question-media img {
+    max-height: 46vh;
+  }
+
+  .reading {
+    gap: 10px;
+  }
+
+  .reading-label {
+    justify-content: center;
+    font-size: 16px;
+    text-align: center;
+  }
+
+  .text-wait {
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 16px;
+    text-align: center;
+  }
+
+  .typing-dots {
+    margin: 0;
+    padding: 10px 14px;
+  }
+
+  .text-wait-title {
+    font-size: 20px;
+  }
+
+  .text-answer-main {
+    font-size: 30px;
+  }
+
+  .finale-teaser {
+    padding: 22px 18px;
+  }
+
+  .finale-trophy {
+    font-size: 56px;
+  }
+
+  .finale-teaser h3 {
+    font-size: 22px;
   }
 
   .timer {
@@ -1811,29 +2846,80 @@ textarea.input {
     font-size: 26px;
   }
 
-  /* Итоги */
-  .results {
+  /* Церемония */
+  .ceremony {
     overflow: visible;
+  }
+
+  .sound-toggle {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .topbar-tools .pill {
+    padding: 5px 12px;
+    font-size: 14px;
+  }
+
+  .intro-title {
+    font-size: 32px;
+  }
+
+  .intro-start {
+    flex: none;
+    width: 100%;
+  }
+
+  .ceremony-caption {
+    font-size: 26px;
   }
 
   .podium {
     gap: 8px;
   }
 
-  .podium-name {
-    font-size: 16px;
+  .place-1 { --block-h: 140px; }
+  .place-2 { --block-h: 104px; }
+  .place-3 { --block-h: 76px; }
+
+  .podium-ghost {
+    width: 72px;
+    font-size: 32px;
   }
+
+  .podium-group.size-1 { --face: 76px; }
+  .podium-group.size-few { --face: 48px; }
+  .podium-group.size-many { --face: 38px; }
+  .podium-group.size-crowd { --face: 32px; }
+
+  .podium-name,
+  .size-few .podium-name {
+    font-size: 15px;
+  }
+
+  .size-few .podium-person { width: calc(var(--face) + 12px); }
+  .size-many .podium-name { display: none; }
 
   .podium-score {
     font-size: 13px;
   }
 
-  .place-1 .podium-block { height: 120px; }
-  .place-2 .podium-block { height: 90px; }
-  .place-3 .podium-block { height: 66px; }
+  .podium-frame,
+  .podium-block {
+    font-size: 36px;
+  }
+
+  .podium-column {
+    border-radius: 12px 12px 0 0;
+  }
 
   .ranking {
     padding: 14px;
+  }
+
+  .final-actions {
+    flex-wrap: wrap;
   }
 
   .ranking-correct {

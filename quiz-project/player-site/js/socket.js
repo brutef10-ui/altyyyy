@@ -14,7 +14,7 @@ function loadClient() {
     script.onerror = () => {
       clientLoader = null;
       script.remove();
-      reject(new Error('Не удалось подключиться к серверу игры. Проверьте интернет.'));
+      reject(Object.assign(new Error('Не удалось связаться с сервером игры. Проверьте интернет.'), { code: 'DISCONNECTED' }));
     };
     document.head.append(script);
   });
@@ -25,20 +25,42 @@ export async function connectPlayer() {
   const io = await loadClient();
   return io(SERVER_URL, {
     transports: ['websocket', 'polling'],
+    // Если WebSocket в сети заблокирован (некоторые Wi-Fi и прокси), пробуем long-polling.
+    tryAllTransports: true,
+    reconnectionDelay: 800,
     reconnectionDelayMax: 3000,
+    // Разброс пауз: после сбоя Wi-Fi весь зал не ломится на сервер в одну и ту же миллисекунду.
+    randomizationFactor: 0.5,
   });
 }
 
-/** Отправляет событие и ждёт ответа. Бросает Error с полем code, если сервер вернул ошибку. */
-export async function request(socket, event, payload = {}, timeoutMs = 8000) {
-  let response;
-  try {
-    response = await socket.timeout(timeoutMs).emitWithAck(event, payload);
-  } catch {
-    throw Object.assign(new Error('Сервер не ответил. Проверьте соединение.'), { code: 'TIMEOUT' });
-  }
-  if (!response?.ok) {
-    throw Object.assign(new Error(response?.error || 'Ошибка сервера'), { code: response?.code || 'UNKNOWN' });
-  }
-  return response;
+const failure = (message, code) => Object.assign(new Error(message), { code });
+
+/**
+ * Отправляет событие и ждёт ответа. Бросает Error с полем code, если сервер вернул ошибку.
+ * Коды клиента: DISCONNECTED — соединения нет или оно оборвалось (запрос не ушёл или ответ потерян),
+ * TIMEOUT — соединение есть, но сервер не ответил за timeoutMs.
+ * Без соединения запрос не ставится в очередь: иначе Socket.IO отправит его после переподключения,
+ * раньше, чем игрок вернётся в комнату.
+ */
+export function request(socket, event, payload = {}, { timeoutMs = 8000 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!socket?.connected) {
+      reject(failure('Нет связи с сервером. Подождите секунду — переподключаемся.', 'DISCONNECTED'));
+      return;
+    }
+    socket.timeout(timeoutMs).emit(event, payload, (error, response) => {
+      if (error) {
+        reject(socket.connected
+          ? failure('Сервер не ответил. Проверьте соединение.', 'TIMEOUT')
+          : failure('Связь прервалась. Переподключаемся…', 'DISCONNECTED'));
+        return;
+      }
+      if (!response?.ok) {
+        reject(failure(response?.error || 'Ошибка сервера', response?.code || 'UNKNOWN'));
+        return;
+      }
+      resolve(response);
+    });
+  });
 }
