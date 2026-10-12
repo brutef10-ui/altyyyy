@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#120d2b">
+  <meta name="color-scheme" content="dark">
+  <title>Искра — селфи</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ff6a3d' d='M16 1l3.6 11.4L31 16l-11.4 3.6L16 31l-3.6-11.4L1 16l11.4-3.6z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/camera.js"></script>
+</head>
+<body data-page="photo">
+  <main class="screen">
+    <header class="step-header">
+      <a class="back-link" href="index.html" aria-label="Назад к вводу кода">←</a>
+      <ol class="steps" aria-label="Шаги входа">
+        <li class="is-done">Код</li>
+        <li class="is-active" aria-current="step">Селфи</li>
+        <li>Ник</li>
+      </ol>
+    </header>
+
+    <section class="panel">
+      <h1>Сделайте селфи</h1>
+      <p class="muted">Фото появится на экране ведущего рядом с вашим ником. После игры оно не сохраняется.</p>
+
+      <div class="camera" id="camera">
+        <video id="video" playsinline muted autoplay aria-label="Изображение с камеры"></video>
+        <img id="preview" alt="Ваше фото" hidden>
+        <div class="camera-placeholder" id="placeholder" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9 4h6l1.8 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.2zm3 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg>
+        </div>
+        <div class="camera-flash" id="flash"></div>
+      </div>
+
+      <p class="form-error" id="error" role="alert" hidden></p>
+
+      <div class="camera-actions">
+        <button class="btn btn-shutter" id="shoot" type="button" disabled aria-label="Сделать снимок">
+          <span class="shutter-ring"></span>
+        </button>
+        <button class="btn btn-ghost btn-block" id="retake" type="button" hidden>↻ Переснять</button>
+        <label class="btn btn-ghost btn-block file-button" id="file-label" hidden>
+          🖼 Загрузить фото
+          <input type="file" id="file" accept="image/*" capture="user">
+        </label>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="continue" type="button" disabled>Продолжить</button>
+    </section>
+  </main>
+</body>
+</html>

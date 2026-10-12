@@ -1,0 +1,15 @@
+{
+  "name": "iskra-quiz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Квиз-игра «Искра»: сервер, сайт ведущего и сайт игрока.",
+  "type": "module",
+  "scripts": {
+    "postinstall": "npm install --prefix server",
+    "dev": "node tools/dev.js",
+    "start": "npm start --prefix server",
+    "host": "node tools/serve.js host-site 5500",
+    "player": "node tools/serve.js player-site 5501",
+    "test": "npm test --prefix server"
+  }
+}

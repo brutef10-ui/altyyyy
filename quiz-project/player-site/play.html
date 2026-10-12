@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#120d2b">
+  <meta name="color-scheme" content="dark">
+  <title>Искра — игра</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ff6a3d' d='M16 1l3.6 11.4L31 16l-11.4 3.6L16 31l-3.6-11.4L1 16l11.4-3.6z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/play.js"></script>
+</head>
+<body data-page="play" class="play">
+  <header class="player-bar">
+    <img class="avatar avatar-sm" id="me-avatar" alt="">
+    <span class="player-bar-name" id="me-name"></span>
+    <span class="player-bar-score" aria-label="Ваши очки"><span id="me-score">0</span> <small>очк.</small></span>
+  </header>
+
+  <div class="reconnect-banner" id="reconnect" role="status" hidden>Связь потеряна. Переподключаемся…</div>
+
+  <main class="views">
+    <!-- Подключение -->
+    <section class="view view-center" id="view-connecting">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="view-text">Подключаемся к игре…</p>
+    </section>
+
+    <!-- Ожидание старта -->
+    <section class="view view-center" id="view-waiting" hidden>
+      <div class="waiting-avatar">
+        <img class="avatar avatar-hero" id="wait-avatar" alt="">
+      </div>
+      <h1>Вы в игре!</h1>
+      <p class="view-text">Смотрите на большой экран — ведущий скоро начнёт.</p>
+      <p class="pill" id="wait-count">Игроков в комнате: 1</p>
+    </section>
+
+    <!-- Вопрос -->
+    <section class="view view-question" id="view-question" hidden>
+      <div class="question-top">
+        <span class="pill" id="q-number">Вопрос 1 из 1</span>
+        <span class="q-seconds" id="q-seconds" aria-live="off">20</span>
+      </div>
+      <div class="timebar" aria-hidden="true"><div class="timebar-fill" id="timebar"></div></div>
+      <p class="q-text" id="q-text"></p>
+      <div class="answer-buttons" id="answer-buttons"></div>
+    </section>
+
+    <!-- Ответ отправлен -->
+    <section class="view view-center" id="view-answered" hidden>
+      <div class="answered-shape" id="answered-shape"></div>
+      <h1>Ответ принят!</h1>
+      <p class="view-text">Ждём остальных игроков…</p>
+    </section>
+
+    <!-- Результат вопроса -->
+    <section class="view view-center" id="view-result" hidden>
+      <div class="result-icon" id="result-icon"></div>
+      <h1 id="result-title"></h1>
+      <p class="result-points" id="result-points"></p>
+      <p class="view-text" id="result-correct"></p>
+      <p class="pill" id="result-rank"></p>
+    </section>
+
+    <!-- Финал -->
+    <section class="view view-center" id="view-final" hidden>
+      <p class="final-caption">Игра окончена</p>
+      <div class="final-place" id="final-place"></div>
+      <p class="view-text" id="final-summary"></p>
+      <ol class="final-podium" id="final-podium"></ol>
+      <p class="muted" id="final-note" hidden></p>
+      <a class="btn btn-primary btn-block" href="index.html" id="play-again">Сыграть ещё</a>
+    </section>
+
+    <!-- Сообщение (комната закрыта, игрок удалён, ошибка) -->
+    <section class="view view-center" id="view-message" hidden>
+      <div class="message-icon" id="message-icon">!</div>
+      <h1 id="message-title"></h1>
+      <p class="view-text" id="message-text"></p>
+      <div class="message-actions" id="message-actions"></div>
+    </section>
+  </main>
+</body>
+</html>

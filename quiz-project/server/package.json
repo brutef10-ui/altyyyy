@@ -1,0 +1,25 @@
+{
+  "name": "iskra-quiz-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Сервер квиз-игры «Искра»: Express + Socket.IO. Вся игровая логика, таймер и подсчёт очков выполняются здесь.",
+  "type": "module",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1"
+  }
+}

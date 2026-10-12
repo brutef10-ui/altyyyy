@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Искра — редактор игры</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23ff6a3d' d='M16 1l3.6 11.4L31 16l-11.4 3.6L16 31l-3.6-11.4L1 16l11.4-3.6z'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/editor.js"></script>
+</head>
+<body class="page-editor">
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="Искра — на главную">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1l3.6 11.4L31 16l-11.4 3.6L16 31l-3.6-11.4L1 16l11.4-3.6z"/></svg>
+      Искра
+    </a>
+    <a class="btn btn-ghost" href="index.html">← К списку игр</a>
+  </header>
+
+  <main class="container editor">
+    <div class="page-intro">
+      <h1 id="editor-heading">Новая игра</h1>
+      <p class="muted">От 2 до 4 вариантов ответа в каждом вопросе. Отметьте правильный кружком справа.</p>
+    </div>
+
+    <div id="draft-banner" class="banner" hidden>
+      <span>Восстановлен несохранённый черновик.</span>
+      <button class="btn btn-small btn-ghost" id="discard-draft" type="button">Начать заново</button>
+    </div>
+
+    <section class="card editor-title">
+      <label class="field">
+        <span class="field-label">Название игры</span>
+        <input id="quiz-title" class="input input-lg" maxlength="80" placeholder="Например: Викторина по истории" autocomplete="off">
+      </label>
+    </section>
+
+    <div id="errors" class="error-box" role="alert" hidden></div>
+
+    <ol id="questions" class="question-list" aria-label="Вопросы"></ol>
+
+    <button id="add-question" class="btn btn-dashed btn-block" type="button">+ Добавить вопрос</button>
+  </main>
+
+  <footer class="action-bar">
+    <div class="action-bar-inner">
+      <span id="summary" class="muted"></span>
+      <div class="action-bar-buttons">
+        <button id="save" class="btn btn-ghost" type="button">Сохранить</button>
+        <button id="launch" class="btn btn-primary btn-lg" type="button">▶ Запустить игру</button>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
