@@ -27,6 +27,12 @@
 		progressMoved: false,
 		progressTouchedAt: 0,
 		progressHoldUntil: 0,
+        fullPlayerOpen: false,
+        _fpHistory: false,
+        _playerUIKey: null,
+        _progressBar: null,
+        _modeChangedAt: 0,
+        _fpColorToken: 0,
 
         t(key) {
             return (I18N[this.language] && I18N[this.language][key]) || key;
@@ -87,6 +93,7 @@
             if (en) { en.textContent = 'English'; en.classList.toggle('active', this.language === 'en'); }
 
             this.renderAll();
+            this.updateFullPlayerMeta();
         },
 
         changeLanguage(lang) {
@@ -224,27 +231,33 @@
             const moveInput = document.getElementById('move-track-input');
             const searchInput = document.getElementById('search-input');
 
-            if (progressBar) {
-    progressBar.step = 'any';
-    progressBar.style.touchAction = 'none';
-    const touch = () => { this.progressDragging = true; this.progressTouchedAt = Date.now(); };
-    const release = () => this.endProgressDrag();
-    progressBar.addEventListener('pointerdown', touch);
-    progressBar.addEventListener('pointermove', () => { if (this.progressDragging) this.progressTouchedAt = Date.now(); });
-    progressBar.addEventListener('input', () => { touch(); this.previewProgress(); });
-    progressBar.addEventListener('change', release);
+            // Перемотка: ползунок мини-плеера и ползунок полноэкранного плеера работают одинаково
+            const progressBars = [progressBar, document.getElementById('fp-progress-bar')].filter(Boolean);
+            const release = () => this.endProgressDrag();
+            progressBars.forEach(bar => {
+    bar.step = 'any';
+    bar.style.touchAction = 'none';
+    const touch = () => { this.progressDragging = true; this.progressTouchedAt = Date.now(); this._progressBar = bar; };
+    bar.addEventListener('pointerdown', touch);
+    bar.addEventListener('pointermove', () => { if (this.progressDragging) this.progressTouchedAt = Date.now(); });
+    bar.addEventListener('input', () => { touch(); this.previewProgress(bar); });
+    bar.addEventListener('change', release);
+            });
+            if (progressBars.length) {
     ['pointerup', 'pointercancel', 'touchend', 'touchcancel', 'blur']
         .forEach(ev => window.addEventListener(ev, release));
-}
+            }
 
-if (volumeBar) {
-    volumeBar.value = Math.round(this.masterVolume * 100);
-    volumeBar.addEventListener('input', (e) => {
+            [volumeBar, document.getElementById('fp-volume-bar')].filter(Boolean).forEach(bar => {
+    bar.addEventListener('input', (e) => {
         this.masterVolume = Number(e.target.value) / 100;
         localStorage.setItem('alty_volume', String(this.masterVolume));
         ALTYNative.setVolume(this.masterVolume);
+        this.renderVolume();
     });
-}
+            });
+            this.renderVolume();
+            this.setupFullPlayer();
             if (moveInput) moveInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.saveTrackMove(); });
             if (searchInput) searchInput.addEventListener('input', (e) => this.renderSearch(e.target.value));
             if (this.nativeStateTimer) clearInterval(this.nativeStateTimer);
@@ -255,13 +268,11 @@ if (volumeBar) {
             }, 500);
         },
 		
-		previewProgress() {
-    const bar = document.getElementById('progress-bar');
-    const cur = document.getElementById('time-current');
+		previewProgress(bar = this._progressBar) {
     const d = this.nativeState && Number(this.nativeState.durationMs);
-    if (!bar || !cur || !d) return;
+    if (!bar || !d) return;
     this.progressMoved = true;
-    cur.textContent = this.formatTime(Number(bar.value) / 100 * d / 1000);
+    this.renderProgress(Number(bar.value), this.formatTime(Number(bar.value) / 100 * d / 1000));
 },
 
 endProgressDrag() {
@@ -269,7 +280,7 @@ endProgressDrag() {
     this.progressDragging = false;
     const moved = this.progressMoved;
     this.progressMoved = false;
-    const bar = document.getElementById('progress-bar');
+    const bar = this._progressBar || document.getElementById('progress-bar');
     const d = this.nativeState && Number(this.nativeState.durationMs);
     if (!moved || !bar || !d) return;
     this.progressHoldUntil = Date.now() + 800; // не даём ползунку дёрнуться назад
@@ -360,23 +371,308 @@ endProgressDrag() {
             ALTYNative.previous();
         },
 
+        // Вызывается каждые 500 мс из опроса состояния, поэтому перерисовываем только при смене трека
         updatePlayerUI(track) {
             if (!track) return;
-            const title = document.getElementById('player-title');
-            if (title) title.textContent = track.name || '';
-            const coverImg = document.getElementById('player-cover');
-            const coverPlace = document.getElementById('player-cover-placeholder');
-            if (coverImg && coverPlace) {
-                if (track.cover) {
-                    coverImg.src = track.cover;
-                    coverImg.classList.remove('hidden');
-                    coverPlace.classList.add('hidden');
-                } else {
-                    coverImg.removeAttribute('src');
-                    coverImg.classList.add('hidden');
-                    coverPlace.classList.remove('hidden');
+            const cover = track.cover || '';
+            const key = `${track.id}|${track.name}|${track.type || ''}|${cover.length}|${cover.slice(-32)}`;
+            if (key !== this._playerUIKey) {
+                this._playerUIKey = key;
+                const { title, artist } = this.splitTrackName(track.name);
+                [['player-title', 'player-artist'], ['fp-title', 'fp-artist']].forEach(([titleId, artistId]) => {
+                    this.setMarqueeText(document.getElementById(titleId), title);
+                    const artistEl = document.getElementById(artistId);
+                    if (artistEl) {
+                        artistEl.classList.toggle('hidden', !artist);
+                        this.setMarqueeText(artistEl, artist);
+                    }
+                });
+                this.setCover(document.getElementById('player-cover'), document.getElementById('player-cover-placeholder'), cover);
+                this.setCover(document.getElementById('fp-cover-img'), document.getElementById('fp-cover-placeholder'), cover);
+                this.applyCoverColor(cover);
+
+                const format = this.getTrackFormat(track);
+                const formatEl = document.getElementById('fp-format');
+                const losslessEl = document.getElementById('fp-lossless');
+                if (formatEl) {
+                    formatEl.textContent = format ? format.name : '';
+                    formatEl.classList.toggle('hidden', !format);
                 }
+                if (losslessEl) losslessEl.classList.toggle('hidden', !(format && format.lossless));
             }
+            this.updateFullPlayerMeta();
+        },
+
+        setCover(img, placeholder, src) {
+            if (!img || !placeholder) return;
+            if (src) {
+                if (img.getAttribute('src') !== src) img.src = src;
+                img.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+            } else {
+                img.removeAttribute('src');
+                img.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+            }
+        },
+
+        // Имя трека хранится как «Исполнитель - Название» (см. extractCoverAndTags)
+        splitTrackName(name) {
+            const full = String(name || '').trim();
+            const m = full.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+            return m ? { title: m[2].trim(), artist: m[1].trim() } : { title: full, artist: '' };
+        },
+
+        getTrackFormat(track) {
+            const ext = (String(track.nativePath || '').match(/\.([a-z0-9]{2,5})$/i) || [])[1] || '';
+            const probe = `${String(track.type || '').toLowerCase()} ${ext.toLowerCase()}`;
+            const formats = [
+                ['FLAC', /flac/, true], ['WAV', /wav/, true], ['AIFF', /aif/, true],
+                ['OPUS', /opus/, false], ['OGG', /ogg|oga/, false], ['AAC', /aac/, false],
+                ['M4A', /m4a|mp4/, false], ['MP3', /mpeg|mp3/, false]
+            ];
+            const found = formats.find(([, re]) => re.test(probe));
+            return found ? { name: found[0], lossless: found[2] } : null;
+        },
+
+        getCurrentTrack() {
+            const queued = this.currentIndex >= 0 ? this.playbackQueue[this.currentIndex] : null;
+            if (!queued) return null;
+            return this.tracks.find(t => Number(t.id) === Number(queued.id)) || queued;
+        },
+
+        updateFullPlayerMeta() {
+            const source = document.getElementById('fp-source');
+            const position = document.getElementById('fp-position');
+            const playlist = this.queueSourcePlaylistId != null
+                ? this.playlists.find(p => p.id === this.queueSourcePlaylistId) : null;
+            const sourceText = playlist ? playlist.name : this.t('Медиатека');
+            if (source && source.textContent !== sourceText) source.textContent = sourceText;
+            const total = this.playbackQueue.length;
+            const n = this.currentIndex + 1;
+            const positionText = total > 0 && this.currentIndex >= 0
+                ? (this.language === 'en' ? `Track ${n} of ${total}` : `Трек ${n} из ${total}`) : '';
+            if (position && position.textContent !== positionText) position.textContent = positionText;
+        },
+
+        // Фон полноэкранного плеера подкрашивается под средний цвет обложки
+        applyCoverColor(cover) {
+            const bg = document.getElementById('fp-bg');
+            if (!bg) return;
+            const fallback = '72, 28, 28';
+            const token = ++this._fpColorToken;
+            if (!cover) { bg.style.setProperty('--fp-color', fallback); return; }
+            const img = new Image();
+            img.onload = () => {
+                if (token !== this._fpColorToken) return;
+                try {
+                    const size = 24;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, size, size);
+                    const data = ctx.getImageData(0, 0, size, size).data;
+                    let r = 0, g = 0, b = 0, total = 0;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const max = Math.max(data[i], data[i + 1], data[i + 2]);
+                        const min = Math.min(data[i], data[i + 1], data[i + 2]);
+                        const w = 1 + (max - min) / 32; // насыщенные пиксели важнее серого фона
+                        r += data[i] * w; g += data[i + 1] * w; b += data[i + 2] * w; total += w;
+                    }
+                    r /= total; g /= total; b /= total;
+                    const peak = Math.max(r, g, b, 1);
+                    const k = peak > 120 ? 120 / peak : 1; // достаточно тёмный для белого текста
+                    bg.style.setProperty('--fp-color', `${Math.round(r * k)}, ${Math.round(g * k)}, ${Math.round(b * k)}`);
+                } catch (e) {
+                    bg.style.setProperty('--fp-color', fallback);
+                }
+            };
+            img.onerror = () => { if (token === this._fpColorToken) bg.style.setProperty('--fp-color', fallback); };
+            img.src = cover;
+        },
+
+        // Бегущая строка включается только если текст не помещается
+        setMarqueeText(el, text) {
+            if (!el) return;
+            text = String(text || '');
+            if (el._marqueeText === text && el.firstElementChild) return;
+            el._marqueeText = text;
+            el.classList.remove('is-overflowing');
+            delete el.dataset.marqueeDistance;
+            el.textContent = '';
+            const track = document.createElement('span');
+            track.className = 'alty-marquee-track';
+            const label = document.createElement('span');
+            label.textContent = text;
+            track.appendChild(label);
+            el.appendChild(track);
+            this.refreshMarquee(el);
+        },
+
+        refreshMarquee(el) {
+            const track = el && el.firstElementChild;
+            if (!track || !track.classList.contains('alty-marquee-track')) return;
+            const label = track.firstElementChild;
+            const gap = 48;
+            const available = el.clientWidth;
+            const overflow = available > 0 && label.offsetWidth > available + 1;
+            const distance = overflow ? Math.ceil(label.offsetWidth + gap) : 0;
+            if (overflow === el.classList.contains('is-overflowing') && String(distance) === el.dataset.marqueeDistance) return;
+            el.dataset.marqueeDistance = String(distance);
+            while (track.children.length > 1) track.removeChild(track.lastElementChild);
+            if (!overflow) { el.classList.remove('is-overflowing'); return; }
+            const spacer = document.createElement('span');
+            spacer.className = 'alty-marquee-gap';
+            const copy = label.cloneNode(true);
+            copy.setAttribute('aria-hidden', 'true');
+            track.appendChild(spacer);
+            track.appendChild(copy);
+            el.style.setProperty('--marquee-distance', `-${distance}px`);
+            el.style.setProperty('--marquee-duration', `${Math.max(6, distance / 32 / 0.82).toFixed(2)}s`);
+            el.classList.add('is-overflowing');
+        },
+
+        refreshAllMarquees() {
+            document.querySelectorAll('.alty-marquee').forEach(el => this.refreshMarquee(el));
+        },
+
+        renderProgress(percent, currentText) {
+            const value = Math.max(0, Math.min(100, Number(percent) || 0));
+            ['progress-bar', 'fp-progress-bar'].forEach(id => {
+                const bar = document.getElementById(id);
+                if (!bar) return;
+                bar.value = value;
+                bar.style.setProperty('--fill', `${value}%`);
+            });
+            const fill = document.getElementById('mini-progress-fill');
+            if (fill) fill.style.width = `${value}%`;
+            ['time-current', 'fp-time-current'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = currentText;
+            });
+        },
+
+        renderVolume() {
+            const value = Math.round(this.masterVolume * 100);
+            ['volume-bar', 'fp-volume-bar'].forEach(id => {
+                const bar = document.getElementById(id);
+                if (!bar) return;
+                bar.value = value;
+                bar.style.setProperty('--fill', `${value}%`);
+            });
+        },
+
+        setupFullPlayer() {
+            const mini = document.getElementById('bottom-player');
+            const panel = document.getElementById('full-player');
+            const scroller = document.getElementById('fp-scroll');
+            if (mini) mini.addEventListener('click', (e) => {
+                if (e.target.closest('button, input, a, label')) return;
+                this.openFullPlayer();
+            });
+
+            if (window.ResizeObserver) {
+                const observer = new ResizeObserver(entries => entries.forEach(entry => this.refreshMarquee(entry.target)));
+                document.querySelectorAll('.alty-marquee').forEach(el => observer.observe(el));
+            } else {
+                window.addEventListener('resize', () => this.refreshAllMarquees());
+            }
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.refreshAllMarquees());
+
+            // Кнопка «Назад» на Android (WebView.goBack) сначала сворачивает плеер
+            window.addEventListener('popstate', () => {
+                if (!this.fullPlayerOpen) return;
+                if (this.isAnyModalOpen()) {
+                    this.closeModals();
+                    try { history.pushState({ altyFullPlayer: true }, ''); } catch (e) {}
+                    return;
+                }
+                this.closeFullPlayer(true);
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && this.fullPlayerOpen && !this.isAnyModalOpen()) this.closeFullPlayer();
+            });
+
+            if (!panel || !scroller) return;
+            // Свайп вниз сворачивает плеер
+            let startX = 0, startY = 0, startT = 0, dy = 0, tracking = false, dragging = false;
+            panel.addEventListener('touchstart', (e) => {
+                tracking = false;
+                if (!this.fullPlayerOpen || e.touches.length !== 1 || e.target.closest('input')) return;
+                if (scroller.scrollTop > 0) return;
+                tracking = true;
+                dragging = false;
+                dy = 0;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                startT = Date.now();
+            }, { passive: true });
+            panel.addEventListener('touchmove', (e) => {
+                if (!tracking) return;
+                const dx = e.touches[0].clientX - startX;
+                const moveY = e.touches[0].clientY - startY;
+                if (!dragging) {
+                    if (Math.abs(moveY) < 8 && Math.abs(dx) < 8) return;
+                    if (moveY <= 0 || Math.abs(dx) > Math.abs(moveY)) { tracking = false; return; }
+                    dragging = true;
+                    panel.classList.add('is-dragging');
+                }
+                dy = Math.max(0, moveY);
+                panel.style.transform = `translateY(${dy}px)`;
+                e.preventDefault();
+            }, { passive: false });
+            const endSwipe = () => {
+                if (!tracking) return;
+                tracking = false;
+                if (!dragging) return;
+                dragging = false;
+                panel.classList.remove('is-dragging');
+                panel.style.transform = '';
+                const flick = dy > 60 && Date.now() - startT < 250;
+                if (flick || dy > Math.min(160, window.innerHeight * 0.22)) this.closeFullPlayer();
+            };
+            panel.addEventListener('touchend', endSwipe);
+            panel.addEventListener('touchcancel', endSwipe);
+        },
+
+        isAnyModalOpen() {
+            return !!document.querySelector('[id$="-modal"]:not(.hidden)');
+        },
+
+        openFullPlayer() {
+            const panel = document.getElementById('full-player');
+            const track = this.getCurrentTrack();
+            if (!panel || !track || this.fullPlayerOpen) return;
+            this.fullPlayerOpen = true;
+            this.updatePlayerUI(track);
+            panel.style.transform = '';
+            panel.classList.add('is-open');
+            panel.setAttribute('aria-hidden', 'false');
+            try { history.pushState({ altyFullPlayer: true }, ''); this._fpHistory = true; } catch (e) { this._fpHistory = false; }
+            this.refreshAllMarquees();
+        },
+
+        closeFullPlayer(fromHistory = false) {
+            const panel = document.getElementById('full-player');
+            if (!panel || !this.fullPlayerOpen) return;
+            this.fullPlayerOpen = false;
+            if (panel.contains(document.activeElement)) document.activeElement.blur();
+            panel.style.transform = '';
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden', 'true');
+            const hadHistory = this._fpHistory;
+            this._fpHistory = false;
+            if (hadHistory && !fromHistory) { try { history.back(); } catch (e) {} }
+        },
+
+        editCurrentTrack() {
+            const track = this.getCurrentTrack();
+            if (track) this.openEditTrackModal(track);
+        },
+
+        addCurrentTrackToPlaylist() {
+            const track = this.getCurrentTrack();
+            if (track) this.showAddToPlaylistModal(track.id);
         },
 
         handleNativeState(state, polling = false) {
@@ -386,11 +682,15 @@ endProgressDrag() {
             if (typeof state.volume === 'number' && !polling) {
                 this.masterVolume = Math.max(0, Math.min(1, state.volume));
                 localStorage.setItem('alty_volume', String(this.masterVolume));
-                const volumeBar = document.getElementById('volume-bar');
-                if (volumeBar) volumeBar.value = Math.round(this.masterVolume * 100);
+                this.renderVolume();
             }
-            if (typeof state.repeatMode === 'number') this.repeatMode = Math.max(0, Math.min(2, state.repeatMode));
-            if (typeof state.shuffle === 'boolean') this.isShuffle = state.shuffle;
+            // Сразу после нажатия сервис может ещё не применить новый режим, а без очереди он не хранит наш выбор
+            const modesSettled = Date.now() - this._modeChangedAt > 1500;
+            if (modesSettled && state.ready !== false) {
+                if (typeof state.repeatMode === 'number') this.repeatMode = Math.max(0, Math.min(2, state.repeatMode));
+                if (typeof state.shuffle === 'boolean') this.isShuffle = state.shuffle;
+            }
+            this.updateModeButtons();
             if (Array.isArray(state.queueIds) && state.queueIds.length && this.playbackQueue.length === 0) {
                 const byId = new Map(this.tracks.map(track => [Number(track.id), track]));
                 const restored = state.queueIds
@@ -417,9 +717,6 @@ endProgressDrag() {
             }
 
             this.updatePlayPauseIcon(!!state.isPlaying);
-            const progress = document.getElementById('progress-bar');
-            const current = document.getElementById('time-current');
-            const total = document.getElementById('time-total');
             const duration = Number(state.durationMs || 0);
             const position = Number(state.positionMs || 0);
             // страховка: если отпускание пальца потерялось, не залипаем
@@ -427,23 +724,18 @@ if (this.progressDragging && Date.now() - this.progressTouchedAt > 4000) this.en
 const trackId = Number(state.id);
 if (trackId !== this._progressTrackId) { this._progressTrackId = trackId; this.progressHoldUntil = 0; }
 const busy = this.progressDragging || Date.now() < this.progressHoldUntil;
-if (!busy) {
-    if (progress) progress.value = duration > 0 ? Math.max(0, Math.min(100, position / duration * 100)) : 0;
-    if (current) current.textContent = this.formatTime(position / 1000);
-}
-if (total) total.textContent = this.formatTime(duration / 1000);
+if (!busy) this.renderProgress(duration > 0 ? position / duration * 100 : 0, this.formatTime(position / 1000));
+['time-total', 'fp-time-total'].forEach(id => {
+    const total = document.getElementById(id);
+    if (total) total.textContent = this.formatTime(duration / 1000);
+});
             this.highlightCurrentTrack();
         },
 
         toggleShuffle() {
             this.isShuffle = !this.isShuffle;
-            const btn = document.getElementById('btn-shuffle');
-            const dot = document.getElementById('shuffle-dot');
-            if (btn) {
-                btn.classList.toggle('text-red-500', this.isShuffle);
-                btn.classList.toggle('text-gray-400', !this.isShuffle);
-            }
-            if (dot) dot.classList.toggle('hidden', !this.isShuffle);
+            this._modeChangedAt = Date.now();
+            this.updateModeButtons();
 
             if (this.playbackQueue.length > 0 && this.currentIndex >= 0) {
                 const currentTrack = this.playbackQueue[this.currentIndex];
@@ -463,19 +755,50 @@ if (total) total.textContent = this.formatTime(duration / 1000);
 
         toggleRepeat() {
             this.repeatMode = (this.repeatMode + 1) % 3;
-            const btn = document.getElementById('btn-repeat');
-            const badge = document.getElementById('repeat-badge');
-            if (btn) {
-                btn.classList.toggle('text-red-500', this.repeatMode !== 0);
-                btn.classList.toggle('text-gray-400', this.repeatMode === 0);
-            }
-            if (badge) badge.classList.toggle('hidden', this.repeatMode !== 2);
+            this._modeChangedAt = Date.now();
+            this.updateModeButtons();
             ALTYNative.setRepeat(this.repeatMode);
         },
 
+        // repeatMode: 0 — выкл, 1 — повторять очередь/альбом, 2 — повторять трек
+        updateModeButtons() {
+            const shuffleOn = this.isShuffle;
+            const repeatOn = this.repeatMode !== 0;
+            const shuffleBtn = document.getElementById('btn-shuffle');
+            const repeatBtn = document.getElementById('btn-repeat');
+            if (shuffleBtn) {
+                shuffleBtn.classList.toggle('text-red-500', shuffleOn);
+                shuffleBtn.classList.toggle('text-gray-400', !shuffleOn);
+            }
+            if (repeatBtn) {
+                repeatBtn.classList.toggle('text-red-500', repeatOn);
+                repeatBtn.classList.toggle('text-gray-400', !repeatOn);
+            }
+            const dot = document.getElementById('shuffle-dot');
+            if (dot) dot.classList.toggle('hidden', !shuffleOn);
+            const fpShuffle = document.getElementById('fp-btn-shuffle');
+            const fpRepeat = document.getElementById('fp-btn-repeat');
+            if (fpShuffle) {
+                fpShuffle.classList.toggle('is-active', shuffleOn);
+                fpShuffle.setAttribute('aria-pressed', String(shuffleOn));
+            }
+            if (fpRepeat) {
+                fpRepeat.classList.toggle('is-active', repeatOn);
+                fpRepeat.setAttribute('aria-pressed', String(repeatOn));
+            }
+            ['repeat-badge', 'fp-repeat-badge'].forEach(id => {
+                const badge = document.getElementById(id);
+                if (badge) badge.classList.toggle('hidden', this.repeatMode !== 2);
+            });
+        },
+
         updatePlayPauseIcon(isPlaying) {    
-            document.getElementById('play-icon').classList.toggle('hidden', isPlaying);    
-            document.getElementById('pause-icon').classList.toggle('hidden', !isPlaying);    
+            [['play-icon', 'pause-icon'], ['fp-play-icon', 'fp-pause-icon']].forEach(([playId, pauseId]) => {
+                const play = document.getElementById(playId);
+                const pause = document.getElementById(pauseId);
+                if (play) play.classList.toggle('hidden', isPlaying);
+                if (pause) pause.classList.toggle('hidden', !isPlaying);
+            });
         },    
   
         formatTime(seconds) {    
@@ -836,17 +1159,8 @@ if (total) total.textContent = this.formatTime(duration / 1000);
             this.closeModals();    
             this.renderAll();    
                 
-            if (this.playbackQueue.length > 0 && this.currentIndex !== -1) {    
-                if (this.playbackQueue[this.currentIndex].id === track.id) {    
-                    document.getElementById('player-title').textContent = track.name;    
-                    const mainCover = document.getElementById('player-cover');    
-                    if (track.cover) {    
-                        mainCover.src = track.cover;    
-                        mainCover.classList.remove('hidden');    
-                        document.getElementById('player-cover-placeholder').classList.add('hidden');    
-                    }    
-                }    
-            }    
+            const current = this.getCurrentTrack();
+            if (current && current.id === track.id) this.updatePlayerUI(current);
             this.showToast(this.t("Изменения сохранены"));    
         },    
   
