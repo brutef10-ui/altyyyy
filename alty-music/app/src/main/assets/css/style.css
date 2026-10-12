@@ -1,0 +1,113 @@
+::-webkit-scrollbar { width: 6px; }    
+        ::-webkit-scrollbar-track { background: #000000; }    
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }    
+        ::-webkit-scrollbar-thumb:hover { background: #555; }  input[type="range"] {    
+        -webkit-appearance: none;    
+        background: transparent;    
+    }    
+    input[type="range"]::-webkit-slider-thumb {    
+        -webkit-appearance: none;    
+        height: 14px; width: 14px;    
+        border-radius: 50%;    
+        background: #ffffff;    
+        cursor: pointer;    
+        margin-top: -5px;    
+    }    
+    input[type="range"]::-webkit-slider-runnable-track {    
+        width: 100%; height: 4px;    
+        cursor: pointer;    
+        background: #4b5563;    
+        border-radius: 2px;    
+    }    
+    @keyframes slideUp {    
+        from { transform: translateY(100%); opacity: 0; }    
+        to { transform: translateY(0); opacity: 1; }    
+    }    
+    .toast-enter { animation: slideUp 0.3s ease-out forwards; }    
+
+        /* ALTY themes */
+        html.light body { background:#f5f5f5 !important; color:#111827 !important; }
+        html.light #main-content { background:linear-gradient(to bottom,#f3f4f6,#ffffff) !important; }
+        html.light aside { background:#ffffff !important; border-color:#e5e7eb !important; }
+        html.light .bg-black { background-color:#ffffff !important; }
+        html.light .bg-gray-900 { background-color:#f3f4f6 !important; }
+        html.light .bg-gray-800 { background-color:#f9fafb !important; }
+        html.light .bg-gray-700 { background-color:#e5e7eb !important; }
+        html.light .bg-gray-800 { background-color:#e5e7eb !important; }
+        html.light .bg-gray-900\/50, html.light .bg-gray-900\/40 { background-color:rgba(243,244,246,.82) !important; }
+        html.light .bg-black\/50 { background-color:rgba(229,231,235,.8) !important; }
+        html.light .bg-\[\#181818\] { background-color:#ffffff !important; }
+        html.light .bg-\[\#0a0a0a\] { background-color:#ffffff !important; }
+        html.light .text-white { color:#111827 !important; }
+        html.light .text-gray-200 { color:#1f2937 !important; }
+        html.light .text-gray-300 { color:#374151 !important; }
+        html.light .text-gray-400, html.light .text-gray-500 { color:#6b7280 !important; }
+        html.light .text-gray-600 { color:#9ca3af !important; }
+        html.light .border-gray-800 { border-color:#e5e7eb !important; }
+        html.light .border-gray-700 { border-color:#d1d5db !important; }
+        html.light .border-gray-600 { border-color:#9ca3af !important; }
+        html.light .border-\[\#282828\], html.light .border-\[\#1f1f1f\] { border-color:#e5e7eb !important; }
+        html.light .hover\:bg-gray-800:hover { background-color:#e5e7eb !important; }
+        html.light .hover\:bg-gray-700:hover { background-color:#d1d5db !important; }
+        html.light .hover\:text-white:hover { color:#111827 !important; }
+        html.light input[type="text"] { color:#111827; }
+        html.light input[type="range"]::-webkit-slider-thumb { background:#111827; }
+        html.light input[type="range"]::-webkit-slider-runnable-track { background:#9ca3af; }
+        html.light .settings-card { background:rgba(255,255,255,.88); border-color:#e5e7eb; }
+        html.light .settings-option { background:#f3f4f6; border-color:#d1d5db; color:#374151; }
+        html.light .settings-option:hover { background:#e5e7eb; }
+        html.light .settings-option.active { background:#dc2626; border-color:#dc2626; color:#fff; }
+        .settings-card { background:rgba(24,24,27,.72); border:1px solid #27272a; border-radius:1rem; padding:1.25rem; box-shadow:0 10px 30px rgba(0,0,0,.16); }
+        .settings-option { background:#18181b; border:1px solid #3f3f46; color:#a1a1aa; border-radius:.75rem; padding:.8rem 1rem; font-weight:700; transition:.2s ease; }
+        .settings-option:hover { background:#27272a; color:#fff; }
+        .settings-option.active { background:#dc2626; border-color:#dc2626; color:#fff; box-shadow:0 6px 18px rgba(220,38,38,.22); }
+
+        .drag-handle { touch-action:none; cursor:grab; }
+        .drag-handle:active { cursor:grabbing; }
+        .track-item.dragging-row { background:#27272a !important; border-color:rgba(220,38,38,.7) !important; box-shadow:0 10px 28px rgba(0,0,0,.5); position:relative; z-index:30; transition:none !important; }
+        html.light .track-item.dragging-row { background:#e5e7eb !important; box-shadow:0 10px 28px rgba(0,0,0,.2); }
+        #playlist-tracks-list.is-dragging .track-item:not(.dragging-row) { pointer-events:none; }
+
+        /* ALTY: компактный текст для телефонов (9:16). Меняйте числа ниже, чтобы подстроить размер */
+        @media (max-width: 767px) {
+            #main-content h1 { font-size:1.375rem !important; line-height:1.75rem !important; }
+            #main-content h2 { font-size:1.1rem !important; line-height:1.5rem !important; }
+            #main-content p, #main-content .text-sm { font-size:.78rem !important; line-height:1.1rem !important; }
+            #main-content .text-xs { font-size:.68rem !important; line-height:1rem !important; }
+            #main-content .track-item .text-sm { font-size:.8rem !important; line-height:1.1rem !important; }
+            #tab-library > div:first-child { padding:1rem !important; margin-bottom:1.5rem !important; gap:.75rem !important; }
+            #tab-library label.bg-red-600 { font-size:.85rem !important; padding:.6rem 1.25rem !important; }
+            #playlists-grid { margin-bottom:1.5rem !important; }
+            #play-playlist-btn { font-size:.85rem !important; padding:.55rem 1.4rem !important; }
+            #shuffle-playlist-btn { padding:.55rem 1rem !important; }
+            #player-title { font-size:.8rem !important; }
+            #toast-container > div { font-size:.75rem !important; padding:.5rem 1rem !important; }
+            .settings-card { padding:1rem; }
+            .settings-option { font-size:.85rem; padding:.65rem .9rem; }
+            [id$="-modal"] h2 { font-size:1.05rem !important; line-height:1.4rem !important; }
+            [id$="-modal"] p { font-size:.78rem !important; }
+            [id$="-modal"] .text-lg { font-size:1rem !important; }	
+        }
+		
+#player-title-container {
+    overflow: hidden; 
+    white-space: nowrap;
+    width: 100%; 
+    position: relative;
+}
+
+#player-title {
+    display: inline-block;
+    padding-left: 100%;
+    animation: scrollText 15s linear infinite;
+}
+
+@keyframes scrollText {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+#player-title-container:hover #player-title {
+    animation-play-state: paused;
+}
+

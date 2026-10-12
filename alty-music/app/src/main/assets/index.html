@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <title>ALTY - Lossless Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-black text-white h-screen flex flex-col md:flex-row overflow-hidden font-sans select-none pb-20 md:pb-0">
+  <!-- Кнопка поддержки -->  
+<button onclick="app.showSupportModal()" class="fixed top-4 right-4 md:top-6 md:right-8 z-[90] p-3 bg-gray-900 border border-gray-700 text-gray-400 hover:text-red-500 hover:border-red-500 rounded-full shadow-lg transition flex items-center justify-center group">  
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">  
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13a7 7 0 0114 0"/>  
+        <rect x="3" y="12" width="4" height="5" rx="1.5" stroke-width="2"/>  
+        <rect x="17" y="12" width="4" height="5" rx="1.5" stroke-width="2"/>  
+        <circle cx="12" cy="12" r="3" stroke-width="2"/>  
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 22c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5"/>  
+    </svg>  
+</button>    <aside class="w-64 bg-black flex-col justify-between p-6 border-r border-gray-800 hidden md:flex z-10 h-full">    
+    <div>    
+        <div class="text-2xl font-bold mb-8 flex items-center gap-2">    
+            <svg class="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>    
+            ALTY    
+        </div>    
+        <nav class="flex flex-col gap-2 text-gray-400 font-semibold">    
+            <button onclick="app.switchTab('library')" id="nav-library" class="flex items-center gap-4 hover:text-white transition w-full text-left p-3 rounded-lg bg-gray-900 text-white">    
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>    
+                Медиатека    
+            </button>    
+            <button onclick="app.switchTab('search')" id="nav-search" class="flex items-center gap-4 hover:text-white transition w-full text-left p-3 rounded-lg">    
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>    
+                Поиск    
+            </button><button onclick="app.switchTab('settings')" id="nav-settings" class="flex items-center gap-4 hover:text-white transition w-full text-left p-3 rounded-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.00 10.32 L21.51 10.72 L21.51 13.28 L19.00 13.68 L18.14 15.76 L19.63 17.82 L17.82 19.63 L15.76 18.14 L13.68 19.00 L13.28 21.51 L10.72 21.51 L10.32 19.00 L8.24 18.14 L6.18 19.63 L4.37 17.82 L5.86 15.76 L5.00 13.68 L2.49 13.28 L2.49 10.72 L5.00 10.32 L5.86 8.24 L4.37 6.18 L6.18 4.37 L8.24 5.86 L10.32 5.00 L10.72 2.49 L13.28 2.49 L13.68 5.00 L15.76 5.86 L17.82 4.37 L19.63 6.18 L18.14 8.24 Z"/>
+    <circle cx="12" cy="12" r="3" stroke-width="2"/>
+</svg>
+                Настройки
+            </button>    
+        </nav>    
+    </div>    
+</aside>    <main class="flex-1 bg-gradient-to-b from-gray-900 to-black overflow-y-auto h-full" id="main-content">    <!-- Вкладка: Медиатека -->    
+<section id="tab-library" class="p-6 md:p-8 block mt-12 md:mt-0">    
+    <!-- Блок загрузки файлов -->    
+    <div class="mb-10 bg-gray-900/50 p-6 rounded-xl border border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4">    
+        <div>    
+            <h2 class="text-2xl font-bold mb-1">Твоя музыка</h2>    
+            <p class="text-gray-400 text-sm">Добавляй треки. Поддерживается MP3, WAV, FLAC.</p>    
+        </div>    
+        <label class="cursor-pointer flex items-center justify-center gap-2 bg-red-600 text-white hover:bg-red-500 font-bold py-3 px-6 rounded-full transition w-full md:w-auto shrink-0 shadow-lg">    
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>    
+            Добавить треки    
+            <input type="file" id="file-upload" multiple accept="audio/*" class="hidden" onchange="app.handleFiles(event)">    
+        </label>    
+    </div>    
+
+    <!-- Блок плейлистов -->    
+    <div class="flex justify-between items-center mb-6">    
+        <h2 class="text-2xl font-bold">Плейлисты</h2>    
+        <button onclick="app.showCreatePlaylistModal()" class="border border-gray-600 hover:border-red-500 hover:text-red-500 px-4 py-1.5 rounded-full text-sm font-semibold transition">    
+            + Создать    
+        </button>    
+    </div>    
+    <div id="playlists-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 mb-10">    
+        <!-- Плейлисты будут здесь -->    
+    </div>    
+
+    <!-- Блок всех треков -->    
+    <div class="flex justify-between items-center mb-4">    
+        <div class="flex items-center gap-2 min-w-0">
+            <h2 class="text-2xl font-bold">Все треки</h2>
+            <span id="library-track-count" class="px-2.5 py-0.5 rounded-full bg-gray-800 border border-gray-700 text-xs font-bold text-gray-300 whitespace-nowrap"></span>
+        </div>    
+        <button onclick="app.playAllTracksShuffled()" class="text-sm font-semibold text-gray-400 hover:text-red-500 flex items-center gap-2">    
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>    
+            Перемешать все    
+        </button>    
+    </div>    
+    <div id="all-tracks-list" class="flex flex-col gap-2 pb-10"></div>    
+</section>    
+
+<!-- Вкладка: Поиск -->    
+<section id="tab-search" class="p-6 md:p-8 hidden mt-12 md:mt-0">    
+    <div class="max-w-2xl">    
+        <h1 class="text-3xl font-bold mb-6">Поиск</h1>    
+        <input type="text" id="search-input" data-i18n-placeholder="Название песни..." placeholder="Название песни..." class="w-full bg-gray-800 text-white rounded-full px-6 py-4 outline-none focus:ring-2 focus:ring-red-500 mb-8 shadow-inner">    
+    </div>    
+    <div id="search-results" class="flex flex-col gap-2 pb-10"></div>    
+</section>    
+
+<!-- Просмотр конкретного плейлиста -->    
+<!-- Вкладка: Настройки -->
+<section id="tab-settings" class="p-6 md:p-8 hidden mt-12 md:mt-0">
+    <div class="max-w-3xl">
+        <h1 class="text-3xl md:text-4xl font-bold mb-2" data-i18n="Настройки">Настройки</h1>
+        <p class="text-gray-400 mb-8" data-i18n="Настройте ALTY под себя. Изменения сохраняются автоматически.">Настройте ALTY под себя. Изменения сохраняются автоматически.</p>
+        <div class="settings-card mb-5">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-red-600/15 text-red-500 flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2v20M2 12h20"/></svg>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg" data-i18n="Язык интерфейса">Язык интерфейса</h2>
+                    <p class="text-gray-400 text-sm" data-i18n="Выберите язык всех элементов ALTY">Выберите язык всех элементов ALTY</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <button id="lang-ru" onclick="app.changeLanguage('ru')" class="settings-option">Русский</button>
+                <button id="lang-en" onclick="app.changeLanguage('en')" class="settings-option">English</button>
+            </div>
+        </div>
+        <div class="settings-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-red-600/15 text-red-500 flex items-center justify-center">
+                    <svg id="theme-settings-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 3v2m0 14v2M3 12h2m14 0h2m-3.64-6.36l-1.42 1.42M7.05 16.95l-1.42 1.42m0-12.72l1.42 1.42m10.9 10.9l-1.42-1.42M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg" data-i18n="Тема оформления">Тема оформления</h2>
+                    <p class="text-gray-400 text-sm" data-i18n="Выберите тёмную или светлую тему">Выберите тёмную или светлую тему</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <button id="theme-dark" onclick="app.changeTheme('dark')" class="settings-option"><span data-i18n="Тёмная">Тёмная</span></button>
+                <button id="theme-light" onclick="app.changeTheme('light')" class="settings-option"><span data-i18n="Светлая">Светлая</span></button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="tab-playlist-view" class="p-6 md:p-8 hidden mt-12 md:mt-0">    
+    <div class="flex flex-col md:flex-row items-start md:items-center gap-6 mb-8">    
+        <!-- Обложка плейлиста -->    
+        <div class="w-32 h-32 md:w-48 md:h-48 bg-gray-800 rounded-2xl shrink-0 shadow-2xl flex items-center justify-center overflow-hidden relative group" id="playlist-cover-container">    
+            <img id="playlist-cover-img" src="" class="w-full h-full object-cover hidden">    
+            <svg id="playlist-cover-placeholder" class="w-16 h-16 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>    
+            <label class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition cursor-pointer">    
+                <svg class="w-8 h-8 text-white mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>    
+                <span class="text-xs font-bold text-white">Изменить</span>    
+                <input type="file" accept="image/*" class="hidden" onchange="app.changePlaylistCover(event)">    
+            </label>    
+        </div>    
+
+        <div class="flex-1 w-full">    
+            <button onclick="app.switchTab('library')" class="mb-4 text-gray-400 hover:text-white flex items-center gap-2 text-sm font-semibold">    
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>    
+                Назад    
+            </button>    
+            <div class="flex items-center gap-3">    
+                <h1 id="current-playlist-title" class="text-3xl md:text-5xl font-bold truncate">Плейлист</h1>    
+                <button onclick="app.renameCurrentPlaylist()" class="text-gray-400 hover:text-white">    
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>    
+                </button>    
+            </div>    
+            <p id="current-playlist-count" class="text-gray-400 mt-2 text-sm">0 треков</p>
+            <p id="playlist-reorder-hint" data-i18n="Меняйте порядок: перетащите ⋮⋮ или нажмите на номер трека" class="text-gray-500 mt-1 text-xs hidden">Меняйте порядок: перетащите ⋮⋮ или нажмите на номер трека</p>    
+                
+            <div class="flex items-center gap-4 mt-6">    
+                <button id="play-playlist-btn" class="bg-red-600 text-white px-8 py-3 rounded-full font-bold hover:scale-105 transition shadow-lg flex items-center gap-2">    
+                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>    
+                    Слушать    
+                </button>    
+                <button id="shuffle-playlist-btn" class="bg-gray-800 text-white px-6 py-3 rounded-full font-bold hover:bg-gray-700 transition flex items-center gap-2 border border-gray-700">    
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>    
+                </button>    
+                <button onclick="app.showDeleteConfirm('playlist')" class="ml-auto text-gray-500 hover:text-red-500 p-3 rounded-full hover:bg-gray-800 transition">    
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>    
+                </button>    
+            </div>    
+        </div>    
+    </div>    
+
+    <div id="playlist-tracks-list" class="flex flex-col gap-2 pb-10 border-t border-gray-800 pt-6"></div>    
+</section>
+
+</main>    <!-- Скрытый по умолчанию нижний плеер -->    
+<div id="bottom-player" class="fixed bottom-14 md:bottom-0 left-0 right-0 h-20 md:h-24 bg-[#181818] border-t border-[#282828] flex items-center justify-between px-2 md:px-6 z-50 transform translate-y-full transition-transform duration-300">    
+    <div class="flex items-center gap-3 w-1/4 md:w-1/3 truncate">    
+        <div class="w-12 h-12 md:w-14 md:h-14 bg-gray-800 rounded flex items-center justify-center shrink-0 shadow-md overflow-hidden relative group">    
+        <img id="player-cover" src="" class="w-full h-full object-cover hidden">    
+        <svg id="player-cover-placeholder" class="w-6 h-6 md:w-8 md:h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>    
+    </div>    
+    <div class="truncate w-full">    
+        <!-- Оригинальный элемент с ID плеера, теперь с классом бегущей строки -->
+        <div id="player-title" class="text-white text-sm md:text-base font-semibold alty-marquee">Трек не выбран</div>    
+    </div>    
+</div>    
+
+<div class="flex flex-col items-center justify-center w-1/2 md:w-1/3 max-w-md px-2">    
+    <div class="flex items-center gap-2 md:gap-4 mb-1">    
+        <button onclick="app.toggleShuffle()" id="btn-shuffle" class="text-gray-400 hover:text-white transition p-2 relative">    
+            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>    
+            <div id="shuffle-dot" class="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-red-500 rounded-full hidden"></div>    
+        </button>    
+        <button onclick="app.prevTrack()" class="text-gray-400 hover:text-white transition p-2">    
+            <svg class="w-5 h-5 md:w-6 md:h-6 fill-current" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>    
+        </button>    
+        <button onclick="app.togglePlay()" class="w-10 h-10 md:w-12 md:h-12 bg-white rounded-full flex items-center justify-center text-black hover:scale-105 transition shadow-lg">    
+            <svg id="play-icon" class="w-5 h-5 md:w-6 md:h-6 ml-1 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>    
+            <svg id="pause-icon" class="w-5 h-5 md:w-6 md:h-6 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>    
+        </button>    
+        <button onclick="app.nextTrack()" class="text-gray-400 hover:text-white transition p-2">    
+            <svg class="w-5 h-5 md:w-6 md:h-6 fill-current" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>    
+        </button>    
+        <button onclick="app.toggleRepeat()" id="btn-repeat" class="text-gray-400 hover:text-white transition p-2 relative">    
+            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>    
+            <div id="repeat-badge" class="absolute -top-1 -right-1 bg-gray-900 text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center border border-gray-700 hidden text-red-500">1</div>    
+        </button>    
+    </div>    
+    <div class="flex items-center gap-2 w-full text-[10px] md:text-xs text-gray-400">    
+        <span id="time-current">0:00</span>    
+        <input type="range" id="progress-bar" value="0" max="100" class="flex-1 w-full h-1">    
+        <span id="time-total">0:00</span>    
+    </div>    
+</div>    
+
+<div class="hidden md:flex items-center justify-end gap-2 w-1/3">    
+    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>    
+    <input type="range" id="volume-bar" value="100" max="100" class="w-24">    
+</div>
+
+</div>    <!-- Мобильное нижнее меню -->    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a] border-t border-[#1f1f1f] flex justify-around items-center h-14 z-[60]">    
+    <button onclick="app.switchTab('library')" id="mob-nav-library" class="flex flex-col items-center gap-1 text-red-500 p-2 transition">    
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>    
+        <span class="text-[9px] font-bold tracking-wide">Медиатека</span>    
+    </button>    
+    <button onclick="app.switchTab('search')" id="mob-nav-search" class="flex flex-col items-center gap-1 text-gray-500 hover:text-white p-2 transition">    
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>    
+        <span class="text-[9px] font-bold tracking-wide">Поиск</span>    
+    </button><button onclick="app.switchTab('settings')" id="mob-nav-settings" class="flex flex-col items-center gap-1 text-gray-500 hover:text-white p-2 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.00 10.32 L21.51 10.72 L21.51 13.28 L19.00 13.68 L18.14 15.76 L19.63 17.82 L17.82 19.63 L15.76 18.14 L13.68 19.00 L13.28 21.51 L10.72 21.51 L10.32 19.00 L8.24 18.14 L6.18 19.63 L4.37 17.82 L5.86 15.76 L5.00 13.68 L2.49 13.28 L2.49 10.72 L5.00 10.32 L5.86 8.24 L4.37 6.18 L6.18 4.37 L8.24 5.86 L10.32 5.00 L10.72 2.49 L13.28 2.49 L13.68 5.00 L15.76 5.86 L17.82 4.37 L19.63 6.18 L18.14 8.24 Z"/>
+    <circle cx="12" cy="12" r="3" stroke-width="2"/>
+</svg>
+        <span class="text-[9px] font-bold tracking-wide">Настройки</span>
+    </button>    
+</div>    <!-- Модалки -->    <div id="edit-track-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[100] p-4">    
+    <div class="bg-gray-900 p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl">    
+        <h2 class="text-xl font-bold mb-4">Изменить трек</h2>    
+        <div class="flex items-center gap-4 mb-6">    
+            <div class="w-20 h-20 bg-gray-800 rounded-lg overflow-hidden shrink-0 relative group">    
+                <img id="edit-track-cover" src="" class="w-full h-full object-cover hidden">    
+                <svg id="edit-track-placeholder" class="w-8 h-8 text-gray-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>    
+                <label class="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition cursor-pointer">    
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a22 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>    
+                    <span class="text-[10px] text-white font-bold">Фото</span>    
+                    <input type="file" accept="image/*" class="hidden" onchange="app.changeTrackCover(event)">    
+                </label>    
+            </div>    
+            <input type="text" id="track-name-input" class="w-full bg-gray-800 text-white rounded-lg p-3 outline-none focus:ring-2 focus:ring-red-500 border border-gray-700">    
+        </div>    
+        <div class="flex justify-end gap-3">    
+            <button onclick="app.closeModals()" class="px-4 py-2 text-gray-400 hover:text-white font-semibold">Отмена</button>    
+            <button onclick="app.saveTrackEdit()" class="px-6 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-500">Сохранить</button>    
+        </div>    
+    </div>    
+</div>    <!-- Модалка поддержки -->    <div id="support-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[100] p-4">    
+    <div class="bg-gray-900 p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl relative">    
+        <button onclick="app.closeModals()" class="absolute top-4 right-4 text-gray-400 hover:text-white p-1">  
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>  
+</button>    
+        <div class="flex items-center gap-3 mb-4 text-red-500">    
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">  
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13a7 7 0 0114 0"/>  
+    <rect x="3" y="12" width="4" height="5" rx="1.5" stroke-width="2"/>  
+    <rect x="17" y="12" width="4" height="5" rx="1.5" stroke-width="2"/>  
+    <circle cx="12" cy="12" r="3" stroke-width="2"/>  
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 22c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5"/>  
+</svg>    
+            <h2 class="text-2xl font-bold text-white">Поддержка</h2>    
+        </div>    
+        <p class="text-gray-400 text-sm mb-6 leading-relaxed">    
+            Если вы увидели баги, ошибки или у вас есть предложения по работе приложения, просим сообщить по этим данным. А так же если бы вы хотели оказать поддержку:    
+        </p>    
+        <div class="bg-black/50 p-4 rounded-xl border border-gray-800 space-y-4">    
+            <div class="font-bold text-white text-lg border-b border-gray-800 pb-2">Алтай Бакытбек</div>    
+            <div class="flex items-center gap-3 text-gray-300">    
+                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>    
+                <a href="tel:+996772288124" class="hover:text-white transition">+996 772 288 124    (SimBank, MBank)</a>    
+            </div>    
+            <div class="flex items-center gap-3 text-gray-300">    
+                <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>    
+                <a href="mailto:2502l0201003@manas.edu.kg" class="hover:text-white transition truncate">2502l0201003@manas.edu.kg</a>    
+            </div>    
+        </div>    
+        <button onclick="app.closeModals()" class="w-full mt-6 px-6 py-3 bg-gray-800 text-white font-bold rounded-full hover:bg-gray-700 transition">    
+            Закрыть    
+        </button>    
+    </div>    
+</div>    <!-- Другие модалки (Удаление, Плейлисты) -->    <div id="confirm-delete-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[100] p-4">    
+    <div class="bg-gray-900 p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl text-center">    
+        <svg class="w-12 h-12 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>    
+        <h2 class="text-xl font-bold mb-2">Точно удалить?</h2>    
+        <p class="text-gray-400 text-sm mb-6">Это действие нельзя будет отменить.</p>    
+        <div class="flex justify-center gap-3">    
+            <button onclick="app.closeModals()" class="px-6 py-2 bg-gray-800 text-white rounded-full hover:bg-gray-700 font-semibold w-1/2">Нет</button>    
+            <button id="confirm-delete-btn" class="px-6 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-500 w-1/2">Удалить</button>    
+        </div>    
+    </div>    
+</div>    <div id="create-playlist-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[100] p-4">    
+    <div class="bg-gray-900 p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl">    
+        <h2 class="text-xl font-bold mb-4">Создать плейлист</h2>    
+        <input type="text" id="playlist-name-input" data-i18n-placeholder="Название..." placeholder="Название..." class="w-full bg-gray-800 text-white rounded-lg p-3 outline-none mb-6 focus:ring-2 focus:ring-red-500 border border-gray-700">    
+        <div class="flex justify-end gap-3">    
+            <button onclick="app.closeModals()" class="px-4 py-2 text-gray-400 hover:text-white font-semibold">Отмена</button>    
+            <button onclick="app.createPlaylist()" class="px-6 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-500">Создать</button>    
+        </div>    
+    </div>    
+</div>    <div id="rename-playlist-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[100] p-4">    
+    <div class="bg-gray-900 p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl">    
+        <h2 class="text-xl font-bold mb-4">Переименовать плейлист</h2>    
+        <input type="text" id="rename-playlist-input" class="w-full bg-gray-800 text-white rounded-lg p-3 outline-none mb-6 focus:ring-2 focus:ring-red-500 border border-gray-700">    
+        <div class="flex justify-end gap-3">    
+            <button onclick="app.closeModals()" class="px-4 py-2 text-gray-400 hover:text-white font-semibold">Отмена</button>    
+            <button onclick="app.savePlaylistRename()" class="px-6 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-500">Сохранить</button>    
+        </div>    
+    </div>    
+</div>  <div id="add-to-playlist-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[100] p-4">    
+    <div class="bg-gray-900 p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl flex flex-col max-h-[80vh]">    
+        <h2 class="text-xl font-bold mb-4">Добавить в плейлист</h2>    
+        <div id="playlist-options" class="flex flex-col gap-2 overflow-y-auto mb-6 flex-1"></div>    
+        <button onclick="app.closeModals()" class="px-6 py-3 bg-gray-800 text-white rounded-full hover:bg-gray-700 font-semibold w-full">Отмена</button>    
+    </div>    
+</div>    <div id="move-track-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-[100] p-4">
+    <div class="bg-gray-900 p-6 rounded-2xl w-full max-w-sm border border-gray-700 shadow-2xl">
+        <h2 class="text-xl font-bold mb-1" data-i18n="Переместить трек">Переместить трек</h2>
+        <p id="move-track-name" class="text-gray-400 text-sm mb-4 truncate"></p>
+        <label for="move-track-input" class="block text-gray-400 text-sm mb-2"><span data-i18n="Новое место">Новое место</span> <span id="move-track-range"></span></label>
+        <input type="number" id="move-track-input" inputmode="numeric" min="1" class="w-full bg-gray-800 text-white rounded-lg p-3 outline-none mb-6 focus:ring-2 focus:ring-red-500 border border-gray-700">
+        <div class="flex justify-end gap-3">
+            <button onclick="app.closeModals()" class="px-4 py-2 text-gray-400 hover:text-white font-semibold">Отмена</button>
+            <button onclick="app.saveTrackMove()" class="px-6 py-2 bg-red-600 text-white font-bold rounded-full hover:bg-red-500">Сохранить</button>
+        </div>
+    </div>
+</div><div id="toast-container" class="fixed top-10 md:top-auto md:bottom-32 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-[110] w-[90%] max-w-sm items-center pointer-events-none"></div>    
+<script src="js/i18n.js"></script>
+<script src="js/db.js"></script>
+<script src="js/native.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

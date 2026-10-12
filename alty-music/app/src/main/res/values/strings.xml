@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ALTY</string>
+    <string name="media_channel_name">ALTY Music playback</string>
+    <string name="media_channel_description">Background music playback controls</string>
+</resources>
