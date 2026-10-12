@@ -62,7 +62,30 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
   return data;
 }
 
+/** Адрес картинки вопроса по её id (картинки отдаёт сервер). */
+export function imageUrl(id) {
+  return id ? `${SERVER_URL}/api/images/${encodeURIComponent(id)}` : '';
+}
+
+/** Загружает картинку (Blob/File JPEG, PNG или WebP до 1 МБ). Возвращает { id, url }. */
+async function uploadImage(blob) {
+  let response;
+  try {
+    response = await fetch(`${SERVER_URL}/api/images`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getHostToken()}`, 'Content-Type': blob.type || 'image/jpeg' },
+      body: blob,
+    });
+  } catch {
+    throw new ApiError(`Сервер недоступен (${SERVER_URL}). Проверьте, что он запущен.`);
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new ApiError(data?.error || `Не удалось загрузить картинку (${response.status})`, { status: response.status, code: data?.code });
+  return data;
+}
+
 export const api = {
+  uploadImage,
   getConfig: () => request('/api/config', { auth: false }),
   listQuizzes: async () => (await request('/api/quizzes')).quizzes,
   getQuiz: async (id) => (await request(`/api/quizzes/${encodeURIComponent(id)}`)).quiz,

@@ -12,9 +12,10 @@ import { AppError } from './src/errors.js';
 import { requireOwner } from './src/auth.js';
 import { RateLimiter } from './src/rateLimit.js';
 import { JsonQuizStore, QuizService } from './src/quizzes.js';
+import { IMAGE_TYPES, ImageStore } from './src/images.js';
 import { RoomManager } from './src/rooms.js';
 import { registerSocketHandlers } from './src/sockets.js';
-import { MAX_PHOTO_BYTES, QUIZ_LIMITS, validateNickname, validateRoomCode } from './src/validate.js';
+import { MAX_PHOTO_BYTES, QUIZ_LIMITS, quizImageIds, validateNickname, validateRoomCode } from './src/validate.js';
 
 // Фото до 100 КБ в base64 занимает ~137 КБ, игра на 50 вопросов — до ~100 КБ.
 const SOCKET_MAX_MESSAGE_BYTES = 256 * 1024;
@@ -44,7 +45,7 @@ function isSameOrigin(origin, host) {
   }
 }
 
-function createApp({ config, quizService, rooms, roomLimiter }) {
+function createApp({ config, quizService, images, rooms, roomLimiter }) {
   const app = express();
   app.disable('x-powered-by');
   if (config.trustProxy) app.set('trust proxy', config.trustProxy);
@@ -68,7 +69,31 @@ function createApp({ config, quizService, rooms, roomLimiter }) {
 
   app.get('/api/config', anyCors, (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ playerSiteUrl: config.playerSiteUrl, limits: QUIZ_LIMITS, maxPhotoBytes: MAX_PHOTO_BYTES });
+    res.json({ playerSiteUrl: config.playerSiteUrl, limits: QUIZ_LIMITS, maxPhotoBytes: MAX_PHOTO_BYTES, imageTypes: IMAGE_TYPES });
+  });
+
+  // ---------- Картинки к вопросам ----------
+  // Загружает только ведущий; смотрят все (картинка показывается на проекторе и на телефонах).
+  app.post('/api/images', hostCors, requireOwner, express.raw({ type: IMAGE_TYPES, limit: QUIZ_LIMITS.imageMaxBytes }), async (req, res) => {
+    const type = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!Buffer.isBuffer(req.body)) throw new AppError('Картинка должна быть в формате JPEG, PNG или WebP', { status: 415, code: 'BAD_IMAGE' });
+    const image = await images.save(req.owner.id, req.body, type);
+    res.status(201).json({ id: image.id, url: `/api/images/${image.id}` });
+  });
+  app.options('/api/images', hostCors);
+
+  app.get('/api/images/:id', (req, res) => {
+    const image = images.locate(req.params.id);
+    if (!image) {
+      res.status(404).json({ error: 'Картинка не найдена', code: 'NOT_FOUND' });
+      return;
+    }
+    res.set({
+      'Content-Type': image.type,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+    res.sendFile(image.path);
   });
 
   // ---------- Сохранённые игры (только ведущий) ----------
@@ -97,7 +122,8 @@ function createApp({ config, quizService, rooms, roomLimiter }) {
 
   // ---------- Проверки для игрока перед входом ----------
   const roomsApi = express.Router();
-  roomsApi.use(roomLimiter.middleware('Слишком много попыток. Подождите минуту.'), express.json({ limit: '2kb' }), (req, res, next) => {
+  // Считаются только неверные коды: игроки одной Wi-Fi сети приходят с одного IP, и это нормально.
+  roomsApi.use(roomLimiter.failuresMiddleware('Слишком много попыток с неверным кодом. Подождите минуту.'), express.json({ limit: '2kb' }), (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     next();
   });
@@ -143,7 +169,8 @@ function createApp({ config, quizService, rooms, roomLimiter }) {
       return;
     }
     if (error.type === 'entity.too.large') {
-      res.status(413).json({ error: 'Слишком большой запрос', code: 'TOO_LARGE' });
+      const isImage = req.path.startsWith('/api/images');
+      res.status(413).json({ error: isImage ? 'Картинка больше 1 МБ' : 'Слишком большой запрос', code: 'TOO_LARGE' });
       return;
     }
     console.error('[http]', error);
@@ -158,17 +185,36 @@ export async function startServer(overrides = {}) {
 
   const store = new JsonQuizStore(config.dataFile);
   await store.init();
-  const quizService = new QuizService(store);
+  const images = new ImageStore(config.imagesDir, { maxBytes: QUIZ_LIMITS.imageMaxBytes });
+  await images.init();
+  const quizService = new QuizService(store, { images });
   const rooms = new RoomManager({ maxRooms: config.maxRooms, maxPlayersPerRoom: config.maxPlayersPerRoom });
-  const roomLimiter = new RateLimiter({ windowMs: 60_000, max: 60 });
+  const roomLimiter = new RateLimiter({ windowMs: 60_000, max: 30 });
 
-  const app = createApp({ config, quizService, rooms, roomLimiter });
+  // Уборка картинок, которые не нужны ни сохранённым играм, ни идущим сейчас комнатам.
+  const collectImages = async () => {
+    try {
+      const referenced = await quizService.referencedImageIds();
+      for (const room of rooms.all()) quizImageIds(room.quiz).forEach((id) => referenced.add(id));
+      await images.collectGarbage(referenced, config.imageGcMinAgeMs);
+    } catch (error) {
+      console.error('[images] уборка не удалась:', error.message);
+    }
+  };
+  const imageGc = setInterval(collectImages, config.imageGcIntervalMs);
+  imageGc.unref();
+  collectImages();
+
+  const app = createApp({ config, quizService, images, rooms, roomLimiter });
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: config.allOrigins, methods: ['GET', 'POST'] },
     maxHttpBufferSize: SOCKET_MAX_MESSAGE_BYTES,
-    pingInterval: 10_000,
-    pingTimeout: 8_000,
+    // Телефоны засыпают, переключаются между Wi-Fi и мобильной сетью, а бесплатный хостинг
+    // может «задуматься» на пару секунд. Слишком строгие пинги рвали такие соединения,
+    // поэтому используем мягкие значения (стандартные для Socket.IO).
+    pingInterval: 25_000,
+    pingTimeout: 20_000,
     // WebSocket не подчиняется CORS, поэтому Origin проверяем сами: разрешены сайты из .env
     // и страницы, которые отдал сам сервер (SERVE_SITES). Запросы без Origin (не из браузера,
     // например тесты) пропускаем: права проверяются на уровне событий.
@@ -177,7 +223,7 @@ export async function startServer(overrides = {}) {
       callback(null, !origin || config.allOrigins.includes(origin) || isSameOrigin(origin, req.headers.host));
     },
   });
-  const sockets = registerSocketHandlers(io, { rooms, quizService, config });
+  const sockets = registerSocketHandlers(io, { rooms, quizService, images, config });
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -200,6 +246,7 @@ export async function startServer(overrides = {}) {
         sockets.closeAll('shutdown');
         sockets.stop();
         roomLimiter.stop();
+        clearInterval(imageGc);
         await new Promise((resolve) => io.close(() => resolve()));
       })();
       return closing;

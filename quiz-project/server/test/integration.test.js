@@ -20,8 +20,8 @@ const photo = () => {
 const quiz = {
   title: 'Интеграционный тест',
   questions: [
-    { text: 'Сколько будет 2+2?', answers: ['3', '4', '5', '22'], correct: 1, timeLimit: 5 },
-    { text: 'Цвет неба?', answers: ['Синий', 'Зелёный'], correct: 0, timeLimit: 5 },
+    { text: 'Сколько будет 2+2?', answers: ['3', '4', '5', '22'], correct: 1, timeLimit: 5, readTime: 0 },
+    { text: 'Цвет неба?', answers: ['Синий', 'Зелёный'], correct: 0, timeLimit: 5, readTime: 0 },
   ],
 };
 
@@ -172,10 +172,15 @@ test('Socket.IO: полная игра от лобби до финала', async
   await request(host, 'host:next');
   assert.equal((await earlyResults).isLast, true);
 
-  const annaEnd = once(anna, 'game:end');
+  // Финал: игроки ждут церемонию и узнают места только по команде ведущего.
+  const annaCeremony = once(anna, 'game:ceremony');
   const hostEnd = once(host, 'game:end');
   await request(host, 'host:next');
   const final = await hostEnd;
+  await annaCeremony;
+  const annaEnd = once(anna, 'game:end');
+  const revealed = await request(host, 'host:reveal', { count: final.revealOrder.length });
+  assert.equal(revealed.revealed, final.revealOrder.length);
   assert.equal(final.leaderboard.length, 2);
   assert.equal((await annaEnd).rank, 1);
 

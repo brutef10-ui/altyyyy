@@ -159,3 +159,40 @@ test('игра: ведущий может закрыть вопрос досро
   game.next();
   assert.equal(game.state, STATES.RESULTS);
 });
+
+test('ответ вручную: нормализация и опечатки', async () => {
+  const { isTextAnswerCorrect, normalizeTextAnswer } = await import('../src/answers.js');
+  assert.equal(normalizeTextAnswer('  Ёлка, «зелёная»!  '), 'елка зеленая');
+  assert.equal(isTextAnswerCorrect('ЮПИТЕР', ['Юпитер']), true);
+  assert.equal(isTextAnswerCorrect('юпитр', ['Юпитер']), true, '1 опечатка в слове из 6 букв');
+  assert.equal(isTextAnswerCorrect('юпт', ['Юпитер']), false);
+  assert.equal(isTextAnswerCorrect('кот', ['кит']), false, 'короткие слова — только точно');
+  assert.equal(isTextAnswerCorrect('1813', ['1812']), false, 'числа — только точно');
+  assert.equal(isTextAnswerCorrect('Jupiter', ['Юпитер', 'Jupiter']), true, 'любой из вариантов');
+  assert.equal(isTextAnswerCorrect('', ['Юпитер']), false);
+});
+
+test('квиз v2: типы вопросов, время чтения, картинка', () => {
+  const ok = validateQuiz({
+    title: 'v2',
+    questions: [
+      { type: 'text', text: 'Q1', accepted: ['да', 'ага'], timeLimit: 20, readTime: 8, image: 'a'.repeat(32) },
+      { text: 'Старый вопрос', answers: ['a', 'b'], correct: 0, timeLimit: 20 },
+    ],
+  });
+  assert.equal(ok.ok, true, ok.errors?.join('; '));
+  assert.deepEqual(ok.value.questions[0], { type: 'text', text: 'Q1', image: 'a'.repeat(32), timeLimit: 20, readTime: 8, accepted: ['да', 'ага'] });
+  assert.equal(ok.value.questions[1].type, 'choice', 'старые игры — вопросы с вариантами');
+  assert.equal(ok.value.questions[1].readTime, 5, 'время чтения по умолчанию');
+
+  const bad = validateQuiz({ title: 'v2', questions: [
+    { type: 'text', text: 'Q', accepted: [], timeLimit: 20 },
+    { type: 'poll', text: 'Q', timeLimit: 20 },
+    { type: 'choice', text: 'Q', answers: ['a', 'b'], correct: 0, timeLimit: 20, readTime: 7, image: '../x' },
+  ] });
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.includes('правильных ответа')));
+  assert.ok(bad.errors.some((e) => e.includes('неизвестный тип')));
+  assert.ok(bad.errors.some((e) => e.includes('время на чтение')));
+  assert.ok(bad.errors.some((e) => e.includes('картинка')));
+});

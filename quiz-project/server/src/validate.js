@@ -6,6 +6,9 @@ export const NICKNAME_MAX = 16;
 export const MAX_PHOTO_BYTES = 100 * 1024;
 const MIN_PHOTO_BYTES = 64;
 
+export const QUESTION_TYPES = Object.freeze(['choice', 'text']);
+export const IMAGE_ID_PATTERN = /^[a-f0-9]{32}$/;
+
 export const QUIZ_LIMITS = Object.freeze({
   titleMax: 80,
   questionsMin: 1,
@@ -14,8 +17,14 @@ export const QUIZ_LIMITS = Object.freeze({
   answersMin: 2,
   answersMax: 4,
   answerMax: 80,
+  acceptedMin: 1,
+  acceptedMax: 5,
+  textAnswerMax: 80,
   timeLimits: Object.freeze([5, 10, 15, 20, 30, 45, 60, 90, 120]),
   defaultTimeLimit: 20,
+  readTimes: Object.freeze([0, 3, 5, 8, 10, 15]),
+  defaultReadTime: 5,
+  imageMaxBytes: 1024 * 1024,
 });
 
 const ok = (value) => ({ ok: true, value });
@@ -98,7 +107,74 @@ export function validateAnswerIndex(value, answersCount) {
   return ok(value);
 }
 
+export function validateTextAnswer(value) {
+  const text = cleanText(value);
+  if (!text) return fail('Введите ответ');
+  if (charCount(text) > QUIZ_LIMITS.textAnswerMax) return fail(`Ответ длиннее ${QUIZ_LIMITS.textAnswerMax} символов`);
+  return ok(text);
+}
+
 // ---------- Игра (квиз) ----------
+
+function validateAnswerList(raw, { min, max, label, noun }, errors) {
+  const list = Array.isArray(raw) ? raw : [];
+  if (list.length < min || list.length > max) {
+    errors.push(min === max ? `${label}: нужно ${min} ${noun}` : `${label}: нужно от ${min} до ${max} ${noun}`);
+  }
+  return list.slice(0, max).map((item, index) => {
+    const text = cleanText(item);
+    if (!text) errors.push(`${label}: заполните вариант ${index + 1}`);
+    else if (charCount(text) > QUIZ_LIMITS.answerMax) errors.push(`${label}: вариант ${index + 1} длиннее ${QUIZ_LIMITS.answerMax} символов`);
+    return text;
+  });
+}
+
+function validateQuestion(raw, index, errors) {
+  const L = QUIZ_LIMITS;
+  const label = `Вопрос ${index + 1}`;
+  if (!isPlainObject(raw)) {
+    errors.push(`${label}: некорректные данные`);
+    return null;
+  }
+
+  // Игры, сохранённые до появления типов вопросов, — это вопросы с вариантами.
+  const type = raw.type === undefined ? 'choice' : raw.type;
+  if (!QUESTION_TYPES.includes(type)) errors.push(`${label}: неизвестный тип вопроса`);
+
+  const text = cleanText(raw.text, { multiline: true });
+  if (!text) errors.push(`${label}: введите текст вопроса`);
+  else if (charCount(text) > L.questionMax) errors.push(`${label}: текст длиннее ${L.questionMax} символов`);
+
+  const image = raw.image === undefined || raw.image === null || raw.image === '' ? null : raw.image;
+  if (image !== null && (typeof image !== 'string' || !IMAGE_ID_PATTERN.test(image))) {
+    errors.push(`${label}: некорректная картинка — загрузите её заново`);
+  }
+
+  const timeLimit = raw.timeLimit;
+  if (!L.timeLimits.includes(timeLimit)) {
+    errors.push(`${label}: время на ответ должно быть одним из значений: ${L.timeLimits.join(', ')} сек.`);
+  }
+
+  const readTime = raw.readTime === undefined ? L.defaultReadTime : raw.readTime;
+  if (!L.readTimes.includes(readTime)) {
+    errors.push(`${label}: время на чтение должно быть одним из значений: ${L.readTimes.join(', ')} сек.`);
+  }
+
+  const question = { type, text, image, timeLimit, readTime };
+
+  if (type === 'text') {
+    question.accepted = validateAnswerList(raw.accepted, { min: L.acceptedMin, max: L.acceptedMax, label, noun: 'правильных ответа' }, errors);
+    return question;
+  }
+
+  question.answers = validateAnswerList(raw.answers, { min: L.answersMin, max: L.answersMax, label, noun: 'варианта ответа' }, errors);
+  const correct = raw.correct;
+  if (!Number.isInteger(correct) || correct < 0 || correct >= question.answers.length) {
+    errors.push(`${label}: отметьте правильный ответ`);
+  }
+  question.correct = correct;
+  return question;
+}
 
 export function validateQuiz(input) {
   if (!isPlainObject(input)) return { ok: false, errors: ['Некорректные данные игры'] };
@@ -113,41 +189,13 @@ export function validateQuiz(input) {
   if (rawQuestions.length < L.questionsMin) errors.push('Добавьте хотя бы один вопрос');
   if (rawQuestions.length > L.questionsMax) errors.push(`Вопросов не может быть больше ${L.questionsMax}`);
 
-  const questions = rawQuestions.slice(0, L.questionsMax).map((raw, index) => {
-    const label = `Вопрос ${index + 1}`;
-    if (!isPlainObject(raw)) {
-      errors.push(`${label}: некорректные данные`);
-      return null;
-    }
-
-    const text = cleanText(raw.text, { multiline: true });
-    if (!text) errors.push(`${label}: введите текст вопроса`);
-    else if (charCount(text) > L.questionMax) errors.push(`${label}: текст длиннее ${L.questionMax} символов`);
-
-    const rawAnswers = Array.isArray(raw.answers) ? raw.answers : [];
-    if (rawAnswers.length < L.answersMin || rawAnswers.length > L.answersMax) {
-      errors.push(`${label}: нужно от ${L.answersMin} до ${L.answersMax} вариантов ответа`);
-    }
-    const answers = rawAnswers.slice(0, L.answersMax).map((answer, answerIndex) => {
-      const answerText = cleanText(answer);
-      if (!answerText) errors.push(`${label}: заполните вариант ${answerIndex + 1}`);
-      else if (charCount(answerText) > L.answerMax) errors.push(`${label}: вариант ${answerIndex + 1} длиннее ${L.answerMax} символов`);
-      return answerText;
-    });
-
-    const correct = raw.correct;
-    if (!Number.isInteger(correct) || correct < 0 || correct >= answers.length) {
-      errors.push(`${label}: отметьте правильный ответ`);
-    }
-
-    const timeLimit = raw.timeLimit;
-    if (!L.timeLimits.includes(timeLimit)) {
-      errors.push(`${label}: время на ответ должно быть одним из значений: ${L.timeLimits.join(', ')} сек.`);
-    }
-
-    return { text, answers, correct, timeLimit };
-  });
+  const questions = rawQuestions.slice(0, L.questionsMax).map((raw, index) => validateQuestion(raw, index, errors));
 
   if (errors.length) return { ok: false, errors };
   return { ok: true, value: { title, questions } };
+}
+
+/** id всех картинок игры. */
+export function quizImageIds(quiz) {
+  return (quiz?.questions ?? []).map((question) => question?.image).filter((id) => typeof id === 'string' && IMAGE_ID_PATTERN.test(id));
 }

@@ -1,9 +1,10 @@
 // События Socket.IO.
 //
-// Ведущий → сервер: host:create, host:resume, host:start, host:next, host:kick, host:close
+// Ведущий → сервер: host:create, host:resume, host:start, host:next, host:reveal, host:kick, host:close
 // Игрок → сервер:   player:join, player:rejoin, player:answer
 // Сервер → клиенты: lobby:update, game:started, question, question:progress, results,
-//                   game:end, room:closed, player:kicked, error
+//                   game:ceremony, game:end, room:closed, player:kicked, error
+// Подробности и форматы данных — в PROTOCOL.md.
 //
 // Каждый запрос клиента получает ответ через acknowledgement: { ok: true, ... } или
 // { ok: false, error, code }. Если клиент не передал callback, ошибка приходит событием «error».
@@ -12,7 +13,7 @@ import { ownerFromSocket } from './auth.js';
 import { PlayerRegistry } from './players.js';
 import { RateLimiter } from './rateLimit.js';
 import { STATES } from './game.js';
-import { isPlainObject, validateNickname, validatePhoto, validateQuiz, validateRoomCode } from './validate.js';
+import { isPlainObject, quizImageIds, validateNickname, validatePhoto, validateQuiz, validateRoomCode } from './validate.js';
 
 const playersChannel = (code) => `players:${code}`;
 
@@ -23,9 +24,11 @@ const CLOSE_MESSAGES = {
   shutdown: 'Сервер перезапускается. Игра завершена.',
 };
 
-export function registerSocketHandlers(io, { rooms, quizService, config }) {
-  const eventLimiter = new RateLimiter({ windowMs: 10_000, max: 40 }); // любые события одного сокета
-  const joinLimiter = new RateLimiter({ windowMs: 60_000, max: 20 }); // попытки входа с одного IP
+export function registerSocketHandlers(io, { rooms, quizService, images, config }) {
+  const eventLimiter = new RateLimiter({ windowMs: 10_000, max: 60 }); // любые события одного сокета
+  // По IP считаем только неудачные попытки входа (неверный код): все игроки одной Wi-Fi сети
+  // выглядят для сервера как один IP, и успешные входы ограничивать нельзя.
+  const joinFailures = new RateLimiter({ windowMs: 60_000, max: 30 });
   const createLimiter = new RateLimiter({ windowMs: 60_000, max: 10 }); // создание комнат одним ведущим
 
   // ---------- Рассылка событий из Game ----------
@@ -108,12 +111,30 @@ export function registerSocketHandlers(io, { rooms, quizService, config }) {
 
   // ---------- Вспомогательные функции ----------
 
+  // IP клиента по тем же правилам, что и req.ip в Express: доверяем ровно trustProxy последним прокси.
   function clientIp(socket) {
-    if (config.trustProxy) {
-      const forwarded = socket.handshake.headers['x-forwarded-for'];
-      if (typeof forwarded === 'string' && forwarded) return forwarded.split(',')[0].trim();
+    const hops = typeof config.trustProxy === 'number' ? config.trustProxy : config.trustProxy ? 1 : 0;
+    const forwarded = String(socket.handshake.headers['x-forwarded-for'] || '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .reverse();
+    const chain = [socket.handshake.address, ...forwarded];
+    return chain[Math.min(hops, chain.length - 1)];
+  }
+
+  // Поиск комнаты при входе игрока: неверные коды считаются попытками подбора.
+  function findRoomForJoin(socket, code) {
+    const ip = clientIp(socket);
+    if (joinFailures.isLimited(ip)) {
+      throw new AppError('Слишком много попыток с неверным кодом. Подождите минуту.', { status: 429, code: 'RATE_LIMIT' });
     }
-    return socket.handshake.address;
+    try {
+      return findRoom(code);
+    } catch (error) {
+      joinFailures.hit(ip);
+      throw error;
+    }
   }
 
   function on(socket, event, handler) {
@@ -184,6 +205,9 @@ export function registerSocketHandlers(io, { rooms, quizService, config }) {
         if (!checked.ok) throw new AppError(checked.errors[0], { status: 422, code: 'INVALID_QUIZ', details: checked.errors });
         quiz = checked.value;
       }
+      if (quizImageIds(quiz).some((id) => !images.has(id))) {
+        throw new AppError('Одна из картинок не найдена на сервере — загрузите её заново в редакторе', { status: 422, code: 'IMAGE_MISSING' });
+      }
 
       const room = rooms.create({ quiz, ownerId: owner.id, hostSocketId: socket.id, createNotifier });
       socket.data = { role: 'host', roomCode: room.code };
@@ -222,6 +246,11 @@ export function registerSocketHandlers(io, { rooms, quizService, config }) {
       return { state: room.game.state };
     });
 
+    on(socket, 'host:reveal', async ({ count }) => {
+      const room = requireHostRoom();
+      return room.game.reveal(count);
+    });
+
     on(socket, 'host:kick', async ({ playerId }) => {
       const room = requireHostRoom();
       if (typeof playerId !== 'string' || !removePlayer(room, playerId, 'kicked')) throw notFound('Игрок не найден');
@@ -238,9 +267,8 @@ export function registerSocketHandlers(io, { rooms, quizService, config }) {
 
     on(socket, 'player:join', async ({ code, nickname, photo }) => {
       if (socket.data.role) throw conflict('Вы уже в игре');
-      if (!joinLimiter.take(clientIp(socket))) throw new AppError('Слишком много попыток входа. Подождите минуту.', { status: 429, code: 'RATE_LIMIT' });
 
-      const room = findRoom(code);
+      const room = findRoomForJoin(socket, code);
       if (!room.isJoinable) throw conflict('Игра уже началась — войти нельзя', 'GAME_STARTED');
 
       const nick = validateNickname(nickname);
@@ -265,9 +293,10 @@ export function registerSocketHandlers(io, { rooms, quizService, config }) {
       };
     });
 
+    // Возврат в игру по секретному токену (24 случайных байта) не ограничиваем по IP:
+    // после сбоя сети все игроки зала переподключаются одновременно.
     on(socket, 'player:rejoin', async ({ code, token }) => {
       if (socket.data.role) throw conflict('Вы уже в игре');
-      if (!joinLimiter.take(clientIp(socket))) throw new AppError('Слишком много попыток входа. Подождите минуту.', { status: 429, code: 'RATE_LIMIT' });
 
       const room = findRoom(code);
       const player = room.players.findByToken(token);
@@ -330,7 +359,7 @@ export function registerSocketHandlers(io, { rooms, quizService, config }) {
     stop() {
       clearInterval(sweeper);
       eventLimiter.stop();
-      joinLimiter.stop();
+      joinFailures.stop();
       createLimiter.stop();
     },
   };

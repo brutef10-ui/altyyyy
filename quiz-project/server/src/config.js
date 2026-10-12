@@ -52,10 +52,13 @@ export function loadConfig(overrides = {}) {
     serveSites: env.SERVE_SITES === 'true',
     sitesRoot: path.resolve(SERVER_ROOT, '..'),
     dataFile: path.resolve(SERVER_ROOT, env.DATA_FILE || 'data/quizzes.json'),
+    imageGcMinAgeMs: 48 * 60 * 60_000,
+    imageGcIntervalMs: 60 * 60_000,
     trustProxy: trustProxy(env.TRUST_PROXY),
     hostReconnectMs: integer(env.HOST_RECONNECT_MS, 15_000, { min: 1_000, max: 300_000 }),
-    playerReconnectMs: integer(env.PLAYER_RECONNECT_MS, 30_000, { min: 1_000, max: 600_000 }),
-    maxPlayersPerRoom: integer(env.MAX_PLAYERS_PER_ROOM, 100, { min: 1, max: 1_000 }),
+    // Игрок, у которого погас экран или пропала сеть в лобби, остаётся в комнате 10 минут.
+    playerReconnectMs: integer(env.PLAYER_RECONNECT_MS, 600_000, { min: 1_000, max: 3_600_000 }),
+    maxPlayersPerRoom: integer(env.MAX_PLAYERS_PER_ROOM, 200, { min: 1, max: 1_000 }),
     maxRooms: integer(env.MAX_ROOMS, 500, { min: 1, max: 100_000 }),
     // Завершённая игра живёт ещё 15 минут, любая комната — не дольше 6 часов.
     finishedRoomTtlMs: 15 * 60_000,
@@ -63,6 +66,9 @@ export function loadConfig(overrides = {}) {
     roomSweepIntervalMs: 60_000,
     ...overrides,
   };
+
+  // Картинки к вопросам хранятся рядом с файлом игр (на том же постоянном диске).
+  config.imagesDir ??= path.join(path.dirname(config.dataFile), 'images');
 
   if (config.playerSiteUrl === undefined) {
     // Без адреса в режиме SERVE_SITES лобби покажет адрес, с которого открыт сайт ведущего.

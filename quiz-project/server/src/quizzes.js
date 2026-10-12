@@ -2,13 +2,13 @@
 //
 // QuizService — бизнес-логика (проверка данных, права владельца).
 // JsonQuizStore — хранилище в JSON-файле. Чтобы перейти на SQLite, напишите класс
-// с теми же пятью методами (listByOwner, findById, insert, update, remove) и передайте
+// с теми же методами (listAll, listByOwner, findById, insert, update, remove) и передайте
 // его в QuizService вместо JsonQuizStore — остальной код менять не нужно. Пример — в README.
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AppError, notFound } from './errors.js';
-import { validateQuiz } from './validate.js';
+import { quizImageIds, validateQuiz } from './validate.js';
 
 const ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -48,6 +48,10 @@ export class JsonQuizStore {
     });
     this.#queue = run.catch(() => {});
     return run;
+  }
+
+  async listAll() {
+    return this.#data.quizzes.map((quiz) => structuredClone(quiz));
   }
 
   async listByOwner(ownerId) {
@@ -111,9 +115,22 @@ function checkQuiz(input) {
 }
 
 export class QuizService {
-  constructor(store, { maxQuizzesPerOwner = 200 } = {}) {
+  constructor(store, { images = null, maxQuizzesPerOwner = 200 } = {}) {
     this.store = store;
+    this.images = images;
     this.maxQuizzesPerOwner = maxQuizzesPerOwner;
+  }
+
+  #checkImages(quiz) {
+    if (this.images && quizImageIds(quiz).some((id) => !this.images.has(id))) {
+      throw new AppError('Одна из картинок не найдена на сервере — загрузите её заново', { status: 422, code: 'IMAGE_MISSING' });
+    }
+  }
+
+  /** id картинок всех сохранённых игр — чтобы не удалить используемые. */
+  async referencedImageIds() {
+    const quizzes = await this.store.listAll();
+    return new Set(quizzes.flatMap(quizImageIds));
   }
 
   async list(ownerId) {
@@ -134,6 +151,7 @@ export class QuizService {
 
   async create(ownerId, input) {
     const data = checkQuiz(input);
+    this.#checkImages(data);
     const existing = await this.store.listByOwner(ownerId);
     if (existing.length >= this.maxQuizzesPerOwner) {
       throw new AppError(`Можно сохранить не больше ${this.maxQuizzesPerOwner} игр`, { status: 409, code: 'TOO_MANY_QUIZZES' });
@@ -146,6 +164,7 @@ export class QuizService {
   async update(ownerId, id, input) {
     await this.#findOwned(ownerId, id);
     const data = checkQuiz(input);
+    this.#checkImages(data);
     const updated = await this.store.update(id, { ...data, updatedAt: new Date().toISOString() });
     if (!updated) throw notFound('Игра не найдена');
     return toPublic(updated);
