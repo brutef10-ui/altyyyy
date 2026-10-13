@@ -82,6 +82,63 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
+# ALTY: Android Gradle Plugin 8.12 (build.gradle) работает только на Java 17+.
+# Если JAVA_HOME указывает на Java старше 17 (например, Java 8 в настройках IDE),
+# ищем установленную JDK 17-23 и запускаем Gradle на ней. Если JAVA_HOME уже Java 17+, ничего не меняется.
+alty_java_major() {
+    # $1 — команда java; печатает мажорную версию (8, 11, 17, ...) или пустую строку
+    alty_v=`"$1" -version 2>&1 | sed -n 's/.* version "\([^"]*\)".*/\1/p' | head -n 1`
+    case "$alty_v" in
+        1.*) echo "$alty_v" | cut -d. -f2 ;;
+        *) echo "$alty_v" | sed 's/[^0-9].*//' ;;
+    esac
+}
+alty_jdk_major() {
+    # $1 — каталог JDK; сначала файл release, иначе bin/java -version
+    alty_r=""
+    if [ -f "$1/release" ] ; then
+        alty_r=`sed -n 's/^JAVA_VERSION="\([^"]*\)".*/\1/p' "$1/release" | head -n 1`
+        case "$alty_r" in
+            1.*) alty_r=`echo "$alty_r" | cut -d. -f2` ;;
+            *) alty_r=`echo "$alty_r" | sed 's/[^0-9].*//'` ;;
+        esac
+    fi
+    if [ -z "$alty_r" ] ; then alty_r=`alty_java_major "$1/bin/java"` ; fi
+    echo "$alty_r"
+}
+if [ -n "$JAVA_HOME" ] ; then alty_cmd="$JAVA_HOME/bin/java" ; else alty_cmd="java" ; fi
+alty_major=`alty_java_major "$alty_cmd" 2>/dev/null`
+case "$alty_major" in
+    ''|*[!0-9]*) ;;
+    *)
+        if [ "$alty_major" -lt 17 ] ; then
+            alty_found=""
+            alty_found_major=""
+            for alty_dir in /opt/java/* /usr/lib/jvm/* /usr/java/* /usr/local/java/* /opt/jdk* /opt/*jdk* "$HOME"/.jdks/* "$HOME"/.gradle/jdks/* "$PREFIX"/lib/jvm/* "$PREFIX"/opt/* ; do
+                [ -x "$alty_dir/bin/java" ] && [ -x "$alty_dir/bin/javac" ] || continue
+                alty_m=`alty_jdk_major "$alty_dir"`
+                case "$alty_m" in ''|*[!0-9]*) continue ;; esac
+                # Gradle 8.13 запускается на Java до 23; из подходящих берём самую раннюю (17 раньше 21)
+                if [ "$alty_m" -ge 17 ] && [ "$alty_m" -le 23 ] ; then
+                    if [ -z "$alty_found" ] || [ "$alty_m" -lt "$alty_found_major" ] ; then
+                        alty_found="$alty_dir"
+                        alty_found_major="$alty_m"
+                    fi
+                fi
+            done
+            if [ -n "$alty_found" ] ; then
+                echo "ALTY: сейчас выбрана Java $alty_major, а для сборки нужна Java 17+. Использую $alty_found (Java $alty_found_major)." >&2
+                JAVA_HOME="$alty_found"
+                export JAVA_HOME
+                PATH="$JAVA_HOME/bin:$PATH"
+                export PATH
+            else
+                echo "ALTY: для сборки нужна Java 17+, а выбрана Java $alty_major и другой JDK 17-23 не найдено. Установите JDK 17 (например: apt install openjdk-17-jdk) или укажите её в JAVA_HOME." >&2
+            fi
+        fi
+        ;;
+esac
+
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
     if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
