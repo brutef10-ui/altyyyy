@@ -16,10 +16,12 @@ const server = createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 16384 });
 const rooms = new Map();
 const upload = multer({ dest: temp, limits: { fileSize: 40 * 1024 * 1024, files: 12, fields: 2, fieldSize: 256 } });
+const videoUpload = multer({ dest: temp, limits: { fileSize: 500 * 1024 * 1024, files: 1, fields: 2, fieldSize: 64 } });
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const ownerHash = (key) => createHash('sha256').update(key).digest('hex');
 const validKey = (key) => typeof key === 'string' && /^[a-f0-9]{64}$/.test(key);
 const validId = (id) => typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id);
+const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const ownerPath = (owner) => path.join(storage, owner);
 const deckPath = (owner, id) => path.join(ownerPath(owner), id);
 const cleanFiles = (files = []) => Promise.all(files.map((file) => fs.rm(file.path, { force: true }).catch(() => {})));
@@ -31,7 +33,8 @@ app.use((req, res, next) => {
   next();
 });
 app.use('/api', (req, res, next) => {
-  const key = req.get('X-Device-Key');
+  // <video> не умеет слать заголовки, поэтому для GET ключ можно передать в ?k=
+  const key = req.get('X-Device-Key') || (req.method === 'GET' ? req.query.k : undefined);
   if (!validKey(key)) return res.status(401).json({ error: 'Не удалось определить устройство. Обновите страницу.' });
   req.owner = ownerHash(key);
   res.setHeader('Cache-Control', 'no-store');
@@ -41,11 +44,15 @@ app.use('/api', (req, res, next) => {
 async function readDeck(owner, id) {
   if (!validId(id)) throw Object.assign(new Error('Презентация не найдена.'), { status: 404 });
   try {
-    return JSON.parse(await fs.readFile(path.join(deckPath(owner, id), 'meta.json'), 'utf8'));
+    const deck = JSON.parse(await fs.readFile(path.join(deckPath(owner, id), 'meta.json'), 'utf8'));
+    deck.videos ||= [];
+    return deck;
   } catch {
     throw Object.assign(new Error('Презентация не найдена.'), { status: 404 });
   }
 }
+const writeDeck = (owner, deck) => fs.writeFile(path.join(deckPath(owner, deck.id), 'meta.json'), JSON.stringify(deck));
+const deckRunning = (owner, id) => [...rooms.values()].some((room) => room.owner === owner && room.state.deckId === id);
 
 app.get('/api/presentations', asyncRoute(async (req, res) => {
   await fs.mkdir(ownerPath(req.owner), { recursive: true });
@@ -90,7 +97,7 @@ app.post('/api/presentations', (req, res, next) => {
         id, name, type: isPdf ? 'pdf' : 'images', createdAt: Date.now(),
         size: files.reduce((total, file) => total + file.size, 0),
         files: files.map((file, index) => ({ index, type: types[index] })),
-        count: isPdf ? null : files.length
+        count: isPdf ? null : files.length, videos: []
       };
       await Promise.all(files.map((file, index) => fs.rename(file.path, path.join(directory, String(index)))));
       await fs.writeFile(path.join(directory, 'meta.json'), JSON.stringify(meta));
@@ -103,6 +110,101 @@ app.post('/api/presentations', (req, res, next) => {
   });
 });
 
+// Принимает ссылку на дизайн Canva (просмотр, редактирование или код встраивания)
+// и превращает её в адрес для встраивания: https://www.canva.com/design/<id>/<token>/view?embed
+function canvaEmbed(raw) {
+  const found = String(raw || '').match(/https:\/\/(?:www\.)?canva\.com\/design\/[^\s"'<>]+/);
+  if (!found) return null;
+  let url;
+  try { url = new URL(found[0].replace(/&amp;/g, '&')); } catch { return null; }
+  const m = url.pathname.match(/^\/design\/([A-Za-z0-9_-]{6,40})(?:\/([A-Za-z0-9_-]{6,80}))?\/(?:view|edit|watch|present)\/?$/);
+  return m ? `https://www.canva.com/design/${m[1]}${m[2] ? '/' + m[2] : ''}/view?embed` : null;
+}
+async function resolveShortLink(raw) {
+  let url = String(raw || '').trim();
+  for (let hop = 0; hop < 4 && /^https:\/\/canva\.link\//i.test(url); hop++) {
+    try {
+      const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(6000) });
+      const next = res.headers.get('location');
+      if (!next) break;
+      url = new URL(next, url).href;
+    } catch { break; }
+  }
+  return url;
+}
+
+app.post('/api/presentations/canva', express.json({ limit: '8kb' }), asyncRoute(async (req, res) => {
+  const embed = canvaEmbed(await resolveShortLink(req.body?.url));
+  if (!embed) throw fail('Это не похоже на ссылку на дизайн Canva. Нужна ссылка вида canva.com/design/…');
+  const count = Number(req.body?.count);
+  if (!Number.isInteger(count) || count < 1 || count > 500) throw fail('Укажите, сколько слайдов в презентации (от 1 до 500).');
+  const id = randomUUID();
+  const meta = {
+    id, type: 'canva', url: embed, createdAt: Date.now(), size: 0, files: [], count, videos: [],
+    name: String(req.body?.name || '').trim().slice(0, 100) || 'Презентация Canva'
+  };
+  await fs.mkdir(deckPath(req.owner, id), { recursive: true });
+  await writeDeck(req.owner, meta);
+  res.status(201).json(meta);
+}));
+
+async function videoType(file) {
+  const handle = await fs.open(file.path, 'r');
+  const buffer = Buffer.alloc(16);
+  try { await handle.read(buffer, 0, 16, 0); } finally { await handle.close(); }
+  if (buffer.subarray(4, 8).toString() === 'ftyp') return buffer.subarray(8, 12).toString() === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+  if (buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) return 'video/webm';
+  throw fail('Поддерживаются видео MP4, MOV и WebM.');
+}
+
+app.post('/api/presentations/:id/videos', (req, res, next) => {
+  videoUpload.single('file')(req, res, async (error) => {
+    if (error) {
+      await cleanFiles(req.file ? [req.file] : []);
+      return next(error.code === 'LIMIT_FILE_SIZE' ? fail('Видео слишком большое. Максимум — 500 МБ.') : error);
+    }
+    try {
+      if (!req.file) throw fail('Выберите видеофайл.');
+      const deck = await readDeck(req.owner, req.params.id);
+      if (deckRunning(req.owner, deck.id)) throw fail('Сначала остановите эту презентацию.', 409);
+      const slide = Number(req.body.slide) - 1;
+      const limit = deck.count || 10000;
+      if (!Number.isInteger(slide) || slide < 0 || slide >= limit) throw fail(`Номер слайда должен быть от 1 до ${limit}.`);
+      const type = await videoType(req.file);
+      const video = { id: randomUUID(), slide, type, size: req.file.size };
+      await fs.rename(req.file.path, path.join(deckPath(req.owner, deck.id), 'v-' + video.id));
+      const old = deck.videos.filter((v) => v.slide === slide);
+      deck.videos = [...deck.videos.filter((v) => v.slide !== slide), video].sort((a, b) => a.slide - b.slide);
+      await writeDeck(req.owner, deck);
+      await Promise.all(old.map((v) => fs.rm(path.join(deckPath(req.owner, deck.id), 'v-' + v.id), { force: true })));
+      res.status(201).json(deck);
+    } catch (error) {
+      await cleanFiles(req.file ? [req.file] : []);
+      next(error);
+    }
+  });
+});
+
+app.get('/api/presentations/:id/videos/:vid', asyncRoute(async (req, res) => {
+  const deck = await readDeck(req.owner, req.params.id);
+  const video = deck.videos.find((v) => v.id === req.params.vid);
+  if (!video) return res.status(404).json({ error: 'Видео не найдено.' });
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.type(video.type);
+  res.sendFile(path.join(deckPath(req.owner, deck.id), 'v-' + video.id));
+}));
+
+app.delete('/api/presentations/:id/videos/:vid', asyncRoute(async (req, res) => {
+  const deck = await readDeck(req.owner, req.params.id);
+  if (deckRunning(req.owner, deck.id)) throw fail('Сначала остановите эту презентацию.', 409);
+  const video = deck.videos.find((v) => v.id === req.params.vid);
+  if (!video) return res.status(404).json({ error: 'Видео не найдено.' });
+  deck.videos = deck.videos.filter((v) => v !== video);
+  await writeDeck(req.owner, deck);
+  await fs.rm(path.join(deckPath(req.owner, deck.id), 'v-' + video.id), { force: true });
+  res.json(deck);
+}));
+
 app.get('/api/presentations/:id/files/:index', asyncRoute(async (req, res) => {
   const deck = await readDeck(req.owner, req.params.id);
   const index = Number(req.params.index);
@@ -113,7 +215,7 @@ app.get('/api/presentations/:id/files/:index', asyncRoute(async (req, res) => {
 
 app.delete('/api/presentations/:id', asyncRoute(async (req, res) => {
   const deck = await readDeck(req.owner, req.params.id);
-  if ([...rooms.values()].some((room) => room.owner === req.owner && room.state.deckId === deck.id)) {
+  if (deckRunning(req.owner, deck.id)) {
     return res.status(409).json({ error: 'Сначала остановите эту презентацию.' });
   }
   await fs.rm(deckPath(req.owner, deck.id), { recursive: true, force: true });
@@ -138,7 +240,8 @@ function publicRoom(room) {
   };
 }
 function broadcast(room) { io.to(room.code).emit('room:update', publicRoom(room)); }
-function emptyState() { return { deckId: null, title: '', slide: 0, total: 0, playing: false, blank: false }; }
+// videos — номера слайдов с видео, video — видео на текущем слайде уже запущено
+function emptyState() { return { deckId: null, title: '', slide: 0, total: 0, playing: false, blank: false, videos: [], video: false }; }
 function makeCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code;
@@ -230,8 +333,9 @@ io.on('connection', (socket) => {
     try {
       const deck = await readDeck(room.owner, id);
       if (screenRoom(socket) !== room || !rooms.has(room.code)) return replyError(ack, 'Комната закрыта.');
-      if (!Number.isInteger(total) || total < 1 || total > 10000 || (deck.type === 'images' && total !== deck.files.length)) return replyError(ack, 'Некорректное количество слайдов.');
-      room.state = { deckId: deck.id, title: deck.name, slide: 0, total, playing: true, blank: false };
+      if (!Number.isInteger(total) || total < 1 || total > 10000 || (deck.count && total !== deck.count)) return replyError(ack, 'Некорректное количество слайдов.');
+      const videos = [...new Set(deck.videos.map((v) => v.slide))].filter((slide) => slide < total);
+      room.state = { deckId: deck.id, title: deck.name, slide: 0, total, playing: true, blank: false, videos, video: false };
       if (typeof ack === 'function') ack({ ok: true });
       broadcast(room);
     } catch (error) { replyError(ack, error.message); }
@@ -243,8 +347,15 @@ io.on('connection', (socket) => {
     if (!room.state.playing) return replyError(ack, 'На экране ещё не запущена презентация.');
     if (Date.now() - (socket.data.lastCommand || 0) < 80) return replyError(ack, '');
     socket.data.lastCommand = Date.now();
-    if (action === 'next') room.state.slide = Math.min(room.state.total - 1, room.state.slide + 1);
-    else if (action === 'prev') room.state.slide = Math.max(0, room.state.slide - 1);
+    const s = room.state;
+    if (action === 'next') {
+      // На слайде с видео первое «вперёд» запускает видео, второе — листает дальше
+      if (s.videos.includes(s.slide) && !s.video) s.video = true;
+      else if (s.slide < s.total - 1) { s.slide += 1; s.video = false; }
+    } else if (action === 'prev') {
+      if (s.video) s.video = false;
+      else s.slide = Math.max(0, s.slide - 1);
+    }
     else if (action === 'blank') room.state.blank = !room.state.blank;
     else if (action === 'stop' && room.screen === socket.id) room.state = emptyState();
     else return replyError(ack, 'Недоступная команда.');

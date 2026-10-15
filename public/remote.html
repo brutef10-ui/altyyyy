@@ -69,7 +69,8 @@ $('#code').value = (q || localStorage.getItem('al-code') || '').toUpperCase().re
 
 function paint() {
   const s = room.state;
-  $('#cnt').textContent = s.playing ? `${s.slide + 1} / ${s.total}` : '';
+  const vid = s.playing && s.videos?.includes(s.slide) ? (s.video ? ' · видео идёт' : ' · ▶ видео') : '';
+  $('#cnt').textContent = s.playing ? `${s.slide + 1} / ${s.total}${vid}` : '';
   $('#hint').textContent = !room.screenOnline ? 'Экран отключён. Ждём, когда он вернётся.' : !s.playing ? 'Запустите презентацию на экране.' : '';
 }
 function show(r) {
