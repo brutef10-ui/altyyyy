@@ -162,7 +162,13 @@ function redirectUri(req) {
 app.get('/api/canva', asyncRoute(async (req, res) => {
   res.json({ configured: canva.configured, connected: await canva.connected(req.owner), redirectUri: redirectUri(req) });
 }));
-app.post('/api/canva/connect', (req, res) => res.json({ url: canva.startAuth(req.owner, redirectUri(req)) }));
+const readCookie = (req, name) => (req.headers.cookie || '').split(/;\s*/).map((part) => part.split('=')).find(([key]) => key === name)?.[1];
+const authCookie = { httpOnly: true, sameSite: 'lax', path: '/canva' };
+app.post('/api/canva/connect', (req, res) => {
+  const { url, nonce } = canva.startAuth(req.owner, redirectUri(req));
+  res.cookie('al_canva', nonce, { ...authCookie, secure: req.secure, maxAge: 600000 });
+  res.json({ url });
+});
 app.delete('/api/canva', asyncRoute(async (req, res) => {
   await canva.disconnect(req.owner);
   res.json({ ok: true });
@@ -172,13 +178,14 @@ app.get('/canva/callback', async (req, res) => {
   let ok = false, message;
   try {
     if (req.query.error) throw fail(req.query.error === 'access_denied' ? 'Вы отменили подключение.' : 'Canva отказала в доступе.');
-    await canva.finishAuth(String(req.query.state || ''), String(req.query.code || ''));
+    await canva.finishAuth(String(req.query.state || ''), String(req.query.code || ''), readCookie(req, 'al_canva'));
     ok = true;
     message = 'Можно закрыть эту вкладку и вернуться к экрану.';
   } catch (error) {
     if (!error.status) console.error(error);
     message = error.status ? error.message : 'Что-то пошло не так. Попробуйте ещё раз.';
   }
+  res.clearCookie('al_canva', authCookie);
   res.setHeader('Cache-Control', 'no-store');
   res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Canva</title></head>
 <body style="font:17px/1.5 system-ui,sans-serif;background:#E8ECF4;color:#10131F;padding:40px 20px;max-width:520px;margin:0 auto">
@@ -187,9 +194,9 @@ ${ok ? "<script>try{localStorage.setItem('al-canva',String(Date.now()))}catch{}s
 });
 
 function startImport(owner, deck) {
-  const control = { cancelled: false };
-  imports.set(deck.id, control);
   let saving = Promise.resolve();
+  const control = { cancelled: false, idle: () => saving };
+  imports.set(deck.id, control);
   const save = () => (saving = saving.catch(() => {}).then(() => (control.cancelled ? undefined : writeDeck(owner, deck))));
   canva.importDeck({ owner, deck, dir: deckPath(owner, deck.id), save, cancelled: () => control.cancelled })
     .catch((error) => console.error(error))
@@ -199,9 +206,18 @@ function startImport(owner, deck) {
 app.post('/api/presentations/canva', express.json({ limit: '8kb' }), asyncRoute(async (req, res) => {
   const link = parseCanva(await resolveShortLink(req.body?.url));
   if (!link) throw fail('Это не похоже на ссылку на дизайн Canva. Нужна ссылка вида canva.com/design/…');
+  const count = Number(req.body?.count);
+  const hasCount = Number.isInteger(count) && count >= 1 && count <= 500;
+  let design = null;
   if (await canva.connected(req.owner)) {
+    try { design = await canva.getDesign(req.owner, link.designId); } catch (error) {
+      // Чужую презентацию API не отдаст — её можно показать встроенным окном Canva
+      if (error.status !== 403) throw error;
+      if (!hasCount) throw Object.assign(fail('Эта презентация не из подключённого аккаунта Canva. Её можно показать встроенным окном Canva, но видео в нём не будут включаться с пульта. Укажите число слайдов и нажмите «Добавить» ещё раз.', 409), { reason: 'needs_count' });
+    }
+  }
+  if (design) {
     // Canva подключена: сами забираем слайды и находим видео
-    const design = await canva.getDesign(req.owner, link.designId);
     const id = randomUUID();
     const meta = {
       id, type: 'canva', url: link.embed, designId: link.designId, createdAt: Date.now(), size: 0, files: [],
@@ -213,8 +229,7 @@ app.post('/api/presentations/canva', express.json({ limit: '8kb' }), asyncRoute(
     startImport(req.owner, meta);
     return res.status(201).json(meta);
   }
-  const count = Number(req.body?.count);
-  if (!Number.isInteger(count) || count < 1 || count > 500) throw fail('Укажите, сколько слайдов в презентации (от 1 до 500).');
+  if (!hasCount) throw Object.assign(fail('Укажите, сколько слайдов в презентации (от 1 до 500).'), { reason: 'needs_count' });
   const id = randomUUID();
   const meta = {
     id, type: 'canva', url: link.embed, createdAt: Date.now(), size: 0, files: [], count, videos: [],
@@ -298,8 +313,13 @@ app.delete('/api/presentations/:id', asyncRoute(async (req, res) => {
     return res.status(409).json({ error: 'Сначала остановите эту презентацию.' });
   }
   const control = imports.get(deck.id);
-  if (control) { control.cancelled = true; imports.delete(deck.id); }
-  await fs.rm(deckPath(req.owner, deck.id), { recursive: true, force: true });
+  if (control) {
+    // Останавливаем загрузку из Canva и ждём, пока допишется её последнее сохранение
+    control.cancelled = true;
+    imports.delete(deck.id);
+    await control.idle().catch(() => {});
+  }
+  await fs.rm(deckPath(req.owner, deck.id), { recursive: true, force: true, maxRetries: 3 });
   res.json({ ok: true });
 }));
 
@@ -311,7 +331,7 @@ app.use((error, req, res, next) => {
     return res.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Файл слишком большой. Максимум — 40 МБ.' : 'Можно загрузить не более 12 изображений или один PDF.' });
   }
   if (!error.status) console.error(error);
-  res.status(error.status || 500).json({ error: error.status ? error.message : 'Что-то пошло не так. Попробуйте ещё раз.' });
+  res.status(error.status || 500).json({ error: error.status ? error.message : 'Что-то пошло не так. Попробуйте ещё раз.', reason: error.status ? error.reason : undefined });
 });
 
 function publicRoom(room) {

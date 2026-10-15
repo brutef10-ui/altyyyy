@@ -161,11 +161,14 @@ const loaded = {}, blobs = {};
 const emit = (ev, data) => new Promise((res) => socket.timeout(6000).emit(ev, data, (e, r) => res(e ? { error: 'Нет связи с сервером.' } : r || {})));
 function toast(m) {
   const t = $('#toast'); t.textContent = m; t.classList.add('on');
-  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 3500);
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), Math.max(3500, m.length * 60));
 }
 async function api(p, o = {}) {
   const r = await fetch('/api' + p, { ...o, headers: { 'X-Device-Key': KEY, ...o.headers } });
-  if (!r.ok) { let m = 'Что-то пошло не так.'; try { m = (await r.json()).error; } catch {} throw new Error(m); }
+  if (!r.ok) {
+    let b = {}; try { b = await r.json(); } catch {}
+    throw Object.assign(new Error(b.error || 'Что-то пошло не так.'), { reason: b.reason });
+  }
   return r;
 }
 let poll;
@@ -174,6 +177,7 @@ async function refresh() {
   // Пока презентация загружается из Canva — обновляем прогресс
   clearTimeout(poll);
   if (decks.some((d) => d.status === 'importing')) poll = setTimeout(refresh, 2000);
+  if (decks.some((d) => d.status === 'error' && /Подключите Canva/.test(d.error || ''))) canvaStatus();
 }
 const mb = (n) => `${(n / 1048576).toFixed(1)} МБ`;
 function list() {
@@ -185,7 +189,17 @@ function list() {
     : d.status === 'error' ? `<small class="bad">${esc(d.error || 'Не удалось загрузить.')}</small>`
     : `<small>${kind(d)}${vids(d)}${d.unchecked ? ` · не удалось проверить слайдов: ${d.unchecked}` : ''}</small>`;
   const runnable = (d) => !d.status || d.status === 'ready';
-  $('#list').innerHTML = decks.map((d) => `<li><div class="info"><b>${esc(d.name)}</b>${note(d)}</div><button data-run="${d.id}" ${!runnable(d) ? 'disabled' : room ? '' : 'disabled title="Сначала создайте комнату"'}>Запустить</button><button class="ghost" data-vid="${d.id}" ${runnable(d) ? '' : 'disabled'}>Видео</button><button class="ghost del" data-del="${d.id}">Удалить</button></li>`).join('');
+  const rows = decks.map((d) => ({
+    id: d.id, key: `${runnable(d)}:${!!room}`, info: `<b>${esc(d.name)}</b>${note(d)}`,
+    buttons: `<button data-run="${d.id}" ${!runnable(d) ? 'disabled' : room ? '' : 'disabled title="Сначала создайте комнату"'}>Запустить</button><button class="ghost" data-vid="${d.id}" ${runnable(d) ? '' : 'disabled'}>Видео</button><button class="ghost del" data-del="${d.id}">Удалить</button>`
+  }));
+  // Если кнопки не поменялись — обновляем только текст, чтобы не сбивать клики во время загрузки
+  const items = [...$('#list').children];
+  if (items.length === rows.length && rows.every((r, i) => items[i].dataset.id === r.id && items[i].dataset.key === r.key)) {
+    rows.forEach((r, i) => { const info = items[i].firstElementChild; if (info.innerHTML !== r.info) info.innerHTML = r.info; });
+    return;
+  }
+  $('#list').innerHTML = rows.map((r) => `<li data-id="${r.id}" data-key="${r.key}"><div class="info">${r.info}</div>${r.buttons}</li>`).join('');
 }
 function paint() {
   $('#empty').hidden = !!room; $('#live').hidden = !room;
@@ -356,15 +370,27 @@ $('#cnvbtn').onclick = async () => {
   } catch (e) { w?.close(); toast(e.message); }
 };
 addEventListener('storage', (e) => { if (e.key === 'al-canva') { canvaStatus(); toast('Canva подключена.'); } });
+// Поле «Слайдов» при подключённой Canva нужно только для чужих презентаций — новая ссылка его снова прячет
+$('#curl').oninput = () => {
+  if (cnv.connected && !$('#ccount').hidden) { $('#ccount').hidden = true; $('#ccount').value = ''; $('#cf').classList.add('auto'); }
+};
 $('#cf').onsubmit = async (e) => {
   e.preventDefault();
   const btn = e.submitter; btn.disabled = true;
   try {
-    const body = { url: $('#curl').value, ...(cnv.connected ? {} : { count: Number($('#ccount').value) }) };
-    await api('/presentations/canva', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    $('#cf').reset(); await refresh();
-    toast(cnv.connected ? 'Загружаем из Canva — это займёт пару минут.' : 'Презентация Canva добавлена.');
-  } catch (er) { toast(er.message); if (/Подключите Canva/.test(er.message)) canvaStatus(); }
+    const body = { url: $('#curl').value, ...($('#ccount').hidden ? {} : { count: Number($('#ccount').value) }) };
+    const deck = await (await api('/presentations/canva', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+    $('#cf').reset(); await refresh(); await canvaStatus();
+    toast(deck.status === 'importing' ? 'Загружаем из Canva — это займёт пару минут.' : 'Презентация Canva добавлена.');
+  } catch (er) {
+    // Состояние Canva на сервере могло измениться — перепроверяем, и если нужно число слайдов, показываем поле
+    await canvaStatus();
+    if (er.reason === 'needs_count') {
+      const c = $('#ccount');
+      c.hidden = false; $('#cf').classList.remove('auto'); c.focus();
+    }
+    toast(er.message);
+  }
   btn.disabled = false;
 };
 
