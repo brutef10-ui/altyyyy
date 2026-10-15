@@ -42,9 +42,28 @@ li{display:flex;gap:10px;align-items:center;padding:14px 0;border-top:1px solid 
 .info b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .info small{color:var(--mut)}
 #none{color:var(--mut);padding:10px 0}
+.or{color:var(--mut);font-size:14px;margin:4px 0 10px}
+.link{display:grid;grid-template-columns:1fr 112px auto;gap:8px;margin-bottom:6px}
+@media(max-width:520px){.link{grid-template-columns:1fr 1fr}.link input:first-child{grid-column:1/-1}}
+.lib input[type=url],.lib input[type=number],dialog input[type=number]{font:inherit;min-width:0;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:var(--ink)}
+.lib input:focus,dialog input:focus{outline:0;border-color:var(--acc)}
+.tip{color:var(--mut);font-size:13px;margin-bottom:6px}
+dialog{border:0;border-radius:20px;padding:clamp(18px,3vw,28px);width:min(480px,92vw);color:var(--ink)}
+dialog::backdrop{background:#10131F99}
+dialog h2{margin-bottom:6px}
+dialog .tip{margin:0 0 14px}
+dialog ul{margin:8px 0 16px}
+dialog li{padding:10px 0}
+.vform{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center}
+.vform input[type=file]{font:inherit;font-size:14px;min-width:0}
+.vform button{grid-column:1/-1}
+dialog .row{justify-content:flex-end;margin-top:16px}
 #stage{position:fixed;inset:0;z-index:10;background:#000;display:grid;place-items:center;cursor:none}
 #stage.ui{cursor:default}
 #stage canvas,#stage img{max-width:100%;max-height:100%}
+#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+#shield{position:absolute;inset:0}
+#vd{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
 #cover{position:absolute;inset:0;background:#000}
 #bar{position:absolute;top:0;left:0;right:0;display:flex;gap:16px;align-items:center;padding:14px 18px;color:#fff;background:linear-gradient(#000C,transparent);opacity:0;transition:opacity .25s}
 #stage.ui #bar{opacity:1}
@@ -82,6 +101,13 @@ li{display:flex;gap:10px;align-items:center;padding:14px 0;border-top:1px solid 
       Выберите PDF или до 12 картинок, либо перетащите сюда
       <input id="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp,image/gif">
     </label>
+    <p class="or">…или добавьте презентацию Canva по ссылке — так в ней сохранятся видео и анимации:</p>
+    <form class="link" id="cf">
+      <input id="curl" type="url" required placeholder="https://www.canva.com/design/…" aria-label="Ссылка на Canva">
+      <input id="ccount" type="number" min="1" max="500" required placeholder="Слайдов" aria-label="Количество слайдов">
+      <button>Добавить</button>
+    </form>
+    <p class="tip">В Canva: «Поделиться» → «Ещё» → «Встроить» (или «Публичная ссылка для просмотра») и скопируйте ссылку.</p>
     <p id="none">Пока пусто. Загруженные презентации появятся здесь.</p>
     <ul id="list"></ul>
   </section>
@@ -90,10 +116,25 @@ li{display:flex;gap:10px;align-items:center;padding:14px 0;border-top:1px solid 
 <section id="stage" hidden aria-label="Показ">
   <canvas id="cv" hidden></canvas>
   <img id="im" alt="" hidden>
+  <iframe id="fr" title="Презентация Canva" allow="autoplay; fullscreen" allowfullscreen hidden></iframe>
+  <div id="shield"></div>
+  <video id="vd" playsinline preload="auto" hidden></video>
   <div id="cover" hidden></div>
   <div id="bar"><span id="ttl"></span><span id="cnt"></span><button id="stop">Завершить показ</button></div>
 </section>
 <div id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="vids" aria-labelledby="vt">
+  <h2 id="vt">Видео на слайдах</h2>
+  <p class="tip">На слайде с видео первое нажатие «вперёд» включает видео, второе — переключает слайд. «Назад» останавливает видео.</p>
+  <ul id="vlist"></ul>
+  <form class="vform" id="vf">
+    <input id="vslide" type="number" min="1" required placeholder="Слайд №" aria-label="Номер слайда">
+    <input id="vfile" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" required aria-label="Видеофайл">
+    <button>Прикрепить видео</button>
+  </form>
+  <div class="row"><button id="vclose" class="ghost">Готово</button></div>
+</dialog>
 
 <script src="/socket.io/socket.io.js"></script>
 <script type="module">
@@ -124,9 +165,12 @@ async function api(p, o = {}) {
 async function refresh() {
   try { decks = await (await api('/presentations')).json(); list(); } catch (e) { toast(e.message); }
 }
+const mb = (n) => `${(n / 1048576).toFixed(1)} МБ`;
 function list() {
   $('#none').hidden = decks.length > 0;
-  $('#list').innerHTML = decks.map((d) => `<li><div class="info"><b>${esc(d.name)}</b><small>${d.type === 'pdf' ? 'PDF' : d.count + ' изобр.'}, ${(d.size / 1048576).toFixed(1)} МБ</small></div><button data-run="${d.id}" ${room ? '' : 'disabled title="Сначала создайте комнату"'}>Запустить</button><button class="ghost del" data-del="${d.id}">Удалить</button></li>`).join('');
+  const kind = (d) => d.type === 'pdf' ? `PDF, ${mb(d.size)}` : d.type === 'canva' ? `Canva, слайдов: ${d.count}` : `${d.count} изобр., ${mb(d.size)}`;
+  const vids = (d) => d.videos?.length ? ` · видео: ${d.videos.length}` : '';
+  $('#list').innerHTML = decks.map((d) => `<li><div class="info"><b>${esc(d.name)}</b><small>${kind(d)}${vids(d)}</small></div><button data-run="${d.id}" ${room ? '' : 'disabled title="Сначала создайте комнату"'}>Запустить</button><button class="ghost" data-vid="${d.id}">Видео</button><button class="ghost del" data-del="${d.id}">Удалить</button></li>`).join('');
 }
 function paint() {
   $('#empty').hidden = !!room; $('#live').hidden = !room;
@@ -144,7 +188,7 @@ async function load(id) {
   let m = decks.find((d) => d.id === id);
   if (!m) { await refresh(); m = decks.find((d) => d.id === id); }
   if (!m) throw new Error('missing');
-  const x = { type: m.type };
+  const x = { type: m.type, url: m.url };
   if (m.type === 'pdf') x.doc = await pdfjs.getDocument({ url: `/api/presentations/${id}/files/0`, httpHeaders: { 'X-Device-Key': KEY } }).promise;
   return (loaded[id] = x);
 }
@@ -155,7 +199,15 @@ async function draw(s) {
   try {
     const d = await load(s.deckId);
     if (drawn !== tag) return;
-    const cv = $('#cv'), im = $('#im');
+    const cv = $('#cv'), im = $('#im'), fr = $('#fr');
+    if (d.type === 'canva') {
+      // Canva листается через номер страницы в адресе (#2, #3…) — без перезагрузки встраивания
+      const src = `${d.url}#${s.slide + 1}`;
+      if (fr.src !== src) fr.src = src;
+      fr.hidden = false; cv.hidden = true; im.hidden = true;
+      return;
+    }
+    fr.hidden = true;
     if (d.type === 'pdf') {
       const p = await d.doc.getPage(s.slide + 1);
       if (drawn !== tag) return;
@@ -178,13 +230,35 @@ async function draw(s) {
 function sync() {
   const s = room?.state, st = $('#stage');
   if (!s?.playing) {
-    if (!st.hidden) { st.hidden = true; drawn = null; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
+    if (!st.hidden) {
+      st.hidden = true; drawn = null;
+      const fr = $('#fr'); fr.hidden = true; fr.removeAttribute('src');
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    }
+    video(null);
     return;
   }
   st.hidden = false;
   $('#ttl').textContent = s.title; $('#cnt').textContent = `${s.slide + 1} / ${s.total}`;
   $('#cover').hidden = !s.blank;
   draw(s);
+  video(s);
+}
+// Видео текущего слайда: заранее подгружаем, по команде «вперёд» показываем и запускаем
+function video(s) {
+  const vd = $('#vd');
+  const v = s && decks.find((d) => d.id === s.deckId)?.videos?.find((x) => x.slide === s.slide);
+  const src = v ? `/api/presentations/${s.deckId}/videos/${v.id}?k=${KEY}` : '';
+  if (vd.dataset.src !== src) {
+    vd.pause(); vd.dataset.src = src;
+    if (src) { vd.src = src; vd.load(); } else vd.removeAttribute('src');
+  }
+  if (v && s.video) {
+    if (vd.hidden) {
+      vd.hidden = false; vd.currentTime = 0;
+      vd.play().catch(() => { vd.muted = true; vd.play().catch(() => toast('Не удалось запустить видео.')); toast('Браузер разрешил видео только без звука — кликните по экрану один раз перед показом.'); });
+    }
+  } else if (!vd.hidden) { vd.pause(); vd.hidden = true; vd.muted = false; }
 }
 
 async function resume(n = 0) {
@@ -215,6 +289,8 @@ $('#list').onclick = async (e) => {
     const r = await emit('presentation:start', { id: d.id, total });
     if (r.error) toast(r.error);
   }
+  const vid = e.target.closest('[data-vid]')?.dataset.vid;
+  if (vid) openVideos(vid);
   if (del && confirm('Удалить презентацию?')) {
     try { await api('/presentations/' + del, { method: 'DELETE' }); delete loaded[del]; await refresh(); } catch (er) { toast(er.message); }
   }
@@ -228,6 +304,57 @@ async function upload(files) {
   $('#file').value = '';
 }
 $('#file').onchange = (e) => upload(e.target.files);
+$('#cf').onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = e.submitter; btn.disabled = true;
+  try {
+    await api('/presentations/canva', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('#curl').value, count: Number($('#ccount').value) }) });
+    $('#cf').reset(); await refresh(); toast('Презентация Canva добавлена.');
+  } catch (er) { toast(er.message); }
+  btn.disabled = false;
+};
+
+let vdeck = null;
+function openVideos(id) {
+  vdeck = decks.find((d) => d.id === id);
+  if (!vdeck) return;
+  $('#vt').textContent = `Видео: ${vdeck.name}`;
+  $('#vslide').max = vdeck.count || 10000;
+  paintVideos();
+  $('#vids').showModal();
+}
+function paintVideos() {
+  $('#vlist').innerHTML = vdeck.videos.length
+    ? vdeck.videos.map((v) => `<li><div class="info"><b>Слайд ${v.slide + 1}</b><small>${mb(v.size)}</small></div><button class="ghost del" data-vdel="${v.id}">Убрать</button></li>`).join('')
+    : '<li><div class="info"><small>Пока нет видео.</small></div></li>';
+}
+const takeDeck = async (r) => { const d = await r.json(); decks = decks.map((x) => x.id === d.id ? d : x); vdeck = d; paintVideos(); list(); };
+$('#vlist').onclick = async (e) => {
+  const id = e.target.closest('[data-vdel]')?.dataset.vdel;
+  if (!id) return;
+  try { await takeDeck(await api(`/presentations/${vdeck.id}/videos/${id}`, { method: 'DELETE' })); } catch (er) { toast(er.message); }
+};
+$('#vf').onsubmit = (e) => {
+  e.preventDefault();
+  const btn = e.submitter, fd = new FormData();
+  fd.append('slide', $('#vslide').value);
+  fd.append('file', $('#vfile').files[0]);
+  // XHR, а не fetch — чтобы показывать прогресс загрузки больших видео
+  const x = new XMLHttpRequest();
+  x.open('POST', `/api/presentations/${vdeck.id}/videos`);
+  x.setRequestHeader('X-Device-Key', KEY);
+  x.upload.onprogress = (ev) => { if (ev.lengthComputable) btn.textContent = `Загружаем… ${Math.round(ev.loaded / ev.total * 100)}%`; };
+  x.onloadend = async () => {
+    btn.disabled = false; btn.textContent = 'Прикрепить видео';
+    let body = {}; try { body = JSON.parse(x.responseText); } catch {}
+    if (x.status !== 201) return toast(body.error || 'Не удалось загрузить видео.');
+    await takeDeck({ json: async () => body });
+    $('#vf').reset(); toast('Видео прикреплено.');
+  };
+  btn.disabled = true;
+  x.send(fd);
+};
+$('#vclose').onclick = () => $('#vids').close();
 const dz = $('#drop');
 ['dragover', 'dragenter'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.add('over'); }));
 ['dragleave', 'drop'].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
