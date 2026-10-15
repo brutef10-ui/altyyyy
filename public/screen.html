@@ -44,8 +44,13 @@ li{display:flex;gap:10px;align-items:center;padding:14px 0;border-top:1px solid 
 #none{color:var(--mut);padding:10px 0}
 .or{color:var(--mut);font-size:14px;margin:4px 0 10px}
 .link{display:grid;grid-template-columns:1fr 112px auto;gap:8px;margin-bottom:6px}
+.link.auto{grid-template-columns:1fr auto}
+.cnv{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--bg);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:14px}
+.cnv button{padding:8px 14px;flex:none}
+.cnv.on span::before{content:"✓ ";color:#1A8F4C;font-weight:700}
+.info small.bad{color:#C2331F}
 @media(max-width:520px){.link{grid-template-columns:1fr 1fr}.link input:first-child{grid-column:1/-1}}
-.lib input[type=url],.lib input[type=number],dialog input[type=number]{font:inherit;min-width:0;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:var(--ink)}
+.lib input#curl,.lib input[type=number],dialog input[type=number]{font:inherit;min-width:0;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff;color:var(--ink)}
 .lib input:focus,dialog input:focus{outline:0;border-color:var(--acc)}
 .tip{color:var(--mut);font-size:13px;margin-bottom:6px}
 dialog{border:0;border-radius:20px;padding:clamp(18px,3vw,28px);width:min(480px,92vw);color:var(--ink)}
@@ -101,13 +106,14 @@ dialog .row{justify-content:flex-end;margin-top:16px}
       Выберите PDF или до 12 картинок, либо перетащите сюда
       <input id="file" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp,image/gif">
     </label>
-    <p class="or">…или добавьте презентацию Canva по ссылке — так в ней сохранятся видео и анимации:</p>
+    <p class="or">…или добавьте презентацию Canva по ссылке:</p>
+    <div class="cnv" id="cnv" hidden><span id="cnvtext"></span><button type="button" id="cnvbtn"></button></div>
     <form class="link" id="cf">
-      <input id="curl" type="url" required placeholder="https://www.canva.com/design/…" aria-label="Ссылка на Canva">
+      <input id="curl" type="text" inputmode="url" autocomplete="off" required placeholder="https://www.canva.com/design/…" aria-label="Ссылка на Canva">
       <input id="ccount" type="number" min="1" max="500" required placeholder="Слайдов" aria-label="Количество слайдов">
       <button>Добавить</button>
     </form>
-    <p class="tip">В Canva: «Поделиться» → «Ещё» → «Встроить» (или «Публичная ссылка для просмотра») и скопируйте ссылку.</p>
+    <p class="tip" id="ctip"></p>
     <p id="none">Пока пусто. Загруженные презентации появятся здесь.</p>
     <ul id="list"></ul>
   </section>
@@ -162,15 +168,24 @@ async function api(p, o = {}) {
   if (!r.ok) { let m = 'Что-то пошло не так.'; try { m = (await r.json()).error; } catch {} throw new Error(m); }
   return r;
 }
+let poll;
 async function refresh() {
   try { decks = await (await api('/presentations')).json(); list(); } catch (e) { toast(e.message); }
+  // Пока презентация загружается из Canva — обновляем прогресс
+  clearTimeout(poll);
+  if (decks.some((d) => d.status === 'importing')) poll = setTimeout(refresh, 2000);
 }
 const mb = (n) => `${(n / 1048576).toFixed(1)} МБ`;
 function list() {
   $('#none').hidden = decks.length > 0;
   const kind = (d) => d.type === 'pdf' ? `PDF, ${mb(d.size)}` : d.type === 'canva' ? `Canva, слайдов: ${d.count}` : `${d.count} изобр., ${mb(d.size)}`;
   const vids = (d) => d.videos?.length ? ` · видео: ${d.videos.length}` : '';
-  $('#list').innerHTML = decks.map((d) => `<li><div class="info"><b>${esc(d.name)}</b><small>${kind(d)}${vids(d)}</small></div><button data-run="${d.id}" ${room ? '' : 'disabled title="Сначала создайте комнату"'}>Запустить</button><button class="ghost" data-vid="${d.id}">Видео</button><button class="ghost del" data-del="${d.id}">Удалить</button></li>`).join('');
+  const progress = ({ stage, done, total }) => stage === 'videos' ? `Ищем слайды с видео: ${done} из ${total}…` : `Загружаем слайды из Canva${total ? `: ${done} из ${total}` : ''}…`;
+  const note = (d) => d.status === 'importing' ? `<small>${progress(d.progress || {})}</small>`
+    : d.status === 'error' ? `<small class="bad">${esc(d.error || 'Не удалось загрузить.')}</small>`
+    : `<small>${kind(d)}${vids(d)}${d.unchecked ? ` · не удалось проверить слайдов: ${d.unchecked}` : ''}</small>`;
+  const runnable = (d) => !d.status || d.status === 'ready';
+  $('#list').innerHTML = decks.map((d) => `<li><div class="info"><b>${esc(d.name)}</b>${note(d)}</div><button data-run="${d.id}" ${!runnable(d) ? 'disabled' : room ? '' : 'disabled title="Сначала создайте комнату"'}>Запустить</button><button class="ghost" data-vid="${d.id}" ${runnable(d) ? '' : 'disabled'}>Видео</button><button class="ghost del" data-del="${d.id}">Удалить</button></li>`).join('');
 }
 function paint() {
   $('#empty').hidden = !!room; $('#live').hidden = !room;
@@ -188,9 +203,16 @@ async function load(id) {
   let m = decks.find((d) => d.id === id);
   if (!m) { await refresh(); m = decks.find((d) => d.id === id); }
   if (!m) throw new Error('missing');
-  const x = { type: m.type, url: m.url };
+  // Презентация, загруженная из Canva через API, — это готовые картинки слайдов
+  const x = { type: m.type === 'canva' && m.files?.length ? 'images' : m.type, url: m.url };
   if (m.type === 'pdf') x.doc = await pdfjs.getDocument({ url: `/api/presentations/${id}/files/0`, httpHeaders: { 'X-Device-Key': KEY } }).promise;
   return (loaded[id] = x);
+}
+// Картинки слайдов кешируем и следующий слайд подгружаем заранее — листание без задержек
+function slideImage(id, i) {
+  const k = `${id}:${i}`;
+  return (blobs[k] ||= api(`/presentations/${id}/files/${i}`).then((r) => r.blob()).then((b) => URL.createObjectURL(b))
+    .catch((e) => { delete blobs[k]; throw e; }));
 }
 async function draw(s) {
   const tag = `${s.deckId}:${s.slide}:${innerWidth}x${innerHeight}`;
@@ -218,10 +240,10 @@ async function draw(s) {
       await task.promise;
       cv.hidden = false; im.hidden = true;
     } else {
-      const u = `${s.deckId}:${s.slide}`;
-      if (!blobs[u]) blobs[u] = URL.createObjectURL(await (await api(`/presentations/${s.deckId}/files/${s.slide}`)).blob());
+      const src = await slideImage(s.deckId, s.slide);
       if (drawn !== tag) return;
-      im.src = blobs[u]; im.hidden = false; cv.hidden = true;
+      im.src = src; im.hidden = false; cv.hidden = true;
+      if (s.slide + 1 < s.total) slideImage(s.deckId, s.slide + 1).catch(() => {});
     }
   } catch (e) {
     if (e?.name !== 'RenderingCancelledException' && drawn === tag) toast('Не удалось показать слайд.');
@@ -304,13 +326,45 @@ async function upload(files) {
   $('#file').value = '';
 }
 $('#file').onchange = (e) => upload(e.target.files);
+let cnv = { configured: false, connected: false };
+async function canvaStatus() {
+  try { cnv = await (await api('/canva')).json(); } catch {}
+  const box = $('#cnv'), auto = cnv.connected;
+  box.hidden = !cnv.configured;
+  box.classList.toggle('on', auto);
+  $('#cnvtext').textContent = auto ? 'Canva подключена: слайды и видео подтянутся сами.' : 'Подключите Canva, чтобы видео из презентации включались с пульта.';
+  $('#cnvbtn').textContent = auto ? 'Отключить' : 'Подключить Canva';
+  $('#cnvbtn').className = auto ? 'ghost' : '';
+  $('#ccount').hidden = auto; $('#ccount').required = !auto;
+  $('#cf').classList.toggle('auto', auto);
+  $('#ctip').textContent = auto
+    ? 'Вставьте ссылку на свою презентацию («Поделиться» → «Копировать ссылку»). Слайды с видео найдутся сами: на них первое «вперёд» включает видео, второе — листает дальше.'
+    : 'В Canva: «Поделиться» → «Ещё» → «Встроить» (или «Публичная ссылка для просмотра») и скопируйте ссылку. Укажите число слайдов.'
+      + (cnv.configured || !cnv.redirectUri ? '' : ` Чтобы видео из Canva включались с пульта, владелец сайта может подключить Canva API (см. README, адрес возврата: ${cnv.redirectUri}).`);
+}
+$('#cnvbtn').onclick = async () => {
+  if (cnv.connected) {
+    if (!confirm('Отключить Canva от этого устройства?')) return;
+    try { await api('/canva', { method: 'DELETE' }); } catch (e) { toast(e.message); }
+    return canvaStatus();
+  }
+  // Вкладку открываем сразу по клику, иначе браузер её заблокирует
+  const w = open('', '_blank');
+  try {
+    const { url } = await (await api('/canva/connect', { method: 'POST' })).json();
+    if (w) w.location.href = url; else location.href = url;
+  } catch (e) { w?.close(); toast(e.message); }
+};
+addEventListener('storage', (e) => { if (e.key === 'al-canva') { canvaStatus(); toast('Canva подключена.'); } });
 $('#cf').onsubmit = async (e) => {
   e.preventDefault();
   const btn = e.submitter; btn.disabled = true;
   try {
-    await api('/presentations/canva', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('#curl').value, count: Number($('#ccount').value) }) });
-    $('#cf').reset(); await refresh(); toast('Презентация Canva добавлена.');
-  } catch (er) { toast(er.message); }
+    const body = { url: $('#curl').value, ...(cnv.connected ? {} : { count: Number($('#ccount').value) }) };
+    await api('/presentations/canva', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    $('#cf').reset(); await refresh();
+    toast(cnv.connected ? 'Загружаем из Canva — это займёт пару минут.' : 'Презентация Canva добавлена.');
+  } catch (er) { toast(er.message); if (/Подключите Canva/.test(er.message)) canvaStatus(); }
   btn.disabled = false;
 };
 
@@ -370,6 +424,7 @@ addEventListener('keydown', (e) => {
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { drawn = null; sync(); }, 200); });
 
 refresh();
+canvaStatus();
 </script>
 </body>
 </html>

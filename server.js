@@ -6,6 +6,7 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createCanva } from './canva.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const storage = path.join(root, 'data');
@@ -25,8 +26,14 @@ const fail = (message, status = 400) => Object.assign(new Error(message), { stat
 const ownerPath = (owner) => path.join(storage, owner);
 const deckPath = (owner, id) => path.join(ownerPath(owner), id);
 const cleanFiles = (files = []) => Promise.all(files.map((file) => fs.rm(file.path, { force: true }).catch(() => {})));
+const canva = createCanva({ tokenFile: (owner) => path.join(ownerPath(owner), 'canva.json') });
+// Идущие сейчас импорты из Canva: id презентации → { cancelled }
+const imports = new Map();
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 app.disable('x-powered-by');
+// Render и другие хостинги стоят за прокси — так req.protocol будет https
+app.set('trust proxy', 1);
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
@@ -46,12 +53,23 @@ async function readDeck(owner, id) {
   try {
     const deck = JSON.parse(await fs.readFile(path.join(deckPath(owner, id), 'meta.json'), 'utf8'));
     deck.videos ||= [];
+    if (deck.status === 'importing' && !imports.has(deck.id)) {
+      deck.status = 'error';
+      deck.error = 'Загрузка из Canva прервалась (сервер перезапускался). Удалите презентацию и добавьте ссылку снова.';
+      delete deck.progress;
+    }
     return deck;
   } catch {
     throw Object.assign(new Error('Презентация не найдена.'), { status: 404 });
   }
 }
-const writeDeck = (owner, deck) => fs.writeFile(path.join(deckPath(owner, deck.id), 'meta.json'), JSON.stringify(deck));
+// Пишем во временный файл и переименовываем — чтобы список никогда не прочитал полузаписанный meta.json
+async function writeDeck(owner, deck) {
+  const tmp = path.join(deckPath(owner, deck.id), `meta.${randomUUID()}.tmp`);
+  await fs.writeFile(tmp, JSON.stringify(deck));
+  await fs.rename(tmp, path.join(deckPath(owner, deck.id), 'meta.json'));
+}
+const busyImporting = (id) => { if (imports.has(id)) throw fail('Дождитесь, пока презентация загрузится из Canva.', 409); };
 const deckRunning = (owner, id) => [...rooms.values()].some((room) => room.owner === owner && room.state.deckId === id);
 
 app.get('/api/presentations', asyncRoute(async (req, res) => {
@@ -112,17 +130,21 @@ app.post('/api/presentations', (req, res, next) => {
 
 // Принимает ссылку на дизайн Canva (просмотр, редактирование или код встраивания)
 // и превращает её в адрес для встраивания: https://www.canva.com/design/<id>/<token>/view?embed
-function canvaEmbed(raw) {
+function parseCanva(raw) {
   const found = String(raw || '').match(/https:\/\/(?:www\.)?canva\.com\/design\/[^\s"'<>]+/);
   if (!found) return null;
   let url;
   try { url = new URL(found[0].replace(/&amp;/g, '&')); } catch { return null; }
   const m = url.pathname.match(/^\/design\/([A-Za-z0-9_-]{6,40})(?:\/([A-Za-z0-9_-]{6,80}))?\/(?:view|edit|watch|present)\/?$/);
-  return m ? `https://www.canva.com/design/${m[1]}${m[2] ? '/' + m[2] : ''}/view?embed` : null;
+  return m ? { designId: m[1], embed: `https://www.canva.com/design/${m[1]}${m[2] ? '/' + m[2] : ''}/view?embed` } : null;
 }
+// Короткие ссылки canva.link/… и canva.com/d/… ведут редиректом на canva.com/design/…
+const SHORT_LINK = /https:\/\/(?:canva\.link|(?:www\.)?canva\.com\/d)\/[^\s"'<>]+/i;
 async function resolveShortLink(raw) {
-  let url = String(raw || '').trim();
-  for (let hop = 0; hop < 4 && /^https:\/\/canva\.link\//i.test(url); hop++) {
+  const short = String(raw || '').match(SHORT_LINK);
+  if (!short) return String(raw || '');
+  let url = short[0];
+  for (let hop = 0; hop < 4 && SHORT_LINK.test(url); hop++) {
     try {
       const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(6000) });
       const next = res.headers.get('location');
@@ -133,14 +155,69 @@ async function resolveShortLink(raw) {
   return url;
 }
 
+function redirectUri(req) {
+  const base = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
+  return `${base}/canva/callback`;
+}
+app.get('/api/canva', asyncRoute(async (req, res) => {
+  res.json({ configured: canva.configured, connected: await canva.connected(req.owner), redirectUri: redirectUri(req) });
+}));
+app.post('/api/canva/connect', (req, res) => res.json({ url: canva.startAuth(req.owner, redirectUri(req)) }));
+app.delete('/api/canva', asyncRoute(async (req, res) => {
+  await canva.disconnect(req.owner);
+  res.json({ ok: true });
+}));
+// Сюда Canva возвращает после входа. Страница сообщает экрану об успехе и закрывается.
+app.get('/canva/callback', async (req, res) => {
+  let ok = false, message;
+  try {
+    if (req.query.error) throw fail(req.query.error === 'access_denied' ? 'Вы отменили подключение.' : 'Canva отказала в доступе.');
+    await canva.finishAuth(String(req.query.state || ''), String(req.query.code || ''));
+    ok = true;
+    message = 'Можно закрыть эту вкладку и вернуться к экрану.';
+  } catch (error) {
+    if (!error.status) console.error(error);
+    message = error.status ? error.message : 'Что-то пошло не так. Попробуйте ещё раз.';
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Canva</title></head>
+<body style="font:17px/1.5 system-ui,sans-serif;background:#E8ECF4;color:#10131F;padding:40px 20px;max-width:520px;margin:0 auto">
+<h1 style="font-size:24px">${ok ? 'Canva подключена' : 'Не получилось подключить Canva'}</h1><p>${esc(message)}</p><p><a href="/screen.html" style="color:#2F3DFF">Вернуться к экрану</a></p>
+${ok ? "<script>try{localStorage.setItem('al-canva',String(Date.now()))}catch{}setTimeout(function(){window.close()},1200)</script>" : ''}</body></html>`);
+});
+
+function startImport(owner, deck) {
+  const control = { cancelled: false };
+  imports.set(deck.id, control);
+  let saving = Promise.resolve();
+  const save = () => (saving = saving.catch(() => {}).then(() => (control.cancelled ? undefined : writeDeck(owner, deck))));
+  canva.importDeck({ owner, deck, dir: deckPath(owner, deck.id), save, cancelled: () => control.cancelled })
+    .catch((error) => console.error(error))
+    .finally(() => { if (imports.get(deck.id) === control) imports.delete(deck.id); });
+}
+
 app.post('/api/presentations/canva', express.json({ limit: '8kb' }), asyncRoute(async (req, res) => {
-  const embed = canvaEmbed(await resolveShortLink(req.body?.url));
-  if (!embed) throw fail('Это не похоже на ссылку на дизайн Canva. Нужна ссылка вида canva.com/design/…');
+  const link = parseCanva(await resolveShortLink(req.body?.url));
+  if (!link) throw fail('Это не похоже на ссылку на дизайн Canva. Нужна ссылка вида canva.com/design/…');
+  if (await canva.connected(req.owner)) {
+    // Canva подключена: сами забираем слайды и находим видео
+    const design = await canva.getDesign(req.owner, link.designId);
+    const id = randomUUID();
+    const meta = {
+      id, type: 'canva', url: link.embed, designId: link.designId, createdAt: Date.now(), size: 0, files: [],
+      count: design.page_count || null, videos: [], status: 'importing', progress: { stage: 'slides', done: 0, total: design.page_count || 0 },
+      name: String(req.body?.name || design.title || '').trim().slice(0, 100) || 'Презентация Canva'
+    };
+    await fs.mkdir(deckPath(req.owner, id), { recursive: true });
+    await writeDeck(req.owner, meta);
+    startImport(req.owner, meta);
+    return res.status(201).json(meta);
+  }
   const count = Number(req.body?.count);
   if (!Number.isInteger(count) || count < 1 || count > 500) throw fail('Укажите, сколько слайдов в презентации (от 1 до 500).');
   const id = randomUUID();
   const meta = {
-    id, type: 'canva', url: embed, createdAt: Date.now(), size: 0, files: [], count, videos: [],
+    id, type: 'canva', url: link.embed, createdAt: Date.now(), size: 0, files: [], count, videos: [],
     name: String(req.body?.name || '').trim().slice(0, 100) || 'Презентация Canva'
   };
   await fs.mkdir(deckPath(req.owner, id), { recursive: true });
@@ -166,6 +243,7 @@ app.post('/api/presentations/:id/videos', (req, res, next) => {
     try {
       if (!req.file) throw fail('Выберите видеофайл.');
       const deck = await readDeck(req.owner, req.params.id);
+      busyImporting(deck.id);
       if (deckRunning(req.owner, deck.id)) throw fail('Сначала остановите эту презентацию.', 409);
       const slide = Number(req.body.slide) - 1;
       const limit = deck.count || 10000;
@@ -196,6 +274,7 @@ app.get('/api/presentations/:id/videos/:vid', asyncRoute(async (req, res) => {
 
 app.delete('/api/presentations/:id/videos/:vid', asyncRoute(async (req, res) => {
   const deck = await readDeck(req.owner, req.params.id);
+  busyImporting(deck.id);
   if (deckRunning(req.owner, deck.id)) throw fail('Сначала остановите эту презентацию.', 409);
   const video = deck.videos.find((v) => v.id === req.params.vid);
   if (!video) return res.status(404).json({ error: 'Видео не найдено.' });
@@ -218,6 +297,8 @@ app.delete('/api/presentations/:id', asyncRoute(async (req, res) => {
   if (deckRunning(req.owner, deck.id)) {
     return res.status(409).json({ error: 'Сначала остановите эту презентацию.' });
   }
+  const control = imports.get(deck.id);
+  if (control) { control.cancelled = true; imports.delete(deck.id); }
   await fs.rm(deckPath(req.owner, deck.id), { recursive: true, force: true });
   res.json({ ok: true });
 }));
@@ -333,6 +414,8 @@ io.on('connection', (socket) => {
     try {
       const deck = await readDeck(room.owner, id);
       if (screenRoom(socket) !== room || !rooms.has(room.code)) return replyError(ack, 'Комната закрыта.');
+      if (deck.status === 'importing') return replyError(ack, 'Презентация ещё загружается из Canva.');
+      if (deck.status === 'error') return replyError(ack, deck.error || 'Презентация не загрузилась.');
       if (!Number.isInteger(total) || total < 1 || total > 10000 || (deck.count && total !== deck.count)) return replyError(ack, 'Некорректное количество слайдов.');
       const videos = [...new Set(deck.videos.map((v) => v.slide))].filter((slide) => slide < total);
       room.state = { deckId: deck.id, title: deck.name, slide: 0, total, playing: true, blank: false, videos, video: false };
