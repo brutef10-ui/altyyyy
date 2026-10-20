@@ -68,18 +68,89 @@ const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a
 const mulc = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 
 const MATS = {};
+
+/** seamless 512 px foliage pattern (grey, multiplies the vertex colours), plus its mean value */
+function leafTexture() {
+  if (MATS.leafTex) return MATS.leafTex;
+  const S = 512, cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const g = cv.getContext('2d'), rng = mulberry32(4242);
+  g.fillStyle = 'rgb(118,118,118)'; g.fillRect(0, 0, S, S);
+  const wrap = (fn, x, y, r) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) if (x + ox > -r && x + ox < S + r && y + oy > -r && y + oy < S + r) fn(x + ox, y + oy); };
+  // leaf clusters: each cluster = a darker shadow blob, then sunlit leaves on top
+  for (let i = 0; i < 230; i++) {
+    const cx = rng() * S, cy = rng() * S, cr = 14 + rng() * 26;
+    const sh = 60 + rng() * 40;
+    g.fillStyle = `rgba(${sh | 0},${sh | 0},${sh | 0},0.55)`;
+    wrap((x, y) => { g.beginPath(); g.ellipse(x + 3, y + 5, cr, cr * 0.8, 0, 0, 6.283); g.fill(); }, cx, cy, cr + 8);
+    const n = 10 + (rng() * 14 | 0);
+    for (let k = 0; k < n; k++) {
+      const a = rng() * 6.283, d = Math.sqrt(rng()) * cr, x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
+      const L = 5 + rng() * 6, Wd = L * (0.45 + 0.2 * rng()), rot = rng() * 3.1416;
+      const up = 1 - (y - cy + cr) / (2 * cr);                   // lighter on the upper side of a cluster
+      const v = 130 + up * 80 + rng() * 45;
+      g.fillStyle = `rgb(${Math.min(255, v) | 0},${Math.min(255, v + 4) | 0},${Math.min(255, v - 6) | 0})`;
+      wrap((xx, yy) => { g.beginPath(); g.ellipse(xx, yy, L, Wd, rot, 0, 6.283); g.fill(); }, x, y, L);
+    }
+  }
+  // fine scattered leaves everywhere
+  for (let i = 0; i < 2600; i++) {
+    const x = rng() * S, y = rng() * S, L = 3 + rng() * 4, v = 100 + rng() * 140, rot = rng() * 3.1416;
+    g.fillStyle = `rgba(${v | 0},${v | 0},${v | 0},0.8)`;
+    wrap((xx, yy) => { g.beginPath(); g.ellipse(xx, yy, L, L * 0.5, rot, 0, 6.283); g.fill(); }, x, y, L);
+  }
+  const data = g.getImageData(0, 0, S, S).data;
+  let sum = 0; for (let i = 0; i < data.length; i += 4) sum += data[i];
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.anisotropy = 4;
+  tex.userData.mean = sum / (S * S) / 255;
+  MATS.leafTex = tex;
+  return tex;
+}
+
+/**
+ * Shared vegetation material: vertex colours × instance tint, with a tri-planar foliage pattern
+ * (object space, so it sticks to each instance) applied where the `leaf` attribute is > 0.
+ */
 function vegMaterial() {
-  return MATS.veg || (MATS.veg = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0, name: 'vegetation' }));
+  if (MATS.veg) return MATS.veg;
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0, name: 'vegetation' });
+  const hasDoc = typeof document !== 'undefined';
+  if (hasDoc) {
+    const tex = leafTexture();
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.leafMap = { value: tex };
+      sh.uniforms.leafGain = { value: 1 / Math.max(0.2, tex.userData.mean) };
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float leaf;\nvarying float vLeaf;\nvarying vec3 vObjPos;\nvarying vec3 vObjN;')
+        .replace('#include <morphtarget_vertex>', '#include <morphtarget_vertex>\nvLeaf = leaf; vObjPos = transformed; vObjN = objectNormal;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform sampler2D leafMap;\nuniform float leafGain;\nvarying float vLeaf;\nvarying vec3 vObjPos;\nvarying vec3 vObjN;')
+        .replace('#include <color_fragment>', `#include <color_fragment>
+        if (vLeaf > 0.0) {
+          vec3 tw = pow(abs(normalize(vObjN)), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
+          vec3 tp = vObjPos * 0.42;
+          float lt = texture2D(leafMap, tp.zy).r * tw.x + texture2D(leafMap, tp.xz + 0.37).r * tw.y + texture2D(leafMap, tp.xy + 0.71).r * tw.z;
+          diffuseColor.rgb *= mix(1.0, lt * leafGain, vLeaf);
+        }`);
+    };
+    m.customProgramCacheKey = () => 'smartcross-veg-leaf-1';
+  }
+  MATS.veg = m;
+  return m;
 }
 
 /* ------------------------------------------------------------------ geometry builder */
 
 class Builder {
-  constructor() { this.p = []; this.n = []; this.c = []; this.i = []; }
+  constructor() { this.p = []; this.n = []; this.c = []; this.i = []; this.l = []; }
   get count() { return this.p.length / 3; }
-  v(x, y, z, nx, ny, nz, col) {
+  /** vertex: position, normal, linear colour, leafiness (0 = bark/stone, 1 = foliage texture) */
+  v(x, y, z, nx, ny, nz, col, leaf = 1) {
     const l = Math.hypot(nx, ny, nz) || 1;
-    this.p.push(x, y, z); this.n.push(nx / l, ny / l, nz / l); this.c.push(col[0], col[1], col[2]);
+    this.p.push(x, y, z); this.n.push(nx / l, ny / l, nz / l); this.c.push(col[0], col[1], col[2]); this.l.push(leaf);
     return this.count - 1;
   }
   t(a, b, c) { this.i.push(a, b, c); }
@@ -93,12 +164,12 @@ class Builder {
     if (fx * nx + fy * ny + fz * nz >= 0) this.i.push(a, b, c); else this.i.push(a, c, b);
   }
   /** append an indexed geometry with position/normal (and optional color or colour callback) */
-  add(geo, colFn) {
+  add(geo, colFn, leaf = 0) {
     const base = this.count, pos = geo.attributes.position, nor = geo.attributes.normal, col = geo.attributes.color;
     for (let k = 0; k < pos.count; k++) {
       const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k);
       const c = colFn ? colFn(x, y, z, k) : col ? [col.getX(k), col.getY(k), col.getZ(k)] : [1, 1, 1];
-      this.v(x, y, z, nor.getX(k), nor.getY(k), nor.getZ(k), c);
+      this.v(x, y, z, nor.getX(k), nor.getY(k), nor.getZ(k), c, leaf);
     }
     if (geo.index) for (let k = 0; k < geo.index.count; k++) this.i.push(base + geo.index.getX(k));
     else for (let k = 0; k < pos.count; k++) this.i.push(base + k);
@@ -108,6 +179,7 @@ class Builder {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
+    g.setAttribute('leaf', new THREE.Float32BufferAttribute(this.l, 1));
     g.setIndex(this.i);
     g.computeBoundingSphere();
     return g;
@@ -167,7 +239,7 @@ function tube(B, pts, radial, col) {
     for (let k = 0; k < radial; k++) {
       const an = k / radial * Math.PI * 2, c = Math.cos(an), s = Math.sin(an);
       const dx = ux * c + vx * s, dy = uy * c + vy * s, dz = uz * c + vz * s;
-      B.v(p[0] + dx * p[3], p[1] + dy * p[3], p[2] + dz * p[3], dx, dy, dz, col(p[1], i, k));
+      B.v(p[0] + dx * p[3], p[1] + dy * p[3], p[2] + dz * p[3], dx, dy, dz, col(p[1], i, k), 0);
     }
   }
   for (let i = 0; i < n - 1; i++) for (let k = 0; k < radial; k++) {
@@ -181,7 +253,7 @@ function tube(B, pts, radial, col) {
 const WASH = C3(0xe8e6de);
 const SPECIES = {
   poplar: {
-    h: 21, r: 2.35, leaves: [0x41702d, 0x4f7f34, 0x385f28, 0x5d8a3c], inner: 0x1d3516,
+    h: 21, r: 2.0, leaves: [0x41702d, 0x4f7f34, 0x385f28, 0x5d8a3c], inner: 0x1d3516,
     bark: 0x8b887c, wash: [1, 1, 0], tint: [0.08, 0.1, 0.07],
   },
   elm: {
@@ -233,8 +305,8 @@ function leafColFn(P, C, base, opts = {}) {
     const d = Math.min(1.15, Math.sqrt(dx * dx + dy * dy + dz * dz));
     let s = clamp(0.25 + 0.85 * d, 0, 1.05);
     let c = mixc(inner, base, Math.pow(s, contrast));
-    let k = 0.86 + 0.22 * clamp(dy * 0.5 + 0.5);
-    if (ny < 0) k *= 1 + 0.28 * ny;
+    let k = 0.84 + 0.26 * clamp(dy * 0.5 + 0.5);
+    k *= ny < 0 ? 1 + 0.42 * ny : 1 + 0.1 * ny;
     k *= 0.86 + 0.28 * rng();
     return mulc(c, k);
   };
@@ -245,7 +317,7 @@ function buildPoplar(variant, seed, laySeed) {
   const H = P.h * (0.96 + 0.08 * rng()) * [1.04, 0.95, 1][variant], R = P.r * (0.92 + 0.16 * rng()) * [0.9, 1.12, 1][variant];
   const y0 = 2.6 + rng() * 0.9, ch = H - y0;
   const lx = (rng() - 0.5) * 0.6, lz = (rng() - 0.5) * 0.6;
-  const prof = t => R * (t < 0.28 ? 0.55 + 0.45 * Math.sin(t / 0.28 * Math.PI / 2) : 1 - Math.pow((t - 0.28) / 0.72, 1.5) * 0.93);
+  const prof = t => R * (t < 0.34 ? 0.5 + 0.5 * Math.sin(t / 0.34 * Math.PI / 2) : 1 - Math.pow((t - 0.34) / 0.66, 2.1) * 0.93);
   const C = { x: lx * 0.42, y: y0 + ch * 0.42, z: lz * 0.42, rx: R * 1.1, ry: ch * 0.62, rz: R * 1.1 };
   const bark = barkFn(P, variant, rng);
   const tr = 0.3 + rng() * 0.05;
@@ -509,7 +581,7 @@ function buildHedge(B, x1, z1, x2, z2, h, seed) {
     const idx = geo.index.array; for (let k = 0; k < idx.length; k += 3) { const tmp = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = tmp; }
     geo.computeVertexNormals();
   }
-  B.add(geo);
+  B.add(geo, null, 1);
 }
 
 function boxInto(B, cx, cy, cz, sx, sy, sz, col, rng) {
@@ -546,7 +618,7 @@ function buildFlowerBed(B, x, z, w, d, seed) {
       const px = tpl.pos[k * 3], py = tpl.pos[k * 3 + 1], pz = tpl.pos[k * 3 + 2];
       const dd = 1 + 0.25 * (rng() - 0.5);
       let c = bloom && py > -0.1 ? mulc(bloom, 0.85 + 0.25 * rng()) : mulc(foliage, (py < 0 ? 0.7 : 1) * (0.85 + 0.25 * rng()));
-      B.v(cx + px * r * dd, cy + py * r * 0.7 * dd, cz + pz * r * dd, px, py + 0.5, pz, c);
+      B.v(cx + px * r * dd, cy + py * r * 0.7 * dd, cz + pz * r * dd, px, py + 0.5, pz, c, bloom ? 0.4 : 0.8);
     }
     for (let k = 0; k < tpl.idx.length; k++) B.i.push(base + tpl.idx[k]);
   }
@@ -676,7 +748,7 @@ export function createLawn(w, d, { seed = 1 } = {}) {
   geo.rotateX(-Math.PI / 2);
   geo.translate(0, 0.02, 0);
   const pos = geo.attributes.position, uv = geo.attributes.uv, cols = new Float32Array(pos.count * 3);
-  const lush = C3(0x5b873a), mid = C3(0x6b8a42), dry = C3(0x8f8b56), deep = C3(0x47702f);
+  const lush = C3(0x55803a), mid = C3(0x66843f), dry = C3(0x8a8656), deep = C3(0x426a2e);
   const so = (seed * 37.17) % 1000;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
@@ -707,63 +779,70 @@ export function createLawn(w, d, { seed = 1 } = {}) {
  * @returns {THREE.Group}
  */
 export function createMountains() {
-  const X0 = -3400, X1 = 3400, Z0 = 1720, Z1 = 2800, DX = 16, DZ = 15;
+  const X0 = -3400, X1 = 3400, Z0 = 1720, Z1 = 2800, DX = 15, DZ = 14;
   const nx = Math.round((X1 - X0) / DX), nz = Math.round((Z1 - Z0) / DZ);
   const W = nx + 1, Hn = nz + 1;
-  const hts = new Float32Array(W * Hn), env = new Float32Array(W * Hn);
+  const hts = new Float32Array(W * Hn), env = new Float32Array(W * Hn), rid = new Float32Array(W * Hn);
   const height = (x, z) => {
-    const crestZ = 2230 + 120 * gnoise2(x / 1100, 0.3, 11) + 45 * gnoise2(x / 380, 1.7, 12);
-    const crestH = 330 + 330 * clamp(0.5 + 0.7 * gnoise2(x / 1250, 0.5, 13) + 0.3 * gnoise2(x / 430, 2.1, 14));
+    const wx = x + 180 * fbm2(x / 800, z / 800, 2, 3);
+    // main range: a long crest with massive peaks and spurs running down toward the city
+    const crestZ = 2220 + 110 * gnoise2(x / 1300, 0.3, 11) + 40 * gnoise2(x / 420, 1.7, 12);
+    const crestH = 0.6 + 0.4 * clamp(0.5 + 0.8 * gnoise2(x / 1400, 0.5, 13) + 0.35 * gnoise2(x / 560, 2.1, 14));
     const dz = z - crestZ;
-    const prof = Math.exp(-Math.pow(Math.abs(dz) / (dz < 0 ? 320 : 420), 1.7));
-    const r = ridged2(x / 330 + 0.5 * fbm2(x / 900, z / 900, 2, 3), z / 520, 5, 21);
-    const main = crestH * prof * (0.42 + 0.75 * r);
-    const fz = 1930 + 50 * gnoise2(x / 700, 3.3, 15);
-    const fH = 110 + 90 * (0.5 + 0.5 * gnoise2(x / 600, 4.4, 16));
-    const front = fH * Math.exp(-Math.pow((z - fz) / 140, 2)) * (0.55 + 0.6 * ridged2(x / 260, z / 260, 4, 31));
-    const bz = 2560 + 70 * gnoise2(x / 900, 5.5, 17);
-    const bH = 430 + 270 * clamp(0.5 + 0.8 * gnoise2(x / 1000, 6.6, 18));
-    const back = bH * Math.exp(-Math.pow((z - bz) / 230, 2)) * (0.45 + 0.7 * ridged2(x / 380, z / 560, 5, 41));
-    let h = main, e = crestH;
-    if (back > h) { h = back; e = bH; }
-    if (front > h) { h = front; e = fH * 2; }
-    const ends = 0.25 + 0.75 * smooth(3450, 2600, Math.abs(x));
-    const base = smooth(1725, 1880, z) * smooth(2800, 2700, z);
-    return [h * ends * base, e * ends];
+    const prof = Math.exp(-Math.pow(Math.abs(dz) / (dz < 0 ? 370 : 470), 1.45));
+    const r = ridged2(wx / 540, z / 800, 4, 21);
+    const det = ridged2(wx / 150, z / 210, 3, 51);
+    const main = crestH * prof * (0.3 + 0.85 * r + 0.12 * det);
+    // front foothills (adyr)
+    const fz = 1935 + 50 * gnoise2(x / 700, 3.3, 15);
+    const fH = 0.17 + 0.12 * (0.5 + 0.5 * gnoise2(x / 650, 4.4, 16));
+    const rf = ridged2(wx / 300, z / 340, 3, 31);
+    const front = fH * Math.exp(-Math.pow((z - fz) / 150, 2)) * (0.55 + 0.6 * rf);
+    // higher, hazier back range peeking over the crest
+    const bz = 2580 + 60 * gnoise2(x / 900, 5.5, 17);
+    const bH = 0.72 + 0.36 * clamp(0.5 + 0.8 * gnoise2(x / 1100, 6.6, 18));
+    const rb = ridged2(wx / 480, z / 700, 4, 41);
+    const back = bH * Math.exp(-Math.pow((z - bz) / 240, 2)) * (0.32 + 0.82 * rb + 0.1 * det);
+    let h = main, e = crestH, rr = r * 0.7 + det * 0.3;
+    if (back > h) { h = back; e = bH; rr = rb; }
+    if (front > h) { h = front; e = fH * 1.6; rr = rf; }
+    const ends = 0.3 + 0.7 * smooth(3450, 2500, Math.abs(x));
+    const base = smooth(1725, 1890, z) * smooth(2800, 2720, z);
+    return [h * ends * base, e * ends, rr];
   };
   let maxH = 0;
   for (let j = 0; j < Hn; j++) for (let i = 0; i < W; i++) {
-    const [h, e] = height(X0 + i * DX, Z0 + j * DZ);
-    hts[j * W + i] = h; env[j * W + i] = e; if (h > maxH) maxH = h;
+    const [h, e, r] = height(X0 + i * DX, Z0 + j * DZ), id = j * W + i;
+    hts[id] = h; env[id] = e; rid[id] = r; if (h > maxH) maxH = h;
   }
   const k = 700 / maxH;
   for (let i = 0; i < hts.length; i++) { hts[i] *= k; env[i] *= k; }
   const pos = new Float32Array(W * Hn * 3), cols = new Float32Array(W * Hn * 3);
   const sRGB = (r, g, b) => { const c = new THREE.Color().setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace); return [c.r, c.g, c.b]; };
-  const rockLit = sRGB(150, 138, 128), rockShade = sRGB(70, 80, 104), grassLit = sRGB(132, 136, 92), grassShade = sRGB(66, 82, 92);
-  const snowLit = sRGB(252, 252, 255), snowShade = sRGB(176, 192, 222), haze = sRGB(184, 206, 229);
-  const L = new THREE.Vector3(-0.55, 0.62, 0.3).normalize();
+  const rockLit = sRGB(150, 138, 130), rockShade = sRGB(54, 66, 102), grassLit = sRGB(132, 132, 90), grassShade = sRGB(56, 72, 92);
+  const snowLit = sRGB(253, 253, 255), snowShade = sRGB(150, 172, 214), haze = sRGB(182, 205, 230);
+  const L = new THREE.Vector3(-0.6, 0.6, 0.25).normalize();
   const H = (i, j) => hts[clamp(j, 0, Hn - 1) * W + clamp(i, 0, W - 1)];
   for (let j = 0; j < Hn; j++) for (let i = 0; i < W; i++) {
-    const x = X0 + i * DX, z = Z0 + j * DZ, h = H(i, j), id = j * W + i;
+    const x = X0 + i * DX, z = Z0 + j * DZ, id = j * W + i, h = hts[id];
     pos[id * 3] = x; pos[id * 3 + 1] = h - 2; pos[id * 3 + 2] = z;
     const gx = (H(i + 1, j) - H(i - 1, j)) / (2 * DX), gz = (H(i, j + 1) - H(i, j - 1)) / (2 * DZ);
     let nx_ = -gx, ny_ = 1, nz_ = -gz; const nl = Math.hypot(nx_, ny_, nz_); nx_ /= nl; ny_ /= nl; nz_ /= nl;
     const dif = Math.max(0, nx_ * L.x + ny_ * L.y + nz_ * L.z);
-    const lit = clamp(0.18 + 1.05 * dif);
-    // rock vs grassy foothills
-    const grassy = 1 - smooth(90, 260, h + 40 * gnoise2(x / 150, z / 150, 61));
+    const lit = clamp(1.3 * dif - 0.04);
+    const grassy = 1 - smooth(70, 240, h + 50 * gnoise2(x / 150, z / 150, 61));
     let c = mixc(mixc(rockShade, rockLit, lit), mixc(grassShade, grassLit, lit), grassy);
-    c = mulc(c, 0.9 + 0.2 * (0.5 + 0.5 * gnoise2(x / 60, z / 60, 62)));
-    // snow above ~60 % of the local range height, less on steep faces, ragged edge
-    const e = env[id];
-    const line = e * 0.58 + e * 0.07 * gnoise2(x / 120, z / 120, 63) + 18 * gnoise2(x / 30, z / 30, 64) + (1 - ny_) * e * 0.35;
-    const snow = smooth(line - 10, line + 22, h);
-    if (snow > 0) c = mixc(c, mixc(snowShade, snowLit, clamp(0.25 + 1.1 * dif)), snow);
+    c = mulc(c, 0.88 + 0.24 * (0.5 + 0.5 * gnoise2(x / 50, z / 50, 62)));
+    // snow above ~60 % of the local range height; lingers in gullies, blown off ridges and steep faces
+    const e = env[id], r = rid[id];
+    const line = e * 0.56 + e * 0.06 * gnoise2(x / 140, z / 140, 63) + 16 * gnoise2(x / 34, z / 34, 64) + 8 * gnoise2(x / 13, z / 13, 65)
+      + (r - 0.45) * e * 0.22 + (1 - ny_) * e * 0.22;
+    const snow = smooth(line - 6, line + 12, h);
+    if (snow > 0) c = mixc(c, mixc(snowShade, snowLit, clamp(1.25 * dif)), snow);
     // aerial perspective: farther and lower = hazier
-    const dist = Math.hypot(x * 0.6, z);
-    let f = clamp(0.2 + (dist - 1750) / 1100 * 0.32 + (1 - h / 700) * 0.18, 0, 0.85);
-    f *= 1 - 0.35 * snow;
+    const dist = Math.hypot(x * 0.55, z);
+    let f = clamp(0.12 + (dist - 1750) / 1000 * 0.34 + (1 - h / 700) * 0.2, 0, 0.88);
+    f *= 1 - 0.3 * snow;
     c = mixc(c, haze, f);
     cols.set(c, id * 3);
   }

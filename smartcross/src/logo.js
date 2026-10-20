@@ -6,21 +6,16 @@ import * as THREE from 'three';
 
 /* ------------------------------------------------------------------ shape parameters (metres) */
 const ARMS = 5;
-let TIP = 2.9;       // centre -> tip-sphere centre
-let R_IN = 1.38;     // centre sphere radius (round-cone base)
-let R_TIP = 0.42;    // tip rounding radius
-let FLAT = 0.6;      // depth flattening (z scale of the cones)
-let BLEND = 0.18;    // smooth-union radius (fillets the inner corners, inflates the centre)
+const TIP = 2.9;     // centre -> tip-sphere centre
+const R_IN = 1.38;   // centre sphere radius (round-cone base)
+const R_TIP = 0.42;  // tip rounding radius
+const FLAT = 0.6;    // depth flattening (z scale of the cones)
+const BLEND = 0.18;  // smooth-union radius (fillets the inner corners, inflates the centre)
 
 const AX = [], AY = [];
 for (let i = 0; i < ARMS; i++) { const a = Math.PI / 2 + i * 2 * Math.PI / ARMS; AX.push(Math.cos(a)); AY.push(Math.sin(a)); }
 
-let L2, RR, A2, IL2;
-function setShape(o = {}) {
-  ({ TIP = TIP, R_IN = R_IN, R_TIP = R_TIP, FLAT = FLAT, BLEND = BLEND } = o);
-  L2 = TIP * TIP; RR = R_IN - R_TIP; A2 = L2 - RR * RR; IL2 = 1 / L2;
-}
-setShape();
+const L2 = TIP * TIP, RR = R_IN - R_TIP, A2 = L2 - RR * RR, IL2 = 1 / L2;
 // exact SDF of a round cone from the origin (radius R_IN) to TIP*(ux,uy,0) (radius R_TIP) — after Inigo Quilez
 function roundCone(px, py, pz, ux, uy) {
   const bx = TIP * ux, by = TIP * uy;
@@ -172,13 +167,14 @@ function mulberry32(a) {
 }
 const SUN_DIR = new THREE.Vector3(-0.45, 0.75, 0.55).normalize();
 
-// Equirectangular sky reflection map (512x256): blue zenith, bright warm horizon, soft clouds, green city below.
+// Art-directed sky used only as the star's own reflection map (scene.environment is a dim RoomEnvironment,
+// which would leave polished gold looking brown). Neutral-light sky so the gold stays gold, warm ground.
 const ENV = {
-  zenith: [0.32, 0.39, 0.52], sky: [0.68, 0.69, 0.72], hband: [0.32, 0.28, 0.20], hbandK: 9,
-  groundNear: [0.78, 0.64, 0.46], groundFar: [0.14, 0.09, 0.05], groundPow: 0.55,
+  zenith: [0.32, 0.39, 0.52], sky: [0.68, 0.69, 0.72], hband: [0.30, 0.25, 0.17], hbandK: 6,
+  groundNear: [0.96, 0.86, 0.68], groundFar: [0.2, 0.13, 0.07], groundPow: 0.42,
   sunBroad: 0.35, sunMid: 0.5, clouds: 18,
   // a big soft sunlit cloud high behind the viewer (south) -> long soft highlights along the arms
-  boxes: [{ dir: [0, 0.6, 0.8], az: Math.PI / 2, el: 0.72, w: 1.1, h: 0.26, a: 0.55 }],
+  boxes: [{ dir: [0, 0.6, 0.8], az: Math.PI / 2, el: 0.72, w: 1.1, h: 0.26, a: 0.45 }],
 };
 // Equirectangular sky reflection map (512x256): zenith, bright warm horizon, soft clouds, sun glow, warm ground.
 function makeSkyEnv(o = ENV) {
@@ -258,7 +254,7 @@ function starMaterial() {
   if (cache.star) return cache.star;
   const m = new THREE.MeshPhysicalMaterial({
     color: 0xffbd3f, metalness: 0.95, roughness: 0.17,
-    clearcoat: 0.8, clearcoatRoughness: 0.04,
+    clearcoat: 0.6, clearcoatRoughness: 0.04,
     iridescence: 0.2, iridescenceIOR: 1.35, iridescenceThicknessRange: [180, 420],
     envMap: makeSkyEnv(), envMapIntensity: 2.0,
   });
@@ -274,17 +270,18 @@ function starMaterial() {
   m.customProgramCacheKey = () => 'lonestar-rim';
   return (cache.star = m);
 }
+// per instance (its opacity is animated); the canvas texture is shared
 function glowMaterial() {
-  if (cache.glow) return cache.glow;
-  return (cache.glow = new THREE.SpriteMaterial({
-    map: makeGlowTex(), color: 0xffffff, transparent: true, opacity: 0.38,
+  if (!cache.glowTex) cache.glowTex = makeGlowTex();
+  return new THREE.SpriteMaterial({
+    map: cache.glowTex, color: 0xffffff, transparent: true, opacity: 0.36,
     blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false,
-  }));
+  });
 }
 function sparkleMaterial() {
   if (cache.sparkle) return cache.sparkle;
   return (cache.sparkle = new THREE.ShaderMaterial({
-    uniforms: { uPx: { value: 400 }, uColor: { value: new THREE.Color(0xffd27a) }, uCore: { value: new THREE.Color(0xfffaf0) } },
+    uniforms: { uPx: { value: 400 }, uColor: { value: new THREE.Color(0xffcf6e) }, uCore: { value: new THREE.Color(0xfffaf0) } },
     vertexShader: `
       attribute float aSize; attribute float aAlpha; attribute float aFlare; attribute float aRot;
       uniform float uPx;
@@ -311,9 +308,9 @@ function sparkleMaterial() {
         float rays2 = exp(-abs(q.x) * 45.0) * pow(max(1.0 - abs(q.y) * 1.7, 0.0), 3.0)
                     + exp(-abs(q.y) * 45.0) * pow(max(1.0 - abs(q.x) * 1.7, 0.0), 3.0);
         float flare = core + 0.32 * halo + 0.75 * rays + 0.28 * rays2;
-        float dotA = exp(-r2 * 5.0) * 0.8 + exp(-r2 * 40.0) * 0.5;
+        float dotA = exp(-r2 * 7.0) * 0.7 + exp(-r2 * 40.0) * 0.6;
         float a = mix(dotA, flare, vFlare) * vAlpha * (1.0 - smoothstep(0.85, 1.0, sqrt(r2)));
-        vec3 col = mix(uColor, uCore, clamp(core * 1.4 + 0.1 * (1.0 - vFlare), 0.0, 1.0));
+        vec3 col = mix(uColor, uCore, clamp(core * 1.4, 0.0, 1.0) * vFlare + 0.35 * (1.0 - vFlare));
         gl_FragColor = vec4(col * a, a);
         #include <colorspace_fragment>
       }`,
@@ -323,11 +320,11 @@ function sparkleMaterial() {
 
 /* ------------------------------------------------------------------ sparkles */
 const ORBITS = [
-  { rx: 4.7, rz: 4.1, tx: 0.30, tz: 0.48, w: 0.55, ph: 0.3, size: 1.0 },
-  { rx: 5.1, rz: 3.7, tx: -0.22, tz: -0.62, w: -0.43, ph: 2.6, size: 0.85 },
-  { rx: 4.2, rz: 4.3, tx: 1.05, tz: 0.12, w: 0.68, ph: 4.4, size: 0.75 },
+  { rx: 4.7, rz: 4.1, tx: 0.30, tz: 0.48, w: 0.55, ph: 0.3, size: 0.9 },
+  { rx: 5.1, rz: 3.7, tx: -0.22, tz: -0.62, w: -0.43, ph: 2.6, size: 0.75 },
+  { rx: 4.2, rz: 4.3, tx: 1.05, tz: 0.12, w: 0.68, ph: 4.4, size: 0.65 },
 ];
-const TRAIL = 44, TRAIL_STEP = 0.016, AMBIENT = 9;
+const TRAIL = 40, TRAIL_STEP = 0.015, AMBIENT = 10;
 
 function createSparkles() {
   const n = ORBITS.length * (1 + TRAIL) + AMBIENT;
@@ -368,7 +365,7 @@ function createSparkles() {
           size[i] = o.size * (0.9 + 0.12 * Math.sin(t * 3.1 + k)); alpha[i] = tw; flare[i] = 1; rot[i] = t * 0.6 + k;
         } else {
           const f = 1 - j / (TRAIL + 1);
-          size[i] = 0.42 * o.size * (0.25 + 0.75 * f); alpha[i] = 0.2 * f * f * (0.6 + 0.4 * f); flare[i] = 0; rot[i] = 0;
+          size[i] = 0.3 * o.size * (0.3 + 0.7 * f); alpha[i] = 0.09 * f * f; flare[i] = 0; rot[i] = 0;
         }
         i++;
       }
@@ -388,10 +385,13 @@ function createSparkles() {
 
 /* ------------------------------------------------------------------ public API */
 /**
- * "Lone Stars" team logo: a puffy golden five-pointed star (~6.3 m tip-to-tip, ~1.7 m thick), centre at the
- * origin, front facing +Z, with a soft glow halo and orbiting sparkles. ≤ 4 draw calls (star, its shadow, glow, sparkles).
+ * "Lone Stars" team logo: a puffy polished-gold five-pointed star, 6.36 m wide × 6.09 m tall × 2.0 m thick
+ * (top tip at y = +3.32, star centre at the origin), front facing +Z, one tip pointing up; plus a soft warm halo
+ * sprite and orbiting sparkles (3 comets with fading trails + 10 twinkles, radius ≈ 4–6 m).
+ * Draw calls: star + its shadow pass + halo + sparkles = 4. Star mesh: 87,000 triangles (built once, ~0.1 s).
  * @returns {{ group: THREE.Group, update: (t: number, dt?: number) => void }}
- *   `update(t)` is a pure function of time: floating bob, gentle turn/tilt, breathing scale, sparkle orbits.
+ *   `update(t)` depends only on absolute time t (seconds): floating bob ±0.22 m, gentle turn (±~17°) and tilt,
+ *   ±1.8 % breathing scale, halo pulse, sparkle orbits/twinkles. Safe to call with any t (no accumulated state).
  */
 export function createStarLogo() {
   if (!cache.geo) cache.geo = buildStarGeometry();
@@ -427,28 +427,14 @@ export function createStarLogo() {
       0.05 * Math.sin(TAU * t / 11.0 + 0.4),
     );
     spin.scale.setScalar(1 + 0.018 * Math.sin(TAU * t / 4.5));
-    glow.material.opacity = 0.34 + 0.05 * Math.sin(TAU * t / 4.5);
+    glow.material.opacity = 0.33 + 0.05 * Math.sin(TAU * t / 4.5);
     sparkles.update(t);
   }
   update(0);
-  return { group, update: (t, dt) => update(t, dt) };
+  return { group, update };
 }
 
 /** Preview showcase: the logo. */
 export function demo() {
   return createStarLogo();
-}
-
-// TEMP: shape exploration
-export function __variants() {
-  const g = new THREE.Group();
-  const shapes = [
-    { TIP: 2.86, R_IN: 1.3, R_TIP: 0.45, FLAT: 0.62, BLEND: 0.12 },
-    { TIP: 2.86, R_IN: 1.42, R_TIP: 0.45, FLAT: 0.57, BLEND: 0.15 },
-    { TIP: 2.82, R_IN: 1.5, R_TIP: 0.5, FLAT: 0.55, BLEND: 0.18 },
-    { TIP: 2.9, R_IN: 1.38, R_TIP: 0.4, FLAT: 0.6, BLEND: 0.2 },
-  ];
-  shapes.forEach((sh, i) => { setShape(sh); const s = new THREE.Mesh(buildStarGeometry(), starMaterial()); s.position.x = i * 40; s.castShadow = s.receiveShadow = true; g.add(s); });
-  setShape({ TIP: 2.86, R_IN: 1.3, R_TIP: 0.45, FLAT: 0.62, BLEND: 0.12 });
-  return g;
 }
