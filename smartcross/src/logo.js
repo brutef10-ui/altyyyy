@@ -6,16 +6,21 @@ import * as THREE from 'three';
 
 /* ------------------------------------------------------------------ shape parameters (metres) */
 const ARMS = 5;
-const TIP = 2.98;    // centre -> tip-sphere centre
-const R_IN = 1.3;    // centre sphere radius (round-cone base)
-const R_TIP = 0.34;  // tip rounding radius
-const FLAT = 0.58;   // depth flattening (z scale of the cones)
-const BLEND = 0.12;  // smooth-union radius (fillets the inner corners, inflates the centre)
+let TIP = 2.9;       // centre -> tip-sphere centre
+let R_IN = 1.38;     // centre sphere radius (round-cone base)
+let R_TIP = 0.42;    // tip rounding radius
+let FLAT = 0.6;      // depth flattening (z scale of the cones)
+let BLEND = 0.18;    // smooth-union radius (fillets the inner corners, inflates the centre)
 
 const AX = [], AY = [];
 for (let i = 0; i < ARMS; i++) { const a = Math.PI / 2 + i * 2 * Math.PI / ARMS; AX.push(Math.cos(a)); AY.push(Math.sin(a)); }
 
-const L2 = TIP * TIP, RR = R_IN - R_TIP, A2 = L2 - RR * RR, IL2 = 1 / L2;
+let L2, RR, A2, IL2;
+function setShape(o = {}) {
+  ({ TIP = TIP, R_IN = R_IN, R_TIP = R_TIP, FLAT = FLAT, BLEND = BLEND } = o);
+  L2 = TIP * TIP; RR = R_IN - R_TIP; A2 = L2 - RR * RR; IL2 = 1 / L2;
+}
+setShape();
 // exact SDF of a round cone from the origin (radius R_IN) to TIP*(ux,uy,0) (radius R_TIP) — after Inigo Quilez
 function roundCone(px, py, pz, ux, uy) {
   const bx = TIP * ux, by = TIP * uy;
@@ -168,15 +173,24 @@ function mulberry32(a) {
 const SUN_DIR = new THREE.Vector3(-0.45, 0.75, 0.55).normalize();
 
 // Equirectangular sky reflection map (512x256): blue zenith, bright warm horizon, soft clouds, green city below.
-function makeSkyEnv() {
+const ENV = {
+  zenith: [0.32, 0.39, 0.52], sky: [0.68, 0.69, 0.72], hband: [0.32, 0.28, 0.20], hbandK: 9,
+  groundNear: [0.78, 0.64, 0.46], groundFar: [0.14, 0.09, 0.05], groundPow: 0.55,
+  sunBroad: 0.35, sunMid: 0.5, clouds: 18,
+  // a big soft sunlit cloud high behind the viewer (south) -> long soft highlights along the arms
+  boxes: [{ dir: [0, 0.6, 0.8], az: Math.PI / 2, el: 0.72, w: 1.1, h: 0.26, a: 0.55 }],
+};
+// Equirectangular sky reflection map (512x256): zenith, bright warm horizon, soft clouds, sun glow, warm ground.
+function makeSkyEnv(o = ENV) {
   const W = 512, H = 256;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d');
   const img = ctx.createImageData(W, H), d = img.data;
   const rnd = mulberry32(7741);
   const clouds = [];
-  for (let i = 0; i < 26; i++) clouds.push({ az: rnd() * Math.PI * 2, el: 0.04 + Math.pow(rnd(), 1.6) * 0.45, w: 0.12 + rnd() * 0.3, h: 0.03 + rnd() * 0.06, a: 0.35 + rnd() * 0.5 });
+  for (let i = 0; i < o.clouds; i++) clouds.push({ az: rnd() * Math.PI * 2, el: 0.04 + Math.pow(rnd(), 1.6) * 0.45, w: 0.12 + rnd() * 0.3, h: 0.03 + rnd() * 0.06, a: 0.35 + rnd() * 0.5 });
   const sx = SUN_DIR.x, sy = SUN_DIR.y, sz = SUN_DIR.z;
+  const lerp = (a, b, t) => a + (b - a) * t;
   for (let y = 0; y < H; y++) {
     const el = (0.5 - (y + 0.5) / H) * Math.PI, cel = Math.cos(el), sel = Math.sin(el);
     for (let x = 0; x < W; x++) {
@@ -184,9 +198,10 @@ function makeSkyEnv() {
       const dx = cel * Math.cos(az), dz = cel * Math.sin(az), dy = sel;
       let r, g, b;
       if (el >= 0) {
-        const h = Math.pow(sel, 0.5);
-        const hb = Math.exp(-sel * 14); // bright horizon band
-        r = 0.62 + (0.26 - 0.62) * h + 0.38 * hb; g = 0.68 + (0.40 - 0.68) * h + 0.32 * hb; b = 0.78 + (0.66 - 0.78) * h + 0.2 * hb;
+        const h = Math.pow(sel, 0.5), hb = Math.exp(-sel * o.hbandK);
+        r = lerp(o.sky[0], o.zenith[0], h) + o.hband[0] * hb;
+        g = lerp(o.sky[1], o.zenith[1], h) + o.hband[1] * hb;
+        b = lerp(o.sky[2], o.zenith[2], h) + o.hband[2] * hb;
         let cl = 0;
         for (const c of clouds) {
           let da = Math.abs(az - c.az); if (da > Math.PI) da = 2 * Math.PI - da;
@@ -196,14 +211,24 @@ function makeSkyEnv() {
         cl = Math.min(1, cl);
         r += (1 - r) * cl; g += (1 - g) * cl; b += (1 - b) * cl;
       } else {
-        const h = Math.pow(-sel, 0.45);
-        r = 0.70 + (0.16 - 0.70) * h; g = 0.66 + (0.14 - 0.66) * h; b = 0.58 + (0.09 - 0.58) * h;
+        const h = Math.pow(-sel, o.groundPow);
+        r = lerp(o.groundNear[0], o.groundFar[0], h); g = lerp(o.groundNear[1], o.groundFar[1], h); b = lerp(o.groundNear[2], o.groundFar[2], h);
+      }
+      // soft "softbox" panels: { dir: [x,y,z], w, h, a } — bright elongated patches (big sunlit clouds)
+      for (const bx of o.boxes) {
+        const c = dx * bx.dir[0] + dy * bx.dir[1] + dz * bx.dir[2];
+        if (c > 0) {
+          const ex = (el - bx.el) / bx.h; let da = Math.abs(az - bx.az); if (da > Math.PI) da = 2 * Math.PI - da;
+          const q = Math.pow(Math.abs(ex), 4) + Math.pow(da / bx.w, 4);
+          const a = bx.a * Math.exp(-q);
+          r += (1 - r) * a; g += (0.98 - g) * a; b += (0.93 - b) * a;
+        }
       }
       const s = Math.max(0, dx * sx + dy * sy + dz * sz);
-      const sun = Math.pow(s, 900) * 1.0 + Math.pow(s, 40) * 0.35;
+      const sun = Math.pow(s, 900) * 1.0 + Math.pow(s, 40) * o.sunMid + Math.pow(s, 6) * o.sunBroad;
       r += sun; g += sun * 0.95; b += sun * 0.82;
-      const o = (y * W + x) * 4;
-      d[o] = Math.min(255, r * 255); d[o + 1] = Math.min(255, g * 255); d[o + 2] = Math.min(255, b * 255); d[o + 3] = 255;
+      const k = (y * W + x) * 4;
+      d[k] = Math.min(255, r * 255); d[k + 1] = Math.min(255, g * 255); d[k + 2] = Math.min(255, b * 255); d[k + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -216,9 +241,9 @@ function makeGlowTex() {
   const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
   const ctx = cv.getContext('2d');
   const gr = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-  gr.addColorStop(0.0, 'rgba(255,238,196,0.9)');
-  gr.addColorStop(0.22, 'rgba(255,226,160,0.55)');
-  gr.addColorStop(0.5, 'rgba(255,214,140,0.16)');
+  gr.addColorStop(0.0, 'rgba(255,232,180,0.9)');
+  gr.addColorStop(0.22, 'rgba(255,220,150,0.5)');
+  gr.addColorStop(0.5, 'rgba(255,206,130,0.14)');
   gr.addColorStop(0.75, 'rgba(255,214,140,0.04)');
   gr.addColorStop(1.0, 'rgba(255,214,140,0)');
   ctx.fillStyle = gr; ctx.fillRect(0, 0, S, S);
@@ -232,10 +257,10 @@ const cache = {};
 function starMaterial() {
   if (cache.star) return cache.star;
   const m = new THREE.MeshPhysicalMaterial({
-    color: 0xffb330, metalness: 0.95, roughness: 0.2,
-    clearcoat: 0.7, clearcoatRoughness: 0.05,
-    iridescence: 0.22, iridescenceIOR: 1.35, iridescenceThicknessRange: [180, 420],
-    envMap: makeSkyEnv(), envMapIntensity: 1.6,
+    color: 0xffbd3f, metalness: 0.95, roughness: 0.17,
+    clearcoat: 0.8, clearcoatRoughness: 0.04,
+    iridescence: 0.2, iridescenceIOR: 1.35, iridescenceThicknessRange: [180, 420],
+    envMap: makeSkyEnv(), envMapIntensity: 2.0,
   });
   const rim = { value: new THREE.Color(0xffc56b).multiplyScalar(0.7) };
   m.onBeforeCompile = (sh) => {
@@ -286,9 +311,9 @@ function sparkleMaterial() {
         float rays2 = exp(-abs(q.x) * 45.0) * pow(max(1.0 - abs(q.y) * 1.7, 0.0), 3.0)
                     + exp(-abs(q.y) * 45.0) * pow(max(1.0 - abs(q.x) * 1.7, 0.0), 3.0);
         float flare = core + 0.32 * halo + 0.75 * rays + 0.28 * rays2;
-        float dotA = exp(-r2 * 6.0) * 0.9 + exp(-r2 * 30.0) * 0.6;
+        float dotA = exp(-r2 * 5.0) * 0.8 + exp(-r2 * 40.0) * 0.5;
         float a = mix(dotA, flare, vFlare) * vAlpha * (1.0 - smoothstep(0.85, 1.0, sqrt(r2)));
-        vec3 col = mix(uColor, uCore, clamp(core * 1.4 + 0.25 * (1.0 - vFlare), 0.0, 1.0));
+        vec3 col = mix(uColor, uCore, clamp(core * 1.4 + 0.1 * (1.0 - vFlare), 0.0, 1.0));
         gl_FragColor = vec4(col * a, a);
         #include <colorspace_fragment>
       }`,
@@ -343,7 +368,7 @@ function createSparkles() {
           size[i] = o.size * (0.9 + 0.12 * Math.sin(t * 3.1 + k)); alpha[i] = tw; flare[i] = 1; rot[i] = t * 0.6 + k;
         } else {
           const f = 1 - j / (TRAIL + 1);
-          size[i] = 0.3 * o.size * (0.2 + 0.8 * f); alpha[i] = 0.32 * f * f; flare[i] = 0; rot[i] = 0;
+          size[i] = 0.42 * o.size * (0.25 + 0.75 * f); alpha[i] = 0.2 * f * f * (0.6 + 0.4 * f); flare[i] = 0; rot[i] = 0;
         }
         i++;
       }
@@ -377,8 +402,19 @@ export function createStarLogo() {
   star.castShadow = true; star.receiveShadow = true; star.name = 'star';
   spin.add(star);
   const glow = new THREE.Sprite(glowMaterial());
-  glow.scale.set(15, 15, 1); glow.position.set(0, 0.1, -2.2); glow.renderOrder = 1;
+  glow.scale.set(14, 14, 1); glow.renderOrder = 1;
   float.add(glow);
+  // keep the halo centred behind the star as seen from whatever camera renders it (no parallax offset)
+  const camL = new THREE.Vector3();
+  glow.onBeforeRender = (renderer, scene, camera) => {
+    camL.setFromMatrixPosition(camera.matrixWorld);
+    float.worldToLocal(camL);
+    const l = camL.length() || 1;
+    glow.position.copy(camL).multiplyScalar(-2.4 / l);
+    glow.updateMatrix();
+    glow.matrixWorld.multiplyMatrices(float.matrixWorld, glow.matrix);
+    glow.modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, glow.matrixWorld);
+  };
   const sparkles = createSparkles();
   float.add(sparkles.points);
 
@@ -401,4 +437,18 @@ export function createStarLogo() {
 /** Preview showcase: the logo. */
 export function demo() {
   return createStarLogo();
+}
+
+// TEMP: shape exploration
+export function __variants() {
+  const g = new THREE.Group();
+  const shapes = [
+    { TIP: 2.86, R_IN: 1.3, R_TIP: 0.45, FLAT: 0.62, BLEND: 0.12 },
+    { TIP: 2.86, R_IN: 1.42, R_TIP: 0.45, FLAT: 0.57, BLEND: 0.15 },
+    { TIP: 2.82, R_IN: 1.5, R_TIP: 0.5, FLAT: 0.55, BLEND: 0.18 },
+    { TIP: 2.9, R_IN: 1.38, R_TIP: 0.4, FLAT: 0.6, BLEND: 0.2 },
+  ];
+  shapes.forEach((sh, i) => { setShape(sh); const s = new THREE.Mesh(buildStarGeometry(), starMaterial()); s.position.x = i * 40; s.castShadow = s.receiveShadow = true; g.add(s); });
+  setShape({ TIP: 2.86, R_IN: 1.3, R_TIP: 0.45, FLAT: 0.62, BLEND: 0.12 });
+  return g;
 }

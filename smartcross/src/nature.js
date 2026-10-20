@@ -144,7 +144,9 @@ function blob(B, rng, o) {
     const rx = ex * cr - ez * sr, rz = ex * sr + ez * cr;
     let cx = (x - C.x) / (C.rx * C.rx), cy = (y - C.y) / (C.ry * C.ry), cz = (z - C.z) / (C.rz * C.rz);
     el = Math.hypot(cx, cy, cz) || 1; cx /= el; cy /= el; cz /= el;
-    const nx = rx * (1 - blend) + cx * blend, ny = ey * (1 - blend) + cy * blend, nz = rz * (1 - blend) + cz * blend;
+    const nj = o.nj || 0;
+    const nx = rx * (1 - blend) + cx * blend + nj * (rng() - 0.5), ny = ey * (1 - blend) + cy * blend + nj * (rng() - 0.5),
+      nz = rz * (1 - blend) + cz * blend + nj * (rng() - 0.5);
     B.v(x, y, z, nx, ny, nz, o.col(x, y, z, ey, rng));
   }
   for (let k = 0; k < t.idx.length; k++) B.i.push(base + t.idx[k]);
@@ -179,34 +181,34 @@ function tube(B, pts, radial, col) {
 const WASH = C3(0xe8e6de);
 const SPECIES = {
   poplar: {
-    h: 21, r: 2.35, leaves: [0x4c7c33, 0x5c8b3b, 0x416f2d, 0x6a9542], inner: 0x24401b,
-    bark: 0x8b887c, wash: [1, 1, 0], tint: [0.08, 0.1, 0.06],
+    h: 21, r: 2.35, leaves: [0x41702d, 0x4f7f34, 0x385f28, 0x5d8a3c], inner: 0x1d3516,
+    bark: 0x8b887c, wash: [1, 1, 0], tint: [0.08, 0.1, 0.07],
   },
   elm: {
-    h: 10.5, trunkR: 0.27, fork: 3.0, cy: 6.9, rx: 4.1, ry: 3.4, big: 11, small: 10, limbs: 4, low: 2,
-    shell: 0.6, clump: 0.5, leaves: [0x4f7f32, 0x5e8d38, 0x46742d], inner: 0x243f19,
-    bark: 0x5f554b, wash: [1, 0, 1], tint: [0.08, 0.08, 0.06],
+    h: 10.5, trunkR: 0.27, fork: 3.0, cy: 6.9, rx: 4.1, ry: 3.4, limbs: 4, low: 2, core: 0.7, mid: 10, tufts: 36,
+    clump: 0.34, tuft: 0.2, leaves: [0x46752d, 0x548234, 0x3d6828], inner: 0x1e3515,
+    bark: 0x5f554b, wash: [1, 0, 1], tint: [0.08, 0.08, 0.07],
   },
   maple: {
-    h: 12, trunkR: 0.28, fork: 2.8, cy: 7.6, rx: 4.4, ry: 4.2, big: 12, small: 10, limbs: 4, low: 2,
-    shell: 0.6, clump: 0.5, leaves: [0x5f9437, 0x70a23f, 0x538731], inner: 0x2a481b,
-    bark: 0x6d655c, wash: [0, 1, 0], tint: [0.1, 0.08, 0.06],
+    h: 12, trunkR: 0.28, fork: 2.8, cy: 7.6, rx: 4.4, ry: 4.2, limbs: 4, low: 2, core: 0.7, mid: 10, tufts: 36,
+    clump: 0.34, tuft: 0.2, leaves: [0x568a33, 0x63963a, 0x4a7c2e], inner: 0x243f17,
+    bark: 0x6d655c, wash: [0, 1, 0], tint: [0.1, 0.08, 0.07],
   },
   oak: {
-    h: 14, trunkR: 0.46, fork: 3.2, cy: 8.8, rx: 6.0, ry: 4.6, big: 12, small: 10, limbs: 5, low: 2,
-    shell: 0.62, clump: 0.48, leaves: [0x47712c, 0x567f33, 0x3e6628], inner: 0x1f3615,
-    bark: 0x584a3d, wash: [0, 0, 0], tint: [0.06, 0.07, 0.05],
+    h: 14, trunkR: 0.46, fork: 3.2, cy: 8.8, rx: 6.0, ry: 4.6, limbs: 5, low: 2, core: 0.68, mid: 12, tufts: 36,
+    clump: 0.34, tuft: 0.2, leaves: [0x3f6829, 0x4c7630, 0x365c24], inner: 0x1a2f12,
+    bark: 0x584a3d, wash: [0, 0, 0], tint: [0.06, 0.07, 0.06],
   },
   birch: {
-    h: 13.5, trunkR: 0.2, fork: 4.6, cy: 9.2, rx: 3.1, ry: 4.3, big: 11, small: 12, limbs: 4, low: 2,
-    shell: 0.66, clump: 0.42, leaves: [0x78a542, 0x8ab24b, 0x6a983b], inner: 0x34541e,
-    bark: 0xe7e3d9, wash: [0, 0, 0], tint: [0.08, 0.06, 0.06], birch: true,
+    h: 13.5, trunkR: 0.2, fork: 4.6, cy: 9.2, rx: 3.1, ry: 4.3, limbs: 4, low: 2, core: 0.58, mid: 10, tufts: 38,
+    clump: 0.3, tuft: 0.17, leaves: [0x6f9c3e, 0x80aa47, 0x618f37], inner: 0x2e4a1b,
+    bark: 0xe7e3d9, wash: [0, 0, 0], tint: [0.08, 0.06, 0.07], birch: true,
   },
   spruce: {
     h: 12.5, r: 2.4, needles: [0x2d4c35, 0x34573c], tips: [0x4b6f4e, 0x56795a], under: 0x16261a,
     bark: 0x5a4434, tint: [0.06, 0.06, 0.06],
   },
-  bush: { leaves: [0x4f7e31, 0x5f8c37, 0x44712b], inner: 0x203a16, tint: [0.1, 0.08, 0.06] },
+  bush: { leaves: [0x4a7830, 0x588636, 0x3f6b2a], inner: 0x1d3515, tint: [0.1, 0.08, 0.08] },
 };
 /** Tree type names accepted by addTree. */
 export const TREE_TYPES = ['poplar', 'elm', 'maple', 'oak', 'spruce', 'birch'];
@@ -233,135 +235,132 @@ function leafColFn(P, C, base, opts = {}) {
     let c = mixc(inner, base, Math.pow(s, contrast));
     let k = 0.86 + 0.22 * clamp(dy * 0.5 + 0.5);
     if (ny < 0) k *= 1 + 0.28 * ny;
-    k *= 0.93 + 0.14 * rng();
+    k *= 0.86 + 0.28 * rng();
     return mulc(c, k);
   };
 }
 
-function buildPoplar(variant, seed) {
-  const P = SPECIES.poplar, rng = mulberry32(seed), B = new Builder();
-  const H = P.h * (0.94 + 0.12 * rng()), R = P.r * (0.88 + 0.24 * rng());
+function buildPoplar(variant, seed, laySeed) {
+  const P = SPECIES.poplar, rng = mulberry32(seed), lay = mulberry32(laySeed), B = new Builder();
+  const H = P.h * (0.96 + 0.08 * rng()) * [1.04, 0.95, 1][variant], R = P.r * (0.92 + 0.16 * rng()) * [0.9, 1.12, 1][variant];
   const y0 = 2.6 + rng() * 0.9, ch = H - y0;
-  const lean = [(rng() - 0.5) * 0.5, (rng() - 0.5) * 0.5];
-  const prof = t => R * (t < 0.3 ? 0.62 + 0.38 * Math.sin(t / 0.3 * Math.PI / 2) : 1 - Math.pow((t - 0.3) / 0.7, 1.55) * 0.9);
-  const C = { x: lean[0] * 0.5, y: y0 + ch * 0.42, z: lean[1] * 0.5, rx: R * 1.05, ry: ch * 0.6, rz: R * 1.05 };
+  const lx = (rng() - 0.5) * 0.6, lz = (rng() - 0.5) * 0.6;
+  const prof = t => R * (t < 0.28 ? 0.55 + 0.45 * Math.sin(t / 0.28 * Math.PI / 2) : 1 - Math.pow((t - 0.28) / 0.72, 1.5) * 0.93);
+  const C = { x: lx * 0.42, y: y0 + ch * 0.42, z: lz * 0.42, rx: R * 1.1, ry: ch * 0.62, rz: R * 1.1 };
   const bark = barkFn(P, variant, rng);
-  // trunk (tapering leader up into the crown)
   const tr = 0.3 + rng() * 0.05;
   tube(B, [
     [0, -0.4, 0, tr * 1.1], [0, 0.4, 0, tr * 1.04], [0, 1.28, 0, tr], [0, 1.36, 0, tr * 0.99],
-    [lean[0] * 0.15, y0, lean[1] * 0.15, tr * 0.86], [lean[0] * 0.5, y0 + ch * 0.4, lean[1] * 0.5, tr * 0.55],
-    [lean[0] * 0.8, y0 + ch * 0.8, lean[1] * 0.8, 0.06],
+    [lx * 0.05, y0, lz * 0.05, tr * 0.86], [lx * 0.4, y0 + ch * 0.4, lz * 0.4, tr * 0.55], [lx * 0.8, y0 + ch * 0.8, lz * 0.8, 0.06],
   ], 8, bark);
   // steep fastigiate branches, visible at the bottom of the crown
   for (let k = 0; k < 5; k++) {
-    const a = k * 2.4 + rng() * 0.8, ys = y0 - 0.6 + k * 0.55 + rng() * 0.4;
-    const out = 0.9 + rng() * 0.6, up = 3 + rng() * 2.5;
-    const ca = Math.cos(a), sa = Math.sin(a);
-    tube(B, [
-      [ca * 0.1, ys, sa * 0.1, 0.11], [ca * out * 0.7, ys + up * 0.45, sa * out * 0.7, 0.07], [ca * out, ys + up, sa * out, 0.025],
-    ], 5, bark);
+    const a = k * 2.4 + lay() * 0.8, ys = y0 - 0.9 + k * 0.45 + rng() * 0.3;
+    const out = 0.9 + rng() * 0.5, up = 3 + rng() * 2.5, ca = Math.cos(a), sa = Math.sin(a);
+    tube(B, [[ca * 0.1, ys, sa * 0.1, 0.1], [ca * out * 0.7, ys + up * 0.45, sa * out * 0.7, 0.065], [ca * out, ys + up, sa * out, 0.02]], 5, bark);
   }
-  // crown: overlapping vertically-stretched clumps spiralling up the column + silhouette tufts
   const leaves = P.leaves.map(C3);
-  const NB = 11, NS = 16, rot0 = rng() * 6.28;
-  for (let i = 0; i < NB; i++) {
-    const t = (i + 0.3 + rng() * 0.4) / NB, r = prof(t), a = rot0 + i * 2.39996;
-    const off = 0.32 * r;
-    const base = mixc(leaves[(i + variant) % leaves.length], leaves[(i * 7 + 1) % leaves.length], rng());
-    blob(B, rng, {
-      detail: 1, x: C.x * t * 1.6 + Math.cos(a) * off, y: y0 + t * ch, z: C.z * t * 1.6 + Math.sin(a) * off,
-      rx: 0.82 * r + 0.3, ry: ch / NB * 1.35 + 0.7, rz: 0.82 * r + 0.3, rot: rng() * 6.28,
-      disp: 0.3, freq: 2.0, crown: C, blend: 0.55, col: leafColFn(P, C, base),
-    });
+  // dense core column: a closed, noise-displaced spindle that unifies the crown
+  const NR = 12, RAD = 9, cb = B.count, ns = rng() * 40, coreCol = leafColFn(P, C, mulc(leaves[2], 0.8));
+  for (let i = 0; i <= NR; i++) {
+    const ty = -0.03 + i / NR * 1.0;
+    const r = i === 0 ? 0.28 : i === NR ? 0.05 : prof(clamp(ty)) * 0.74;
+    const y = y0 + ty * ch - (i === 0 ? 0.35 : 0), ax = lx * ty, az = lz * ty;
+    for (let k = 0; k < RAD; k++) {
+      const a = k / RAD * 6.2832 + i * 0.4, ca = Math.cos(a), sa = Math.sin(a);
+      const d = 1 + 0.2 * vnoise3(ca * 1.4 + ns, y * 0.5, sa * 1.4, 5);
+      const x = ax + ca * r * d, z = az + sa * r * d;
+      B.v(x, y, z, ca, i === 0 ? -1.5 : 0.2, sa, coreCol(x, y, z, i === 0 ? -1 : 0, rng));
+    }
   }
-  for (let i = 0; i < NS; i++) {
-    const last = i === NS - 1;
-    const t = last ? 0.985 : (i + 0.2 + rng() * 0.6) / (NS - 1) * 0.95, r = prof(t), a = rng() * 6.28;
-    const off = last ? 0 : 0.88 * r;
-    const base = mulc(mixc(leaves[(i + 1) % leaves.length], leaves[3], rng()), 1.08);
+  for (let i = 0; i < NR; i++) for (let k = 0; k < RAD; k++) {
+    const a = cb + i * RAD + k, b = cb + i * RAD + (k + 1) % RAD;
+    B.ta(a, b, a + RAD); B.ta(b, b + RAD, a + RAD);
+  }
+  // leafy tufts, vertically stretched (fastigiate branchlets) covering the column
+  const NT = 46, rot0 = lay() * 6.28;
+  for (let i = 0; i < NT; i++) {
+    const t = Math.min(0.995, (i + 0.15 + lay() * 0.7) / NT), r = prof(t), a = rot0 + i * 2.39996 + (lay() - 0.5) * 0.6;
+    const off = r * (0.6 + 0.22 * rng()), sz = 0.36 * r + 0.3;
+    const base = mixc(leaves[(i + variant) % 4], leaves[(i * 3 + 1) % 4], rng());
     blob(B, rng, {
-      detail: 0, x: C.x * t * 1.6 + Math.cos(a) * off, y: y0 + t * ch + (last ? 0.2 : 0), z: C.z * t * 1.6 + Math.sin(a) * off,
-      rx: last ? 0.45 : 0.3 * r + 0.35, ry: last ? 1.6 : 0.9 + 0.5 * rng(), rz: last ? 0.45 : 0.3 * r + 0.35, rot: rng() * 6.28,
-      disp: 0.25, crown: C, blend: 0.5, col: leafColFn(P, C, base),
+      detail: 0, x: lx * t + Math.cos(a) * off, y: y0 + t * ch, z: lz * t + Math.sin(a) * off,
+      rx: sz * (0.85 + 0.3 * rng()), ry: sz * (1.45 + 0.6 * rng()), rz: sz * (0.85 + 0.3 * rng()), rot: lay() * 6.28,
+      disp: 0.3, crown: C, blend: 0.62, nj: 0.4, col: leafColFn(P, C, base),
     });
   }
   return B;
 }
 
-function buildBroadleaf(type, variant, seed) {
-  const P = SPECIES[type], rng = mulberry32(seed), B = new Builder();
+function buildBroadleaf(type, variant, seed, laySeed) {
+  const P = SPECIES[type], rng = mulberry32(seed), lay = mulberry32(laySeed), B = new Builder();
   const v = (a) => a * (0.9 + 0.2 * rng());
-  const C = { x: (rng() - 0.5) * 0.7, y: v(P.cy), z: (rng() - 0.5) * 0.7, rx: v(P.rx), ry: v(P.ry), rz: v(P.rx) };
+  const vx = [1, 1.12, 0.92][variant], vy = [1, 0.9, 1.08][variant];
+  const C = { x: (rng() - 0.5) * 0.7, y: v(P.cy) * (0.5 + 0.5 * vy), z: (rng() - 0.5) * 0.7, rx: v(P.rx) * vx, ry: v(P.ry) * vy, rz: v(P.rx) * vx };
   const fork = v(P.fork), tr = v(P.trunkR);
   const bark = barkFn(P, variant, rng);
   const F = [C.x * 0.35 + (rng() - 0.5) * 0.3, fork, C.z * 0.35 + (rng() - 0.5) * 0.3];
-  // trunk + leader
   tube(B, [
     [0, -0.4, 0, tr * 1.18], [0, 0.35, 0, tr * 1.08], [0, 1.28, 0, tr], [0, 1.36, 0, tr * 0.99],
     [F[0] * 0.6, fork * 0.7, F[2] * 0.6, tr * 0.93], [F[0], F[1], F[2], tr * 0.82],
     [C.x, C.y, C.z, tr * 0.42], [C.x * 1.1, C.y + C.ry * (P.birch ? 0.8 : 0.5), C.z * 1.1, 0.05],
   ], P.birch ? 7 : 8, bark);
-  // main limbs fanning out into the crown
-  const la = rng() * 6.28;
+  const la = lay() * 6.28;
   for (let k = 0; k < P.limbs; k++) {
-    const a = la + k / P.limbs * 6.28 + (rng() - 0.5) * 0.7, ca = Math.cos(a), sa = Math.sin(a);
-    const ex = C.x + ca * C.rx * (0.5 + 0.2 * rng()), ey = C.y + C.ry * (-0.05 + 0.4 * rng()), ez = C.z + sa * C.rz * (0.5 + 0.2 * rng());
+    const a = la + k / P.limbs * 6.28 + (lay() - 0.5) * 0.7, ca = Math.cos(a), sa = Math.sin(a);
+    const ex = C.x + ca * C.rx * (0.55 + 0.2 * rng()), ey = C.y + C.ry * (-0.1 + 0.4 * rng()), ez = C.z + sa * C.rz * (0.55 + 0.2 * rng());
     tube(B, [
       [F[0], F[1] - 0.2, F[2], tr * 0.55],
       [F[0] + (ex - F[0]) * 0.45, F[1] + (ey - F[1]) * 0.62, F[2] + (ez - F[2]) * 0.45, tr * 0.36],
       [ex, ey, ez, 0.05],
     ], 5, bark);
   }
-  // a couple of low, visible branches below the crown with a leafy tip
   const leaves = P.leaves.map(C3);
+  // a couple of low, visible branches below the crown with a leafy tip
   for (let k = 0; k < P.low; k++) {
-    const a = la + 1.1 + k * 3.3 + rng() * 0.8, ca = Math.cos(a), sa = Math.sin(a);
+    const a = la + 1.1 + k * 3.3 + lay() * 0.8, ca = Math.cos(a), sa = Math.sin(a);
     const ys = fork * (0.62 + 0.18 * rng());
-    const ex = ca * C.rx * 0.82, ez = sa * C.rz * 0.82, ey = C.y - C.ry * (0.55 + 0.15 * rng());
-    tube(B, [
-      [ca * 0.1, ys, sa * 0.1, tr * 0.32], [ex * 0.55, ys + (ey - ys) * 0.75, ez * 0.55, tr * 0.2], [ex, ey, ez, 0.03],
-    ], 5, bark);
+    const ex = ca * C.rx * 0.84, ez = sa * C.rz * 0.84, ey = C.y - C.ry * (0.55 + 0.15 * rng());
+    tube(B, [[ca * 0.1, ys, sa * 0.1, tr * 0.32], [ex * 0.55, ys + (ey - ys) * 0.75, ez * 0.55, tr * 0.2], [ex, ey, ez, 0.03]], 5, bark);
     blob(B, rng, {
-      detail: 0, x: ex, y: ey + 0.15, z: ez, rx: 0.75, ry: 0.5, rz: 0.75, rot: rng() * 6.28, disp: 0.3,
-      crown: C, blend: 0.35, col: leafColFn(P, C, leaves[k % leaves.length]),
+      detail: 0, x: ex, y: ey + 0.2, z: ez, rx: 0.8, ry: 0.55, rz: 0.8, rot: lay() * 6.28, disp: 0.3,
+      crown: C, blend: 0.4, nj: 0.3, col: leafColFn(P, C, leaves[k % leaves.length]),
     });
   }
-  // inner core mass (darker) fills the gaps between clumps
+  const mr = (C.rx + C.ry) / 2, rot0 = lay() * 6.28;
+  // inner core mass (darker) closes the crown
   blob(B, rng, {
-    detail: 1, x: C.x, y: C.y - C.ry * 0.05, z: C.z, rx: C.rx * 0.66, ry: C.ry * 0.62, rz: C.rz * 0.66, rot: rng() * 6.28,
-    disp: 0.25, crown: C, blend: 0.6, col: leafColFn(P, C, mulc(leaves[2], 0.9)),
+    detail: 1, x: C.x, y: C.y - C.ry * 0.04, z: C.z, rx: C.rx * P.core, ry: C.ry * P.core * 0.92, rz: C.rz * P.core, rot: lay() * 6.28,
+    disp: 0.22, crown: C, blend: 0.65, nj: 0.2, col: leafColFn(P, C, mulc(leaves[2], 0.85)),
   });
-  // big clumps on a shell (fibonacci distribution, flattened underside)
-  const rot0 = rng() * 6.28, mr = (C.rx + C.ry) / 2;
-  for (let i = 0; i < P.big; i++) {
-    const yN = 1 - (i + 0.5) / P.big * 1.6, rr = Math.sqrt(Math.max(0, 1 - yN * yN)), a = rot0 + i * 2.39996 + (rng() - 0.5) * 0.4;
-    const f = P.shell * (0.9 + 0.2 * rng());
-    const base = mixc(leaves[i % leaves.length], leaves[(i + 1) % leaves.length], rng());
-    const cs = P.clump * mr * (0.82 + 0.36 * rng());
-    blob(B, rng, {
-      detail: 1, x: C.x + Math.cos(a) * rr * f * C.rx, y: C.y + yN * f * C.ry * 0.95, z: C.z + Math.sin(a) * rr * f * C.rz,
-      rx: cs, ry: cs * (P.birch ? 1.15 : 0.82), rz: cs, rot: rng() * 6.28, disp: 0.32, freq: 1.9,
-      sag: P.birch ? 0.25 * cs : 0, crown: C, blend: 0.5, col: leafColFn(P, C, base),
-    });
-  }
-  // small tufts that break the silhouette
-  for (let i = 0; i < P.small; i++) {
-    const yN = 0.95 - (i + 0.5) / P.small * 1.5, rr = Math.sqrt(Math.max(0, 1 - yN * yN)), a = rot0 + 1.3 + i * 2.39996 + (rng() - 0.5) * 0.6;
-    const f = 0.9 + 0.14 * rng();
-    const base = mulc(leaves[(i + 1) % leaves.length], 1.1);
-    const cs = mr * (P.birch ? 0.2 : 0.24) * (0.8 + 0.4 * rng());
+  // mid-layer clumps
+  for (let i = 0; i < P.mid; i++) {
+    const yN = 0.9 - (i + 0.5) / P.mid * 1.55, rr = Math.sqrt(Math.max(0, 1 - yN * yN)), a = rot0 + i * 2.39996 + (lay() - 0.5) * 0.5;
+    const f = 0.56 + 0.1 * rng(), cs = P.clump * mr * (0.8 + 0.4 * rng());
     blob(B, rng, {
       detail: 0, x: C.x + Math.cos(a) * rr * f * C.rx, y: C.y + yN * f * C.ry, z: C.z + Math.sin(a) * rr * f * C.rz,
-      rx: cs, ry: cs * (P.birch ? 1.4 : 0.85), rz: cs, rot: rng() * 6.28, disp: 0.3, crown: C, blend: 0.45,
-      col: leafColFn(P, C, base),
+      rx: cs, ry: cs * 0.85, rz: cs * (0.85 + 0.3 * rng()), rot: lay() * 6.28, disp: 0.3, crown: C, blend: 0.6, nj: 0.3,
+      col: leafColFn(P, C, mixc(leaves[i % 3], leaves[(i + 1) % 3], rng())),
+    });
+  }
+  // outer leafy tufts on the envelope (silhouette and leafy texture)
+  for (let i = 0; i < P.tufts; i++) {
+    let yN = 1 - (i + 0.5) / P.tufts * 1.72;
+    const rr = Math.sqrt(Math.max(0, 1 - yN * yN)), a = rot0 + 1.1 + i * 2.39996 + (lay() - 0.5) * 0.5;
+    if (yN < -0.35) yN = -0.35 + (yN + 0.35) * 0.6;     // flatter underside
+    const f = 0.84 + 0.16 * rng(), cs = P.tuft * mr * (0.75 + 0.5 * rng());
+    const base = mulc(mixc(leaves[(i + variant) % 3], leaves[(i * 2 + 1) % 3], rng()), 1.04 + 0.1 * rng());
+    blob(B, rng, {
+      detail: 0, x: C.x + Math.cos(a) * rr * f * C.rx, y: C.y + yN * f * C.ry, z: C.z + Math.sin(a) * rr * f * C.rz,
+      rx: cs * (0.85 + 0.3 * rng()), ry: cs * (P.birch ? 1.5 : 0.8), rz: cs * (0.85 + 0.3 * rng()), rot: lay() * 6.28,
+      disp: 0.3, sag: P.birch ? 0.3 * cs : 0, crown: C, blend: 0.6, nj: 0.4, col: leafColFn(P, C, base),
     });
   }
   return B;
 }
 
-function buildSpruce(variant, seed) {
-  const P = SPECIES.spruce, rng = mulberry32(seed), B = new Builder();
+function buildSpruce(variant, seed, laySeed) {
+  const P = SPECIES.spruce, rng = mulberry32(seed), lay = mulberry32(laySeed), B = new Builder();
   const H = P.h * (0.92 + 0.16 * rng()), R0 = P.r * (0.88 + 0.24 * rng());
   const bark = barkFn(P, variant, rng);
   tube(B, [[0, -0.3, 0, 0.26], [0, 1.0, 0, 0.21], [0, H * 0.5, 0, 0.13], [0, H * 0.93, 0, 0.03]], 7, bark);
@@ -372,14 +371,14 @@ function buildSpruce(variant, seed) {
     const yb = 1.0 + t * (H - 2.4) + (rng() - 0.5) * 0.2;
     const hT = 2.3 * (1 - 0.5 * t) + 0.5;
     const r = R0 * Math.pow(1 - t, 0.9) * (0.9 + 0.2 * rng()) + 0.3;
-    const apex = yb + hT, rot = rng() * 6.28;
+    const apex = yb + hT, rot = lay() * 6.28;
     const ox = (rng() - 0.5) * 0.12, oz = (rng() - 0.5) * 0.12;
     const cn = mixc(needles[0], needles[1], rng()), ct = mixc(tips[0], tips[1], rng());
     const shade = 0.75 + 0.3 * t;
     const A = B.v(ox, apex, oz, 0, 1, 0, mulc(cn, shade * 1.05));
     const r1 = [], r2 = [], r3 = [];
     for (let k = 0; k < K; k++) {
-      const a = rot + k / K * 6.2832 + (rng() - 0.5) * 0.25, ca = Math.cos(a), sa = Math.sin(a);
+      const a = rot + k / K * 6.2832 + (lay() - 0.5) * 0.25, ca = Math.cos(a), sa = Math.sin(a);
       const j = 0.85 + 0.3 * rng();
       r1.push(B.v(ox + ca * r * 0.5 * j, apex - hT * 0.5, oz + sa * r * 0.5 * j, ca, 0.9, sa, mulc(cn, shade * (0.85 + 0.2 * rng()))));
       const tip = k % 2 === 0 ? 1 : 0.8;
@@ -402,25 +401,19 @@ function buildSpruce(variant, seed) {
   return B;
 }
 
-function buildBush(variant, seed) {
-  const P = SPECIES.bush, rng = mulberry32(seed), B = new Builder();
+function buildBush(variant, seed, laySeed) {
+  const P = SPECIES.bush, rng = mulberry32(seed), lay = mulberry32(laySeed), B = new Builder();
   const C = { x: 0, y: 0.55, z: 0, rx: 0.95 + 0.15 * rng(), ry: 0.72, rz: 0.85 + 0.15 * rng() };
   const leaves = P.leaves.map(C3);
-  blob(B, rng, { detail: 1, x: 0, y: 0.45, z: 0, rx: C.rx * 0.75, ry: 0.55, rz: C.rz * 0.75, disp: 0.25, crown: C, blend: 0.6, col: leafColFn(P, C, leaves[2]) });
-  for (let i = 0; i < 6; i++) {
-    const a = i / 6 * 6.28 + rng() * 0.6, f = 0.45 + 0.15 * rng();
-    const cs = 0.42 + 0.14 * rng();
+  blob(B, rng, { detail: 1, x: 0, y: 0.42, z: 0, rx: C.rx * 0.8, ry: 0.55, rz: C.rz * 0.8, disp: 0.25, crown: C, blend: 0.6, nj: 0.2, col: leafColFn(P, C, mulc(leaves[2], 0.85)) });
+  const NT = 18, rot0 = lay() * 6.28;
+  for (let i = 0; i < NT; i++) {
+    const yN = 0.95 - (i + 0.5) / NT * 1.25, rr = Math.sqrt(Math.max(0, 1 - yN * yN)), a = rot0 + i * 2.39996 + (lay() - 0.5) * 0.5;
+    const f = 0.8 + 0.2 * rng(), cs = 0.3 + 0.12 * rng();
     blob(B, rng, {
-      detail: 1, x: Math.cos(a) * C.rx * f, y: 0.42 + rng() * 0.35, z: Math.sin(a) * C.rz * f, rx: cs, ry: cs * 0.85, rz: cs,
-      rot: rng() * 6.28, disp: 0.32, crown: C, blend: 0.5, col: leafColFn(P, C, mixc(leaves[i % 3], leaves[(i + 1) % 3], rng())),
-    });
-  }
-  for (let i = 0; i < 6; i++) {
-    const a = i / 6 * 6.28 + 0.5 + rng() * 0.5, yN = 0.2 + rng() * 0.7;
-    const cs = 0.2 + 0.08 * rng();
-    blob(B, rng, {
-      detail: 0, x: Math.cos(a) * C.rx * 0.85, y: C.y + yN * 0.45, z: Math.sin(a) * C.rz * 0.85, rx: cs, ry: cs, rz: cs,
-      rot: rng() * 6.28, disp: 0.3, crown: C, blend: 0.45, col: leafColFn(P, C, mulc(leaves[1], 1.1)),
+      detail: 0, x: Math.cos(a) * rr * f * C.rx, y: C.y + yN * f * C.ry * 0.95, z: Math.sin(a) * rr * f * C.rz,
+      rx: cs, ry: cs * 0.85, rz: cs, rot: lay() * 6.28, disp: 0.3, crown: C, blend: 0.55, nj: 0.35,
+      col: leafColFn(P, C, mulc(mixc(leaves[i % 3], leaves[(i + 1) % 3], rng()), 1.05)),
     });
   }
   return B;
@@ -432,11 +425,13 @@ const VARIANT_SEEDS = [1013, 2027, 3061];
 function typeGeometry(type) {
   if (GEO[type]) return GEO[type];
   const build = (v) => {
-    const s = VARIANT_SEEDS[v] + type.length * 101;
-    if (type === 'poplar') return buildPoplar(v, s);
-    if (type === 'spruce') return buildSpruce(v, s);
-    if (type === 'bush') return buildBush(v, s);
-    return buildBroadleaf(type, v, s);
+    // shape seed differs per variant; layout seed (angles, rotations) is shared so that blending the
+    // variants per instance never pulls clumps across the crown
+    const s = VARIANT_SEEDS[v] + type.length * 101, ls = 4243 + type.charCodeAt(0) * 37 + type.length;
+    if (type === 'poplar') return buildPoplar(v, s, ls);
+    if (type === 'spruce') return buildSpruce(v, s, ls);
+    if (type === 'bush') return buildBush(v, s, ls);
+    return buildBroadleaf(type, v, s, ls);
   };
   const vs = [0, 1, 2].map(build);
   const g = vs[0].geometry();
@@ -466,11 +461,11 @@ function buildHedge(B, x1, z1, x2, z2, h, seed) {
   const W = 0.95, bev = Math.min(0.24, h * 0.25);
   // cross-section profile: [across, up, normal across, normal up]
   const prof = [
-    [-W / 2 - 0.02, -0.05, -1, -0.1], [-W / 2, h * 0.35, -1, 0], [-W / 2 + 0.01, h - bev, -1, 0.25],
-    [-W / 2 + bev * 0.3, h - bev * 0.3, -0.7, 0.7], [-W / 2 + bev, h, -0.15, 1], [0, h + 0.02, 0, 1],
+    [-W / 2 - 0.02, -0.05, -1, -0.1], [-W / 2, h * 0.3, -1, 0], [-W / 2 + 0.005, h * 0.6, -1, 0.05], [-W / 2 + 0.01, h - bev, -1, 0.25],
+    [-W / 2 + bev * 0.3, h - bev * 0.3, -0.7, 0.7], [-W / 2 + bev, h, -0.15, 1], [-W / 4, h + 0.015, 0, 1], [0, h + 0.02, 0, 1],
   ];
   for (let i = prof.length - 1; i >= 0; i--) { const p = prof[i]; if (p[0] !== 0) prof.push([-p[0], p[1], -p[2], p[3]]); }
-  const steps = Math.max(2, Math.ceil(len / 0.3)), np = prof.length;
+  const steps = Math.max(2, Math.ceil(len / 0.2)), np = prof.length;
   const g1 = C3(0x4a7a2f), g2 = C3(0x3c6826), g3 = C3(0x5f8d38), dark = C3(0x1f3a16);
   const geo = new THREE.BufferGeometry(), P = [], Cc = [], I = [];
   const vert = (s, t, bulge) => {
@@ -478,12 +473,13 @@ function buildHedge(B, x1, z1, x2, z2, h, seed) {
     let wx = nx * p[2], wz = nz * p[2], wy = p[3];
     const l = Math.hypot(wx, wy, wz); wx /= l; wy /= l; wz /= l;
     const n1 = vnoise3(px * 2.3, p[1] * 2.3, pz * 2.3, seed), n2 = vnoise3(px * 6.1, p[1] * 6.1, pz * 6.1, seed + 1);
-    const d = (p[1] < 0 ? 0 : 0.065 * n1 + 0.03 * n2) - bulge;
+    const n4 = vnoise3(px * 12.5, p[1] * 12.5, pz * 12.5, seed + 3);
+    const d = (p[1] < 0 ? 0 : 0.06 * n1 + 0.035 * n2 + 0.022 * n4) - bulge;
     P.push(px + wx * d, p[1] + wy * d, pz + wz * d);
     const n3 = vnoise3(px * 0.8, p[1], pz * 0.8, seed + 2) * 0.5 + 0.5;
     let c = mixc(mixc(g2, g1, n3), g3, clamp(n2 * 0.6 + 0.3 + (p[3] > 0.5 ? 0.35 : 0)));
     c = mixc(dark, c, 0.45 + 0.55 * smooth(-0.05, h * 0.55, p[1]));
-    c = mulc(c, 0.9 + 0.2 * (n1 * 0.5 + 0.5));
+    c = mulc(c, (0.86 + 0.2 * (n1 * 0.5 + 0.5)) * (0.84 + 0.3 * (n4 * 0.5 + 0.5)));
     Cc.push(c[0], c[1], c[2]);
   };
   for (let i = 0; i <= steps; i++) {
@@ -680,7 +676,7 @@ export function createLawn(w, d, { seed = 1 } = {}) {
   geo.rotateX(-Math.PI / 2);
   geo.translate(0, 0.02, 0);
   const pos = geo.attributes.position, uv = geo.attributes.uv, cols = new Float32Array(pos.count * 3);
-  const lush = C3(0x6a9a40), mid = C3(0x7d9e45), dry = C3(0xa29d5c), deep = C3(0x527f33);
+  const lush = C3(0x5b873a), mid = C3(0x6b8a42), dry = C3(0x8f8b56), deep = C3(0x47702f);
   const so = (seed * 37.17) % 1000;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
