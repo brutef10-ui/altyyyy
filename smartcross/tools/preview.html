@@ -1,0 +1,70 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#9cc4e4}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const W = +q.get('w') || 1280, H = +q.get('h') || 720;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa9cbe8);
+const pm = new THREE.PMREMGenerator(renderer);
+scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.35;
+scene.add(new THREE.HemisphereLight(0xd6e8ff, 0x5d6b45, 0.6));
+// Project sun: fixed direction for the whole presentation (from south-west, ~46deg high)
+const SUN_DIR = new THREE.Vector3(-0.45, 0.75, 0.55).normalize();
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ color: 0x9aa07e, roughness: 1 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.002; ground.receiveShadow = true;
+if (q.get('ground') !== '0') scene.add(ground);
+const camera = new THREE.PerspectiveCamera(+q.get('fov') || 40, W / H, 0.05, 8000);
+window.__errors = [];
+let res;
+try {
+  const mod = await import('/' + q.get('mod'));
+  const fn = q.get('fn') || 'demo';
+  res = await mod[fn]();
+} catch (e) { window.__errors.push(String(e && e.stack || e)); }
+const obj = res ? (res.isObject3D ? res : res.group) : new THREE.Group();
+const upd = res && !res.isObject3D && typeof res.update === 'function' ? res.update : null;
+scene.add(obj);
+const box = new THREE.Box3().setFromObject(obj);
+const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+const R = Math.max(size.length() / 2, 1);
+sun.target.position.copy(center);
+sun.position.copy(center).addScaledVector(SUN_DIR, R * 3 + 50);
+const sc = sun.shadow.camera;
+sc.left = sc.bottom = -R * 1.2; sc.right = sc.top = R * 1.2; sc.near = 1; sc.far = R * 6 + 200; sc.updateProjectionMatrix();
+const custom = q.get('views') ? JSON.parse(q.get('views')) : null;
+const dirs = [[1, 0.45, 1.5], [-1.4, 0.3, 0.9], [0.0, 0.25, -1.6], [0.35, 1.7, 0.6]];
+window.__info = () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, size: size.toArray().map(v => +v.toFixed(2)), center: center.toArray().map(v => +v.toFixed(2)), errors: window.__errors });
+window.__count = custom ? custom.length : dirs.length;
+window.__shot = (i, t) => {
+  if (upd) { const steps = Math.max(1, Math.round(t * 60)); for (let s = 0; s <= steps; s++) upd(s / 60, 1 / 60); }
+  if (custom) { const v = custom[i]; camera.position.set(...v.pos); camera.lookAt(new THREE.Vector3(...v.target)); }
+  else {
+    const d = new THREE.Vector3(...dirs[i]).normalize();
+    const dist = R / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.95;
+    camera.position.copy(center).addScaledVector(d, dist);
+    camera.lookAt(center);
+  }
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  return window.__info();
+};
+window.__ready = true;
+</script></body></html>

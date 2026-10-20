@@ -1,0 +1,460 @@
+<title>SmartCross</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+:root {
+  /* Layout: a fixed 16:9 stage; the 3D city fills it, one glass text panel sits on the side opposite the shot's key object */
+  --night: #0b1420;
+  --ink: #0f1d2a;
+  --ink-2: #435468;
+  --paper: #ffffff;
+  --glass: rgba(255, 255, 255, .80);
+  --line: rgba(15, 29, 42, .12);
+  --stop: #e2483d;
+  --wait: #f2a516;
+  --go: #19a75a;
+  --brand: #0f2a44;
+  --gold: #f4b740;
+  --f-display: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Golos Text", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0; display: grid; place-items: center; overflow: hidden;
+  background: var(--night); color: var(--ink); font-family: var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+.stage {
+  position: relative; overflow: hidden; isolation: isolate;
+  width: min(100%, calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) * 16 / 9));
+  aspect-ratio: 16 / 9; max-width: 100%;
+  container-type: inline-size;
+  background: linear-gradient(#5d9bd6, #cfe2f1);
+  font-size: 1.12cqw;
+}
+.stage:fullscreen { width: 100%; height: 100%; aspect-ratio: auto; }
+#gl, #fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#fx { pointer-events: none; z-index: 2; }
+
+/* ---------- panels ---------- */
+.panels { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.panel {
+  position: absolute; top: 0; bottom: 0; margin-block: auto; height: fit-content;
+  left: 4.2cqw; width: 37cqw; max-height: 84%;
+  display: flex; flex-direction: column; gap: 1.3cqw;
+  padding: 2.4cqw 2.6cqw;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, .7);
+  border-radius: 1.6cqw;
+  box-shadow: 0 1.6cqw 4cqw -1.6cqw rgba(8, 20, 34, .45);
+  visibility: hidden; opacity: 0;
+}
+.panel--right { left: auto; right: 4.2cqw; }
+.panel.is-on { visibility: visible; opacity: 1; pointer-events: auto; }
+.eyebrow {
+  display: flex; align-items: center; gap: .8cqw; margin: 0;
+  font: 600 .82cqw/1.2 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2);
+}
+.lights { display: inline-flex; gap: .3cqw; }
+.lights i { width: .62cqw; height: .62cqw; border-radius: 50%; background: var(--stop); }
+.lights i:nth-child(2) { background: var(--wait); }
+.lights i:nth-child(3) { background: var(--go); }
+.panel h2 {
+  margin: 0; font: 800 2.55cqw/1.08 var(--f-display); letter-spacing: -.02em; text-wrap: balance; color: var(--ink);
+}
+.panel p { margin: 0; line-height: 1.5; color: var(--ink-2); }
+.panel b { color: var(--ink); font-weight: 600; }
+.src { font: 500 .78cqw/1.3 var(--f-mono); color: var(--ink-2); letter-spacing: .04em; }
+
+/* title */
+.panel--title { background: rgba(255, 255, 255, .62); width: 40cqw; gap: 1.1cqw; }
+.team { display: flex; align-items: center; gap: .9cqw; font: 700 1.05cqw/1 var(--f-display); letter-spacing: .32em; text-transform: uppercase; color: var(--brand); }
+.team svg { width: 1.9cqw; height: 1.9cqw; }
+.panel--title h1 { margin: .4cqw 0 0; font: 800 6.4cqw/0.95 var(--f-display); letter-spacing: -.045em; color: var(--brand); }
+.panel--title h1 span { color: var(--go); }
+.panel--title .lead { font: 700 1.75cqw/1.25 var(--f-display); color: var(--ink); }
+.panel--title .sub { font-size: 1.25cqw; }
+
+/* stats */
+.stats { display: flex; flex-direction: column; gap: 1.1cqw; }
+.stat { display: grid; grid-template-columns: 11.5cqw 1fr; gap: 1.2cqw; align-items: baseline; padding-top: 1.1cqw; border-top: 1px solid var(--line); }
+.stat__n { font: 800 2.3cqw/1 var(--f-display); letter-spacing: -.02em; color: var(--stop); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stat__t { line-height: 1.45; color: var(--ink-2); }
+
+/* icon lists */
+.items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1cqw; }
+.items li { display: grid; grid-template-columns: 2.6cqw 1fr; gap: 1cqw; align-items: start; line-height: 1.45; color: var(--ink-2); }
+.items li b { display: block; color: var(--ink); }
+.ico { width: 2.6cqw; height: 2.6cqw; border-radius: .7cqw; display: grid; place-items: center; background: rgba(226, 72, 61, .12); color: var(--stop); }
+.ico svg { width: 1.5cqw; height: 1.5cqw; }
+.ico--go { background: rgba(25, 167, 90, .13); color: var(--go); }
+.ico--wait { background: rgba(242, 165, 22, .16); color: #b77700; }
+.items--grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1cqw 1.6cqw; }
+.items--grid li { grid-template-columns: 2.3cqw 1fr; gap: .8cqw; font-size: .95cqw; }
+.items--grid .ico { width: 2.3cqw; height: 2.3cqw; }
+.items--grid .ico svg { width: 1.3cqw; height: 1.3cqw; }
+.items--grid li.wide { grid-column: 1 / -1; }
+
+/* road km chart */
+.km { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1cqw; align-items: end; height: 10.5cqw; padding-bottom: .2cqw; border-bottom: 1px solid var(--line); }
+.km div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: .5cqw; height: 100%; }
+.km .bar { width: 100%; border-radius: .5cqw .5cqw 0 0; background: linear-gradient(#5a6774, #2c3640); transform-origin: bottom; }
+.km .bar--plan { background: repeating-linear-gradient(135deg, #2c3640 0 .5cqw, #5a6774 .5cqw 1cqw); }
+.km strong { font: 800 1.6cqw/1 var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.km-labels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1cqw; text-align: center; font: 500 .8cqw/1.2 var(--f-mono); color: var(--ink-2); margin-top: -.6cqw; }
+.result { display: flex; gap: 1cqw; align-items: center; padding: 1cqw 1.2cqw; border-radius: 1cqw; background: rgba(226, 72, 61, .1); color: var(--ink); line-height: 1.4; }
+.result strong { font: 800 2cqw/1 var(--f-display); color: var(--stop); white-space: nowrap; }
+
+/* blind signal */
+.blind { display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw; }
+.blind div { display: flex; flex-direction: column; gap: .6cqw; padding: 1.1cqw; border-radius: 1cqw; background: rgba(15, 29, 42, .06); }
+.blind span { font: 500 .8cqw/1.2 var(--f-mono); color: var(--ink-2); text-transform: uppercase; letter-spacing: .08em; }
+.blind strong { font: 800 2.6cqw/1 var(--f-display); color: var(--go); font-variant-numeric: tabular-nums; }
+
+/* tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: .98cqw; }
+.tbl th { text-align: left; font: 600 .78cqw/1.2 var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); padding: 0 .6cqw .7cqw 0; border-bottom: 1px solid var(--line); }
+.tbl td { padding: .75cqw .6cqw .75cqw 0; border-bottom: 1px solid var(--line); line-height: 1.35; vertical-align: top; color: var(--ink-2); }
+.tbl td:first-child { color: var(--ink); font-weight: 600; }
+.tbl .us { color: var(--go); font-weight: 600; }
+.tbl .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl tr.crit td { color: var(--stop); }
+.tbl tr.crit td:first-child { color: var(--stop); }
+.tbl .tag { display: inline-block; padding: .1cqw .5cqw; border-radius: .4cqw; background: var(--stop); color: #fff; font: 700 .7cqw/1.5 var(--f-mono); letter-spacing: .06em; margin-left: .3cqw; vertical-align: middle; }
+.note { font-size: .95cqw; line-height: 1.45; color: var(--ink-2); }
+.fdot { display: inline-block; width: .7cqw; height: .7cqw; border-radius: 50%; margin-right: .5cqw; vertical-align: middle; }
+
+/* calc */
+.calc { display: flex; flex-direction: column; gap: .9cqw; }
+.calc-row { display: grid; grid-template-columns: 1fr auto; gap: 1cqw; align-items: baseline; font-size: .95cqw; color: var(--ink-2); line-height: 1.35; }
+.calc-row b { font-variant-numeric: tabular-nums; }
+.calc-sum { display: flex; justify-content: space-between; align-items: baseline; padding: .7cqw 1cqw; border-radius: .8cqw; background: rgba(15, 29, 42, .06); font: 700 1.05cqw/1.2 var(--f-display); color: var(--ink); }
+.calc-sum strong { font: 800 1.5cqw/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.green { display: flex; flex-direction: column; gap: .8cqw; padding-top: .3cqw; }
+.green-row { display: grid; grid-template-columns: 4.2cqw 1fr 4.6cqw; gap: .8cqw; align-items: center; font: 600 .9cqw/1 var(--f-mono); }
+.track { position: relative; height: 1.5cqw; border-radius: .5cqw; background: rgba(15, 29, 42, .08); overflow: hidden; }
+.track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: .5cqw; }
+.track .fill { background: var(--go); }
+.track .old { top: auto; height: .3cqw; background: var(--ink-2); opacity: .55; }
+.green-row strong { font: 800 1.35cqw/1 var(--f-display); text-align: right; font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 1.4cqw; font: 500 .75cqw/1.2 var(--f-mono); color: var(--ink-2); }
+.legend i { display: inline-block; width: 1.2cqw; height: .5cqw; border-radius: .2cqw; margin-right: .4cqw; vertical-align: middle; background: var(--go); }
+.legend i.old { height: .25cqw; background: var(--ink-2); opacity: .55; }
+
+/* simulation field */
+.panel--sim { left: 0; right: 0; top: 3.6cqw; bottom: auto; margin: 0 auto; width: fit-content; max-height: none; padding: 1.2cqw 2.2cqw; align-items: center; text-align: center; }
+.panel--sim h2 { font-size: 2.2cqw; }
+.simfield {
+  position: absolute; left: 0; right: 0; margin: 0 auto; top: 12.4cqw; width: 70cqw; height: 37cqw;
+  border: .2cqw dashed rgba(255, 255, 255, .9); border-radius: 1.4cqw;
+  background: rgba(10, 22, 36, .28);
+  display: grid; grid-template-columns: 1fr 1fr; align-items: end;
+  visibility: hidden; opacity: 0;
+}
+.simfield.is-on { visibility: visible; opacity: 1; }
+.simfield span { padding: 1.2cqw 1.6cqw; font: 600 1cqw/1.2 var(--f-mono); color: #fff; letter-spacing: .06em; text-transform: uppercase; text-shadow: 0 1px 6px rgba(0, 0, 0, .5); }
+.simfield span + span { text-align: right; border-left: .15cqw dashed rgba(255, 255, 255, .6); height: 100%; display: flex; align-items: flex-end; justify-content: flex-end; }
+
+/* finale */
+.panel--final h2 { font-size: 3cqw; line-height: 1.04; }
+.panel--final h2 span { color: var(--go); }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .9cqw; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 2.4cqw 1fr; gap: 1cqw; line-height: 1.45; color: var(--ink-2); counter-increment: s; }
+.steps li::before { content: counter(s); width: 2.4cqw; height: 2.4cqw; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; font: 700 1cqw/1 var(--f-display); }
+.steps b { color: var(--ink); }
+.signoff { display: flex; align-items: center; gap: .8cqw; font: 700 .9cqw/1 var(--f-display); letter-spacing: .26em; text-transform: uppercase; color: var(--brand); }
+.signoff svg { width: 1.4cqw; height: 1.4cqw; }
+
+/* ---------- chrome ---------- */
+.hud {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between; gap: 1cqw;
+  padding: 0 2.4cqw 1.6cqw;
+  pointer-events: none;
+}
+.hud > * { pointer-events: auto; }
+.count {
+  display: flex; align-items: center; gap: .8cqw; padding: .55cqw 1cqw; border-radius: 99px;
+  background: rgba(11, 20, 32, .55); color: #fff; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  font: 600 .8cqw/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+}
+.count b { color: var(--gold); font-weight: 600; font-variant-numeric: tabular-nums; }
+.count .name { color: rgba(255, 255, 255, .78); }
+.btns { display: flex; gap: .6cqw; }
+.btn {
+  display: grid; place-items: center; width: max(36px, 2.9cqw); height: max(36px, 2.9cqw); padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .35); background: rgba(11, 20, 32, .55); color: #fff;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  transition: background .2s, opacity .2s;
+}
+.btn:hover { background: rgba(11, 20, 32, .8); }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn svg { width: 45%; height: 45%; }
+.btn--text { width: auto; border-radius: 99px; padding: 0 1cqw; font: 600 max(11px, .75cqw)/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; }
+.bar { position: absolute; left: 0; right: 0; bottom: 0; height: .25cqw; background: rgba(255, 255, 255, .25); z-index: 5; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--stop), var(--wait), var(--go)); transform-origin: left; transform: scaleX(0); transition: transform 1.2s cubic-bezier(.6, 0, .2, 1); }
+
+.notes {
+  position: absolute; left: 0; right: 0; margin: 0 auto; bottom: 5.4cqw; z-index: 6;
+  width: 62cqw; padding: 1.2cqw 1.6cqw; border-radius: 1cqw;
+  background: rgba(11, 20, 32, .86); color: #fff; font-size: 1.05cqw; line-height: 1.5;
+}
+.notes span { display: block; margin-bottom: .4cqw; font: 600 .72cqw/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+
+.loader {
+  position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; align-content: center; gap: 1.4cqw;
+  background: radial-gradient(80% 80% at 50% 40%, #183552, var(--night));
+  color: #fff; text-align: center;
+}
+.loader svg { width: 6cqw; height: 6cqw; color: var(--gold); animation: spin 3s linear infinite; }
+.loader p { margin: 0; font: 600 .9cqw/1.4 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: rgba(255, 255, 255, .8); }
+.loader .meter { width: 22cqw; height: .3cqw; border-radius: 1cqw; background: rgba(255, 255, 255, .15); overflow: hidden; }
+.loader .meter i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .3s; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loader svg { animation: none; } .bar i { transition: none; } }
+</style>
+
+<div class="stage" id="stage" aria-roledescription="презентация" aria-label="SmartCross">
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <canvas id="fx" aria-hidden="true"></canvas>
+
+  <div class="panels">
+    <!-- 0 -->
+    <section class="panel panel--title" data-shot="title" data-name="SmartCross">
+      <div class="team" data-r><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6-4.5-4.2 6.1-.7z"/></svg>Lone Stars</div>
+      <h1 data-r>Smart<span>Cross</span></h1>
+      <p class="lead" data-r>ИИ-регулировщик для перекрёстков</p>
+      <p class="sub" data-r>Светофор, который видит пробку</p>
+    </section>
+
+    <!-- 1 -->
+    <section class="panel" data-shot="city" data-name="Бишкек стоит"
+      data-note="Каждое утро одно и то же: выходишь заранее и всё равно опаздываешь на пару, на работу, на встречу. Мы привыкли считать это нормой. Но 40 минут в день складываются в целый рабочий месяц в году, который человек просто сидит в машине.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Проблема</p>
+      <h2 data-r>Бишкек стоит</h2>
+      <div class="stats">
+        <div class="stat" data-r><span class="stat__n">40–60 мин</span><span class="stat__t">в день горожанин проводит в пробке в час пик</span></div>
+        <div class="stat" data-r><span class="stat__n">180–260 ч</span><span class="stat__t">в год. Это примерно <b>целый рабочий месяц</b> в машине</span></div>
+        <div class="stat" data-r><span class="stat__n">205+ ч</span><span class="stat__t">сильных пробок (6–9 баллов) только за I квартал 2026 года, то есть <b>больше 2 часов каждый день</b></span></div>
+      </div>
+      <p class="src" data-r>Источник: 2GIS</p>
+    </section>
+
+    <!-- 2 -->
+    <section class="panel" data-shot="driver" data-name="Чем мы платим"
+      data-note="Пробка забирает не только время. Она забирает деньги, здоровье и иногда жизни, когда скорая не может проехать.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Цена пробки</p>
+      <h2 data-r>Чем мы платим за пробки</h2>
+      <ul class="items">
+        <li data-r><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg></span><span><b>Опоздания и стресс</b>Постоянное «успею или нет»</span></li>
+        <li data-r><span class="ico ico--wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 9h6M14 8h2a2 2 0 0 1 2 2v6a2 2 0 0 0 4 0V9l-3-3"/></svg></span><span><b>Деньги</b>Бензин сгорает на холостом ходу</span></li>
+        <li data-r><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h8"/></svg></span><span><b>Воздух</b>Машина в пробке дымит, а не едет. И это в городе, который зимой и так задыхается от смога</span></li>
+        <li data-r><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16V8a1 1 0 0 1 1-1h11v9M14 10h4l3 3v3h-7"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/><path d="M8 9.5v3M6.5 11h3"/></svg></span><span><b>Скорая и пожарные</b>Стоят в том же заторе</span></li>
+      </ul>
+    </section>
+
+    <!-- 3 -->
+    <section class="panel" data-shot="works" data-name="Больше асфальта"
+      data-note="Город честно вкладывает в дороги, и с каждым годом всё больше. Но пробки никуда не делись.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Что делает город</p>
+      <h2 data-r>Больше асфальта</h2>
+      <div data-r>
+        <div class="km">
+          <div><strong>62 км</strong><span class="bar" style="height:42%"></span></div>
+          <div><strong>92 км</strong><span class="bar" style="height:63%"></span></div>
+          <div><strong>120 км</strong><span class="bar bar--plan" style="height:82%"></span></div>
+        </div>
+      </div>
+      <div class="km-labels" data-r><span>2024</span><span>2025</span><span>2026, план</span></div>
+      <p data-r>Ремонт и реконструкция дорог. Расширяют проезжие части, строят новые улицы.</p>
+      <div class="result" data-r><strong>205 ч</strong><span>сильных пробок за первые три месяца 2026 года. Это результат.</span></div>
+    </section>
+
+    <!-- 4 -->
+    <section class="panel" data-shot="avenue" data-name="Почему не работает"
+      data-note="Расширять дорогу — всё равно что расширять трубу, а кран оставить прежним. Вода от этого быстрее не потечёт.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Индуцированный спрос</p>
+      <h2 data-r>Больше дорог ≠ меньше пробок</h2>
+      <ul class="items">
+        <li data-r><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg></span><span><b>Новая полоса возвращает пробку</b>Ездить на машине удобнее, машин больше, через пару лет затор снова, только шире</span></li>
+        <li data-r><span class="ico ico--wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20 9 4M20 20 15 4M12 6v2M12 11v2M12 16v2"/></svg></span><span><b>Хьюстон, Katy Freeway</b>26 полос за $2,8 млрд. Через несколько лет время в пути выросло: <b>+30%</b> утром и <b>+55%</b> вечером</span></li>
+        <li data-r><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="14" rx="2"/><circle cx="12" cy="6" r="1.2"/><circle cx="12" cy="9.5" r="1.2"/><circle cx="12" cy="13" r="1.2"/><path d="M12 16v6"/></svg></span><span><b>Всё упирается в перекрёсток</b>Любая широкая улица ведёт к тому же светофору</span></li>
+      </ul>
+    </section>
+
+    <!-- 5 -->
+    <section class="panel" data-shot="campus" data-name="Кампус «Манас»"
+      data-note="Это тупик. Чтобы машинам стало просторнее, у людей забирают их пространство. А пробка, как мы видели, через пару лет вернётся. Мы предлагаем другой путь.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>С июня 2026</p>
+      <h2 data-r>Асфальт там, где его быть не должно</h2>
+      <ul class="items">
+        <li data-r><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21 9 3M20 21 15 3M12 5v3M12 11v3M12 17v3"/></svg></span><span><b>Улица Минжилкиева, 1,35 км</b>Мэрия прокладывает её через кампус КТУ «Манас»: от пр. Айтматова к Тыналиева и Курчатова</span></li>
+        <li data-r><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 21V9M8 21V9M13 21v-4M18 21V9M21 21V9M3 12h18M3 17h7M15 17h6"/></svg></span><span><b>Часть ограды уже снесена</b></span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12M12 12C12 7 8 4 4 4c0 4 3 8 8 8ZM12 14c0-4 3-7 8-7 0 4-3 7-8 7Z"/></svg></span><span><b>Кампус — мини-город студентов</b>Учёба, общежития, спорт, зелень. Безопасен, пока в нём нет транзитных машин</span></li>
+        <li data-r><span class="ico ico--wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h18M6 10v11M18 10v11M6 21h12M9 6l3-3 3 3M12 3v7"/></svg></span><span><b>Взамен — подземные переходы</b>Студентов уводят под землю, чтобы освободить место машинам</span></li>
+      </ul>
+    </section>
+
+    <!-- 6 -->
+    <section class="panel" data-shot="signal" data-name="Слепой светофор"
+      data-note="Пробка рождается не на дороге, а на перекрёстке. Значит, менять надо не ширину дороги, а мозги светофора.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Решение</p>
+      <h2 data-r>Научить перекрёсток видеть</h2>
+      <p data-r>Сегодня светофор <b>слепой</b>. Он даёт одинаковые 40 секунд зелёного пустой улице и хвосту в 300 метров.</p>
+      <div class="blind" data-r>
+        <div><span>Пустая улица</span><strong>40 с</strong></div>
+        <div><span>Хвост 300 м</span><strong>40 с</strong></div>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="panel" data-shot="camera" data-name="Камера SmartCross"
+      data-note="Пробка рождается не на дороге, а на перекрёстке. Значит, менять надо не ширину дороги, а мозги светофора.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>SmartCross</p>
+      <h2 data-r>Камера с ИИ на каждом подходе</h2>
+      <ul class="items">
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M12 3l-2 2.5M12 3l2 2.5"/></svg></span><span><b>4 подхода: С, Ю, З, В</b>Камера смотрит навстречу потоку</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 7V5M17 7V5M7 12h4M7 15h7"/></svg></span><span><b>Считает в реальном времени</b>Машины в полосе и длину хвоста</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="8" y="2" width="8" height="20" rx="3"/><circle cx="12" cy="17" r="2" fill="currentColor"/></svg></span><span><b>Больше зелёного</b>той полосе, где затор больше</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Без строек и сносов</b>Только камеры и софт</span></li>
+      </ul>
+    </section>
+
+    <!-- 8 -->
+    <section class="panel" data-shot="regulator" data-name="Цифровой регулировщик"
+      data-note="Все замечали: когда на перекрёсток выходит инспектор, пробка рассасывается быстрее, чем со светофором. Он смотрит не на таймер, а на дорогу: видит, что с запада хвост на два квартала, а с севера три машины, и держит запад дольше. SmartCross делает то же самое, только на каждом перекрёстке, круглосуточно и с точностью до секунды.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Идея</p>
+      <h2 data-r>Мы оцифровали регулировщика</h2>
+      <table class="tbl" data-r>
+        <thead><tr><th></th><th>Регулировщик</th><th>SmartCross</th></tr></thead>
+        <tbody>
+          <tr><td>Видит, где затор</td><td>глазами</td><td class="us">4 камеры одновременно</td></tr>
+          <tr><td>Решает, кому ехать</td><td>на глаз</td><td class="us">точный расчёт в секундах</td></tr>
+          <tr><td>Работает</td><td>пару часов в пик</td><td class="us">24/7</td></tr>
+          <tr><td>Сколько перекрёстков</td><td>один</td><td class="us">все сразу</td></tr>
+          <tr><td>Устаёт, мёрзнет, дышит выхлопом</td><td>да</td><td class="us">нет</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 9 -->
+    <section class="panel panel--right" data-shot="pov" data-name="Виртуальные заборчики"
+      data-note="При установке мы размечаем на изображении несколько виртуальных заборчиков, расстояние до каждого известно. Вдали машины на картинке сливаются, и считать их поштучно трудно. А понять, занят ли участок за линией стоящими машинами, нейросеть может надёжно. Поэтому камера знает длину пробки в метрах, а не просто «много» или «мало». Чем больше заборчиков пройдено, тем больше баллов и тем выше приоритет. Баллы за ожидание нужны, чтобы маленькая улица не стояла вечно.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Как камера видит пробку</p>
+      <h2 data-r>Виртуальные заборчики</h2>
+      <table class="tbl" data-r>
+        <thead><tr><th>Заборчик</th><th>От стоп-линии</th><th>≈ машин в полосе</th><th>Баллы</th></tr></thead>
+        <tbody>
+          <tr data-fence="0"><td><span class="fdot" style="background:#19a75a"></span>1</td><td class="num">30 м</td><td class="num">~5</td><td class="num">+5</td></tr>
+          <tr data-fence="1"><td><span class="fdot" style="background:#9acb3c"></span>2</td><td class="num">60 м</td><td class="num">~10</td><td class="num">+10</td></tr>
+          <tr data-fence="2"><td><span class="fdot" style="background:#f2a516"></span>3</td><td class="num">120 м</td><td class="num">~20</td><td class="num">+20</td></tr>
+          <tr data-fence="3" class="crit"><td><span class="fdot" style="background:#e2483d"></span>4</td><td class="num">200 м</td><td class="num">~33</td><td class="num">+40<span class="tag">критично</span></td></tr>
+        </tbody>
+      </table>
+      <p class="note" data-r>Ещё баллы: <b>+1</b> за каждую машину в очереди и <b>+1</b> за каждые 10 секунд ожидания на красном.</p>
+    </section>
+
+    <!-- 10 -->
+    <section class="panel panel--right" data-shot="seconds" data-name="Из баллов в секунды"
+      data-note="Запад и восток едут на одном зелёном, поэтому баллы двух встречных камер складываются. Камера не просто говорит «тут пробка», она выдаёт точное число секунд.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Пример расчёта</p>
+      <h2 data-r>Из баллов в секунды</h2>
+      <div class="calc" data-r>
+        <div class="calc-row"><span>Запад: 24 машины, хвост за 3-м заборчиком</span><b>24 + 5 + 10 + 20 = 59</b></div>
+        <div class="calc-row"><span>Восток: 12 машин, за 2-м</span><b>12 + 5 + 10 = 27</b></div>
+        <div class="calc-sum"><span>Направление З–В</span><strong>86 баллов</strong></div>
+        <div class="calc-row"><span>Север: 6 машин, за 1-м · Юг: 3 машины</span><b>11 + 3</b></div>
+        <div class="calc-sum"><span>Направление С–Ю</span><strong>14 баллов</strong></div>
+      </div>
+      <p class="note" data-r>Цикл 90 с. Каждому направлению минимум 15 с, чтобы пешеходы успели перейти. Остальные 60 с делим по баллам:</p>
+      <div class="green" data-r>
+        <div class="green-row"><span>З–В</span><span class="track"><i class="fill" style="width:74.4%"></i><i class="old" style="width:50%"></i></span><strong>67 с</strong></div>
+        <div class="green-row"><span>С–Ю</span><span class="track"><i class="fill" style="width:25.6%"></i><i class="old" style="width:50%"></i></span><strong>23 с</strong></div>
+        <div class="legend"><span><i></i>SmartCross: 15 + 60 × доля баллов</span><span><i class="old"></i>обычный светофор: 45 с</span></div>
+      </div>
+      <p class="note" data-r>Минимум и максимум зелёного, жёлтый не трогаем. Очередь рассосалась раньше — зелёный переключается досрочно. Пересчёт каждый цикл.</p>
+    </section>
+
+    <!-- 11 -->
+    <section class="panel" data-shot="benefits" data-name="Преимущества">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Почему SmartCross</p>
+      <h2 data-r>Преимущества</h2>
+      <ul class="items items--grid">
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5c-.5-1-1.5-1.5-2.5-1.5-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1 0-2-.5-2.5-1.5M12 6.5V8M12 16v1.5"/></svg></span><span><b>Дёшево</b>Камера и мини-компьютер вместо миллионов на километр дороги</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span><span><b>Быстро</b>Перекрёсток переводится за дни, а не за годы стройки</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-6M7 16h10l-5-13z"/></svg></span><span><b>Бережно</b>Никаких сносов заборов, деревьев и кампусов</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.3M3 12A9 9 0 0 1 18.5 5.7M18 2v4h-4M6 22v-4h4"/></svg></span><span><b>Гибко</b>Само подстраивается под час пик, ДТП, ремонт, снег, праздники</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12M12 12C12 7 8 4 4 4c0 4 3 8 8 8ZM12 14c0-4 3-7 8-7 0 4-3 7-8 7Z"/></svg></span><span><b>Экология</b>Меньше стоим на холостом ходу: меньше выхлопа и бензина</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0M2 17c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0M2 7c2.5-3 4.5-3 7 0s4.5 3 7 0 4.5-3 6 0"/></svg></span><span><b>Масштаб</b>Соседние перекрёстки обмениваются данными: «зелёная волна» по всей улице</span></li>
+        <li class="wide" data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 15l4-4 3 3 6-7"/></svg></span><span><b>Данные</b>У города появляется живая карта потоков для планирования</span></li>
+      </ul>
+    </section>
+
+    <!-- 12 -->
+    <section class="panel panel--right" data-shot="edge" data-name="Это реально уже сейчас">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Технологии</p>
+      <h2 data-r>Это реально уже сейчас</h2>
+      <ul class="items">
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Распознавание машин</b>Нейросеть YOLO в реальном времени, open source</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20h16M4 15h16M4 10h16M8 4v16M16 4v16"/></svg></span><span><b>Заборчики и полосы</b>OpenCV</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6H9zM9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg></span><span><b>Мини-компьютер на перекрёстке</b>Видео никуда не уходит. Хранятся только цифры, без лиц и номеров</span></li>
+        <li data-r><span class="ico ico--wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg></span><span><b>Надёжность</b>Если камера отказала, светофор возвращается в обычный режим по таймеру</span></li>
+        <li data-r><span class="ico ico--go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 9l4 4 4-6 5 7"/></svg></span><span><b>Подход доказан</b>Адаптивные светофоры SURTRAC в Питтсбурге: время в пути <b>−25%</b>, ожидание на перекрёстках <b>−40%</b></span></li>
+      </ul>
+    </section>
+
+    <!-- 13 -->
+    <section class="panel panel--sim" data-shot="sim" data-name="Симуляция"
+      data-note="Слева обычный светофор на таймере, справа SmartCross. Смотрите: с запада хвост перешёл второй заборчик, система подняла баллы и дала западу больше зелёного. Через N циклов очередь справа короче.">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Демонстрация</p>
+      <h2 data-r>Давайте посмотрим на симуляцию</h2>
+    </section>
+
+    <!-- 14 -->
+    <section class="panel panel--final" data-shot="final" data-name="Финал">
+      <p class="eyebrow" data-r><span class="lights"><i></i><i></i><i></i></span>Итог</p>
+      <h2 data-r>Пробку не победить асфальтом. <span>Её можно победить умом.</span></h2>
+      <ol class="steps">
+        <li data-r><span><b>Пилот</b> на одном перекрёстке пр. Айтматова рядом с «Манасом», замер до и после</span></li>
+        <li data-r><span><b>Сеть перекрёстков</b> и «зелёная волна»</span></li>
+      </ol>
+      <div class="signoff" data-r><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6-4.5-4.2 6.1-.7z"/></svg>Lone Stars · SmartCross</div>
+    </section>
+  </div>
+
+  <div class="simfield" id="simfield" aria-hidden="true"><span>Обычный светофор · таймер</span><span>SmartCross</span></div>
+
+  <div class="notes" id="notes" hidden><span>Заметки спикера</span><div id="notesText"></div></div>
+
+  <nav class="hud" aria-label="Навигация по слайдам">
+    <div class="count" aria-live="polite"><b id="num">01</b><span>/ 15</span><span class="name" id="name">SmartCross</span></div>
+    <div class="btns">
+      <button class="btn btn--text" id="notesBtn" type="button" aria-pressed="false">Заметки</button>
+      <button class="btn" id="prev" type="button" aria-label="Предыдущий слайд" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      <button class="btn" id="next" type="button" aria-label="Следующий слайд"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <button class="btn" id="fs" type="button" aria-label="Во весь экран"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+  </nav>
+  <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+
+  <div class="loader" id="loader" role="status">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6-4.5-4.2 6.1-.7z"/></svg>
+    <p id="loaderText">Строим город…</p>
+    <div class="meter"><i id="loaderBar"></i></div>
+  </div>
+</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script type="module">
+/*__BUNDLE__*/
+</script>
