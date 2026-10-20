@@ -24,3 +24,7 @@ hs_err_pid*
 replay_pid*
 node_modules/
 data/
+
+# Python bytecode
+__pycache__/
+*.pyc
