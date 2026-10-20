@@ -159,6 +159,8 @@ td.num { font-family: var(--font-data); font-size: 13px; }
 .log .prio time { color: var(--accent); }
 .log li span { min-width: 0; overflow-wrap: anywhere; }
 .log-empty { color: var(--muted); font-size: 13.5px; margin: 0; }
+.rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.rules b { color: var(--fg); font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -167,7 +169,7 @@ td.num { font-family: var(--font-data); font-size: 13px; }
   <header class="top">
     <div>
       <h1>Умный перекрёсток</h1>
-      <p class="lead">Обычный светофор работает по таймеру и не видит очередей, поэтому на загруженном направлении копится пробка. Включите ИИ-регулировщик: камеры измерят очереди, и время зелёного начнёт постепенно перераспределяться туда, где машин больше.</p>
+      <p class="lead">Перекрёсток с тремя полосами в каждую сторону: налево, прямо, прямо и направо. Обычный светофор работает по таймеру и не видит очередей, поэтому на загруженном направлении копится пробка. Включите ИИ-регулировщик: камеры измерят очередь в каждой полосе, и время зелёного начнёт постепенно перераспределяться туда, где машин больше.</p>
     </div>
     <button id="aiToggle" class="ai-toggle" aria-pressed="false" type="button">
       <span class="ai-switch" aria-hidden="true"></span>
@@ -191,7 +193,13 @@ td.num { font-family: var(--font-data); font-size: 13px; }
         </div>
       </div>
       <div class="canvas-wrap" id="sceneWrap"><canvas id="scene" aria-label="Вид сверху на перекрёсток с машинами и светофорами"></canvas></div>
-      <p class="hint">Машины едут прямо по четырём подъездам. При включённом ИИ синим показаны зоны камер и распознанные машины, жёлтая полоса вдоль дороги — измеренная очередь, пунктир поперёк полосы — порог затора. Хвост очереди за порогом даёт направлению приоритет.</p>
+      <p class="hint">При включённом ИИ синим показаны зоны камер и распознанные машины, заливка полосы — измеренная очередь, пунктир поперёк дороги — порог затора. Хвост очереди за порогом даёт направлению приоритет.</p>
+      <ul class="rules">
+        <li><b>Полосы.</b> Налево — из левой полосы, прямо — из средней и правой, направо — из правой; поворот в ближайшую полосу (ПДД 8.5, 8.6, разметка 1.18).</li>
+        <li><b>Налево.</b> Уступает встречным, которые едут прямо: выезжает в центр перекрёстка, ждёт разрыва и завершает манёвр, даже если сигнал сменился (13.4, 13.7). Над ждущими машинами — знак «Уступите дорогу».</li>
+        <li><b>Смена сигнала.</b> На жёлтый проезжает только тот, кто не успевает остановиться (6.14); на зелёный сначала пропускают тех, кто ещё на перекрёстке (13.8).</li>
+        <li><b>Затор.</b> На перекрёсток не выезжают, если за ним некуда ехать (13.2). Перед поворотом — указатель поворота и снижение скорости (8.1).</li>
+      </ul>
     </section>
 
     <aside class="side">
@@ -211,7 +219,7 @@ td.num { font-family: var(--font-data); font-size: 13px; }
         <h2>Подъезды</h2>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Откуда</th><th>Очередь</th><th>Первая ждёт</th><th>Статус</th></tr></thead>
+            <thead><tr><th>Откуда</th><th>По полосам</th><th>Длина</th><th>Ждёт</th><th>Статус</th></tr></thead>
             <tbody id="dirRows"></tbody>
           </table>
         </div>
@@ -228,10 +236,15 @@ td.num { font-family: var(--font-data); font-size: 13px; }
           <button type="button" data-preset="north" aria-pressed="false">Час пик с севера</button>
           <button type="button" data-preset="even" aria-pressed="false">Равномерно</button>
         </div>
-        <div class="slider"><div class="row"><label for="dW">С запада</label><output id="oW" for="dW"></output></div><input id="dW" type="range" min="0" max="24" step="1" value="17"></div>
-        <div class="slider"><div class="row"><label for="dE">С востока</label><output id="oE" for="dE"></output></div><input id="dE" type="range" min="0" max="24" step="1" value="12"></div>
-        <div class="slider"><div class="row"><label for="dN">С севера</label><output id="oN" for="dN"></output></div><input id="dN" type="range" min="0" max="24" step="1" value="7"></div>
-        <div class="slider"><div class="row"><label for="dS">С юга</label><output id="oS" for="dS"></output></div><input id="dS" type="range" min="0" max="24" step="1" value="5"></div>
+        <div class="slider"><div class="row"><label for="dW">С запада</label><output id="oW" for="dW"></output></div><input id="dW" type="range" min="0" max="40" step="1" value="26"></div>
+        <div class="slider"><div class="row"><label for="dE">С востока</label><output id="oE" for="dE"></output></div><input id="dE" type="range" min="0" max="40" step="1" value="17"></div>
+        <div class="slider"><div class="row"><label for="dN">С севера</label><output id="oN" for="dN"></output></div><input id="dN" type="range" min="0" max="40" step="1" value="9"></div>
+        <div class="slider"><div class="row"><label for="dS">С юга</label><output id="oS" for="dS"></output></div><input id="dS" type="range" min="0" max="40" step="1" value="7"></div>
+      </div>
+      <div class="ctl-group">
+        <h2>Повороты</h2>
+        <div class="slider"><div class="row"><label for="tL">Поворачивают налево</label><output id="otL" for="tL"></output></div><input id="tL" type="range" min="0" max="40" step="5" value="20"></div>
+        <div class="slider"><div class="row"><label for="tR">Поворачивают направо</label><output id="otR" for="tR"></output></div><input id="tR" type="range" min="0" max="40" step="5" value="20"></div>
       </div>
       <div class="ctl-group">
         <h2>Обычный светофор</h2>
@@ -241,8 +254,8 @@ td.num { font-family: var(--font-data); font-size: 13px; }
       </div>
       <div class="ctl-group">
         <h2>Камеры ИИ</h2>
-        <div class="slider"><div class="row"><label for="barrier">Порог затора от стоп-линии</label><output id="oBarrier" for="barrier"></output></div><input id="barrier" type="range" min="30" max="120" step="10" value="60"></div>
-        <p class="note">Камера видит 130 м. Зелёный меняется не больше чем на +8 / −6 с за цикл, поэтому пробка уходит постепенно и без рывков для других направлений.</p>
+        <div class="slider"><div class="row"><label for="barrier">Порог затора от стоп-линии</label><output id="oBarrier" for="barrier"></output></div><input id="barrier" type="range" min="30" max="110" step="10" value="60"></div>
+        <p class="note">Камера видит 120 м по каждой из трёх полос. Зелёный меняется не больше чем на +8 / −6 с за цикл, поэтому пробка уходит постепенно и без рывков для других направлений. Если в левой полосе 4 машины и больше, ИИ включает стрелку налево.</p>
       </div>
     </div>
 
@@ -262,12 +275,17 @@ td.num { font-family: var(--font-data); font-size: 13px; }
 
 <script>
 /* ENGINE START */
-// Геометрия в метрах. s — путь машины от точки появления; стоп-линия при s = GEO.sStop.
-// Ширина полосы на картинке немного увеличена, чтобы машины было видно; расстояния вдоль дороги — реальные.
-const GEO = { lane: 5.5, stopD: 14, appLen: 150, carLen: 4.6, carW: 2.5 };
-GEO.R = GEO.stopD + GEO.appLen;
+// Геометрия в метрах. На каждом подъезде 3 полосы к перекрёстку и 3 от него.
+// Полоса 0 (у осевой) — налево, 1 — прямо, 2 — прямо и направо (ПДД 8.5: поворот из крайнего положения).
+// Ширина полосы на картинке чуть больше реальной, чтобы машины было видно; расстояния вдоль дороги — реальные.
+const GEO = { lane: 4, appLen: 130, carLen: 4.6, carW: 2.2 };
+GEO.H = 3 * GEO.lane;            // половина ширины дороги
+GEO.B0 = GEO.H + 5;              // граница зоны манёвров: переход и закругления углов
+GEO.stopD = GEO.B0 + 0.5;        // стоп-линия
+GEO.R = GEO.stopD + GEO.appLen;  // точка появления машин
 GEO.sStop = GEO.appLen;
-GEO.sEnd = 2 * GEO.R;
+GEO.LA = GEO.R - GEO.B0;         // путь от появления до въезда в зону манёвров
+const laneY = (i) => (i + 0.5) * GEO.lane;
 
 // Подъезд назван по стороне, откуда едут машины; dx, dy — направление движения.
 const APPROACHES = {
@@ -277,20 +295,26 @@ const APPROACHES = {
   S: { name: 'Юг', phase: 'NS', dx: 0, dy: -1 },
 };
 const DIRS = ['W', 'E', 'N', 'S'];
+const LANES = [0, 1, 2];
+const LANE_MOVES = [['L'], ['S'], ['S', 'R']];
+const LANE_NAME = ['налево', 'прямо', 'прямо и направо'];
 const PHASE_DIRS = { EW: ['W', 'E'], NS: ['N', 'S'] };
 const PHASE_NAME = { EW: 'Запад–Восток', NS: 'Север–Юг' };
 const OTHER = { EW: 'NS', NS: 'EW' };
+const OPPOSITE = { W: 'E', E: 'W', N: 'S', S: 'N' };
 
 // Модель следования за лидером (Intelligent Driver Model). Подобрана так, что очередь
 // разъезжается со скоростью ≈2 с на машину — 1800 машин в час с полосы, как на реальных перекрёстках.
 const IDM = { T: 1.0, s0: 2, a: 2.0, b: 2.5 };
-const V0 = 13.9;        // 50 км/ч
+const V0 = 13.9;                 // 50 км/ч
+const TURN_V = { L: 8, R: 5.5 }; // скорость в повороте, м/с
 const YELLOW = 3, ALLRED = 2;
 const SLOW = 2;         // м/с: медленнее — машина считается стоящей
 const CRAWL = 5;        // м/с: в очередь камера включает и тех, кто ползёт в хвосте
 const QUEUE_GAP = 12;   // м: разрыв больше — очередь закончилась
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const tail = (list) => list[list.length - 1];
 
 function makeRng(seed) {
   let a = seed >>> 0;
@@ -303,27 +327,95 @@ function makeRng(seed) {
   };
 }
 
-function createSim({ seed = 7, demand, fixed }) {
+// Подъезд, чьё направление движения совпадает с (hx, hy): в его системе координат машина уезжает.
+function headingKey(hx, hy) {
+  return hx > 0.5 ? 'W' : hx < -0.5 ? 'E' : hy > 0.5 ? 'N' : 'S';
+}
+
+// Траектория в зоне манёвров в системе подъезда (x — вдоль движения, y — вправо): [x, y, hx, hy] через u метров.
+// Направо — дуга в крайнюю правую полосу, налево — дуга в крайнюю левую (ПДД 8.6).
+function connector(lane, m, u) {
+  const B0 = GEO.B0;
+  if (m === 'S') return [-B0 + u, laneY(lane), 1, 0];
+  if (m === 'R') {
+    const r = B0 - laneY(2), f = -Math.PI / 2 + u / r;
+    return [-B0 + r * Math.cos(f), B0 + r * Math.sin(f), -Math.sin(f), Math.cos(f)];
+  }
+  const r = B0 + laneY(0), f = Math.PI / 2 - u / r;
+  return [-B0 + r * Math.cos(f), -B0 + r * Math.sin(f), Math.sin(f), -Math.cos(f)];
+}
+
+function connectorLen(m) {
+  if (m === 'S') return 2 * GEO.B0;
+  return Math.PI / 2 * (m === 'R' ? GEO.B0 - laneY(2) : GEO.B0 + laneY(0));
+}
+
+// Точки, где дуга левого поворота пересекает встречные полосы «прямо»:
+// onc — путь встречной машины от въезда в зону, mine — путь поворачивающей.
+const LEFT_CROSS = [1, 2].map((j) => {
+  const r = GEO.B0 + laneY(0), dy = GEO.B0 - laneY(j);
+  const x = -GEO.B0 + Math.sqrt(r * r - dy * dy);
+  return { lane: j, onc: GEO.B0 - x, mine: r * (Math.PI / 2 - Math.atan2(dy, x + GEO.B0)) };
+});
+// Где поворачивающий налево ждёт в центре перекрёстка, пропуская встречных.
+const LEFT_WAIT = LEFT_CROSS[0].mine - 4.5;
+
+// Положение точки машины на её пути s (в мировых координатах, центр перекрёстка — 0, 0).
+function pose(c, s) {
+  let f = APPROACHES[c.d], x, y, hx = 1, hy = 0;
+  if (s <= GEO.LA) { x = -GEO.R + s; y = laneY(c.lane); }
+  else if (s <= GEO.LA + c.LB) [x, y, hx, hy] = connector(c.lane, c.m, s - GEO.LA);
+  else { f = APPROACHES[c.exitH]; x = GEO.B0 + s - GEO.LA - c.LB; y = laneY(c.exitLane); }
+  return { x: f.dx * x - f.dy * y, y: f.dy * x + f.dx * y, hx: f.dx * hx - f.dy * hy, hy: f.dy * hx + f.dx * hy };
+}
+
+const posC = (c) => c.s - GEO.LA - c.LB; // путь по полосе выезда
+
+function makeCar(st, d, lane, m, born, v0, v) {
+  const a = APPROACHES[d];
+  const exitH = m === 'S' ? d : m === 'R' ? headingKey(-a.dy, a.dx) : headingKey(a.dy, -a.dx);
+  const LB = connectorLen(m);
+  return {
+    id: st.nextId++, d, lane, m, exitH, exitLane: m === 'S' ? lane : m === 'R' ? 2 : 0,
+    LB, total: GEO.LA + LB + GEO.R - GEO.B0, seg: 'A',
+    s: 0, v, v0, acc: 0, born, wait: 0, passed: false, go: null, ok: false, cross: false, yield: null, brake: false,
+    paint: Math.floor(st.rand() * 6),
+  };
+}
+
+function createSim({ seed = 7, demand, fixed, turns = { L: 0.2, R: 0.2 } }) {
+  const perDir = (fn) => Object.fromEntries(DIRS.map((d) => [d, fn(d)]));
   const st = {
     t: 0, rand: makeRng(seed), nextId: 1,
-    demand: { ...demand }, fixed: { ...fixed },
-    lanes: { W: [], E: [], N: [], S: [] },    // от головы к хвосту
-    outside: { W: [], E: [], N: [], S: [] },  // время прибытия машин, которые не влезли в кадр
+    demand: { ...demand }, fixed: { ...fixed }, turns: { ...turns },
+    lanes: perDir(() => [[], [], []]),    // до зоны манёвров, от головы к хвосту
+    box: {},                               // в зоне манёвров, по траекториям
+    out: perDir(() => [[], [], []]),      // на выезде; ключ — подъезд с тем же направлением движения
+    outside: perDir(() => [[], [], []]),  // приехали, но не влезли в кадр
     nextArr: {},
-    sig: { phase: 'EW', stage: 'green', t: 0, green: fixed.EW },
+    sig: { phase: 'EW', stage: 'green', t: 0, green: fixed.EW, arrow: 0, lastEnd: { EW: 0, NS: 0 } },
     ai: {
-      on: false, barrier: 60, camRange: 130,
+      on: false, barrier: 60, camRange: 120,
       minGreen: 10, maxGreen: 45, maxGreenPrio: 70,
-      stepUp: 8, stepDown: 6, headway: 2.0, startLoss: 3, maxRed: 90,
+      stepUp: 8, stepDown: 6, headway: 2.0, startLoss: 3, maxRed: 100,
+      arrowFrom: 4, arrowMin: 6, arrowMax: 20,
       lastGreen: { ...fixed }, prio: { EW: false, NS: false },
-      press: { W: 0, E: 0, N: 0, S: 0 },
+      press: perDir(() => 0),
     },
-    cam: {}, camEntries: { W: [], E: [], N: [], S: [] },
+    cam: {}, camEntries: perDir(() => [[], [], []]),
     exits: [], passes: [], hist: [], histTimer: 0, log: [], logSeq: 0,
   };
-  for (const d of DIRS) st.nextArr[d] = arrivalGap(st, d);
+  for (const d of DIRS) {
+    for (const i of LANES) for (const m of LANE_MOVES[i]) st.box[d + i + m] = [];
+    st.nextArr[d] = arrivalGap(st, d);
+  }
   measureAll(st);
   return st;
+}
+
+function forEachList(st, fn) {
+  for (const d of DIRS) for (const i of LANES) { fn(st.lanes[d][i]); fn(st.out[d][i]); }
+  for (const k in st.box) fn(st.box[k]);
 }
 
 function arrivalGap(st, d) {
@@ -347,16 +439,18 @@ function setAI(st, on) {
   st.ai.on = on;
   if (on) {
     st.ai.lastGreen = { ...st.fixed };
-    pushLog(st, 'on', `ИИ включён. Камеры измеряют очереди, зелёный будет меняться от текущих ${st.fixed.EW}/${st.fixed.NS} с не больше чем на +${st.ai.stepUp}/−${st.ai.stepDown} с за цикл.`);
+    pushLog(st, 'on', `ИИ включён. Камеры измеряют очередь в каждой полосе, зелёный будет меняться от текущих ${st.fixed.EW}/${st.fixed.NS} с не больше чем на +${st.ai.stepUp}/−${st.ai.stepDown} с за цикл.`);
   } else {
     st.ai.prio = { EW: false, NS: false };
     pushLog(st, 'off', `ИИ выключен. Светофор вернулся к фиксированному циклу ${st.fixed.EW}/${st.fixed.NS} с.`);
   }
 }
 
-function lightFor(st, d) {
+// Сигнал для полосы. Во время стрелки (дополнительная секция) зелёный горит только левой полосе.
+function lightFor(st, d, lane = 1) {
   const s = st.sig;
   if (APPROACHES[d].phase !== s.phase || s.stage === 'allred') return 'red';
+  if (s.stage === 'arrow') return lane === 0 ? 'green' : 'red';
   return s.stage;
 }
 
@@ -366,10 +460,137 @@ function idmAcc(v, v0, gap, dv) {
   return IDM.a * (1 - Math.pow(v / v0, 4) - (sStar / g) ** 2);
 }
 
-// То, что видит камера: машины в пределах range от стоп-линии.
-function measure(st, d, range) {
+// Желаемая скорость: перед поворотом машина плавно сбрасывает скорость до скорости поворота.
+function desiredV(c) {
+  if (c.m === 'S' || c.seg === 'C') return c.v0;
+  const vt = TURN_V[c.m];
+  if (c.seg === 'B') return vt;
+  return Math.min(c.v0, Math.sqrt(vt * vt + 3 * Math.max(0, GEO.LA - c.s)));
+}
+
+// Время, за которое машина со скоростью v проедет D метров, разгоняясь с 2 м/с² до vmax.
+function travelTime(D, v, vmax) {
+  if (D <= 0) return 0;
+  if (v >= vmax - 0.5) return D / Math.max(v, 0.1);
+  const tAcc = (vmax - v) / 2, dAcc = (v + vmax) / 2 * tAcc;
+  return D <= dAcc ? (-v + Math.sqrt(v * v + 4 * D)) / 2 : tAcc + (D - dAcc) / vmax;
+}
+
+// ПДД 13.4: поворачивая налево, уступи встречным, которые едут прямо.
+// true — встречная машина помешает, если сейчас поехать через её полосу.
+function leftConflict(st, c) {
+  const o = OPPOSITE[c.d], u = c.s - GEO.LA;
+  for (const x of LEFT_CROSS) {
+    const tMe = travelTime(x.mine - u + GEO.carLen + 2, c.v, TURN_V.L) + 1.5;
+    for (const q of st.lanes[o][x.lane].concat(st.box[o + x.lane + 'S'])) {
+      if (q.m !== 'S') continue;
+      if (!q.passed && lightFor(st, q.d, q.lane) !== 'green' && !q.go) continue; // стоит на красный
+      const uq = q.s - GEO.LA;
+      if (uq > x.onc + GEO.carLen + 2) continue;      // уже проехала точку пересечения
+      if (uq > x.onc - 2) return true;                 // сейчас в точке пересечения
+      if (travelTime(x.onc - 2 - uq, q.v, q.v0) < tMe) return true;
+    }
+  }
+  return false;
+}
+
+// Почему машина у стоп-линии не может въехать на перекрёсток при зелёном (null — может).
+function blockReason(st, c) {
+  // ПДД 13.8: сначала дать завершить проезд тем, кто уже на перекрёстке.
+  for (const d of PHASE_DIRS[OTHER[APPROACHES[c.d].phase]]) {
+    for (const i of LANES) for (const m of LANE_MOVES[i]) {
+      if (st.box[d + i + m].some((o) => o.s - GEO.LA < o.LB - 1)) return 'clear';
+    }
+  }
+  // ПДД 13.7–13.8: встречный, уже поворачивающий налево через мою полосу, завершает манёвр.
+  if (c.m === 'S') {
+    const x = LEFT_CROSS.find((k) => k.lane === c.lane);
+    if (st.box[OPPOSITE[c.d] + '0L'].some((o) => o.cross && o.s - GEO.LA < x.mine + GEO.carLen + 1)) return 'clear';
+  }
+  // ПДД 13.2: не выезжать на перекрёсток, если за ним затор.
+  const last = tail(st.out[c.exitH][c.exitLane]);
+  if (last && posC(last) < GEO.carLen + 3 && last.v < 2) return 'jam';
+  // Налево: в центре перекрёстка ждут не больше двух машин, остальные — у стоп-линии.
+  if (c.m === 'L' && st.box[c.d + '0L'].filter((o) => !o.cross).length >= 2) return 'left';
+  return null;
+}
+
+function accelA(st, c, lead) {
+  const len = GEO.carLen, v0 = desiredV(c);
+  let gap = Infinity, lv = 0;
+  if (lead) { gap = lead.s - len - c.s; lv = lead.v; }
+  else {
+    // Лидер уже в зоне манёвров: на своей траектории или ещё на общем участке у въезда.
+    for (const m of LANE_MOVES[c.lane]) {
+      const last = tail(st.box[c.d + c.lane + m]);
+      if (last && (m === c.m || last.s - GEO.LA < len + 1)) {
+        const g = last.s - len - c.s;
+        if (g < gap) { gap = g; lv = last.v; }
+      }
+    }
+    if (gap === Infinity) {
+      const last = tail(st.out[c.exitH][c.exitLane]);
+      if (last) { gap = GEO.LA + c.LB - c.s + posC(last) - len; lv = last.v; }
+    }
+  }
+  let acc = gap === Infinity ? idmAcc(c.v, v0, 1e9, 0) : idmAcc(c.v, v0, gap, c.v - lv);
+  c.yield = null;
+  if (!c.passed) {
+    const light = lightFor(st, c.d, c.lane), dist = GEO.sStop - c.s;
+    let stop = false;
+    if (light === 'green') {
+      c.go = null;
+      if (!lead && !c.ok && dist < 60) {
+        const why = blockReason(st, c);
+        if (why) { stop = true; c.yield = why; }
+        else if (dist < c.v * c.v / 5 + 4) c.ok = true; // решение принято, дальше без остановки
+      }
+    } else {
+      // ПДД 6.14: на жёлтый проезжает только тот, кто не может остановиться без экстренного торможения.
+      c.ok = false;
+      if (c.go === null) c.go = light === 'yellow' && c.v * c.v / (2 * Math.max(dist, 0.1)) > 3.2;
+      stop = !c.go;
+    }
+    if (stop) acc = Math.min(acc, idmAcc(c.v, v0, dist - 1, c.v));
+  }
+  c.acc = Math.max(acc, -9);
+}
+
+function accelB(st, c, lead) {
+  const len = GEO.carLen, v0 = desiredV(c);
+  let gap = Infinity, lv = 0;
+  if (lead) { gap = lead.s - len - c.s; lv = lead.v; }
+  else {
+    const last = tail(st.out[c.exitH][c.exitLane]);
+    if (last) { gap = GEO.LA + c.LB - c.s + posC(last) - len; lv = last.v; }
+  }
+  let acc = gap === Infinity ? idmAcc(c.v, v0, 1e9, 0) : idmAcc(c.v, v0, gap, c.v - lv);
+  c.yield = null;
+  // Налево: ждём в центре перекрёстка, пока встречные не дадут разрыв, и завершаем манёвр
+  // даже после смены сигнала (ПДД 13.4, 13.7).
+  if (c.m === 'L' && !c.cross) {
+    const u = c.s - GEO.LA;
+    if (leftConflict(st, c)) {
+      if (u < LEFT_WAIT + 0.5) {
+        acc = Math.min(acc, idmAcc(c.v, v0, LEFT_WAIT - u, c.v));
+        c.yield = 'left';
+      }
+    } else if (u > LEFT_WAIT - 2 - c.v * c.v / 5) c.cross = true;
+  }
+  c.acc = Math.max(acc, -9);
+}
+
+function accelC(c, lead) {
+  const acc = lead
+    ? idmAcc(c.v, c.v0, posC(lead) - GEO.carLen - posC(c), c.v - lead.v)
+    : idmAcc(c.v, c.v0, 1e9, 0);
+  c.acc = Math.max(acc, -9);
+}
+
+// То, что видит камера на одной полосе: машины в пределах range от стоп-линии.
+function measureLane(list, range) {
   let q = 0, rear = GEO.sStop, moving = 0, beyond = false, headWait = 0, open = true;
-  for (const c of st.lanes[d]) {
+  for (const c of list) {
     if (c.passed) continue;
     const dist = GEO.sStop - c.s;
     const joins = open && (q ? c.v < CRAWL : c.v < SLOW) && rear - c.s < QUEUE_GAP;
@@ -386,38 +607,60 @@ function measure(st, d, range) {
   return { q, len: q ? GEO.sStop - rear : 0, moving, beyond, headWait };
 }
 
+function measureApproach(st, d, range) {
+  const lanes = LANES.map((i) => measureLane(st.lanes[d][i], range));
+  return {
+    lanes,
+    q: Math.max(...lanes.map((m) => m.q)),
+    total: lanes.reduce((s, m) => s + m.q, 0),
+    len: Math.max(...lanes.map((m) => m.len)),
+    moving: lanes.reduce((s, m) => s + m.moving, 0),
+    beyond: lanes.some((m) => m.beyond),
+    headWait: Math.max(...lanes.map((m) => m.headWait)),
+  };
+}
+
 // «Давление» подъезда: самая длинная очередь за последний цикл, медленно забывается (≈0,5 м/с).
 function measureAll(st, dt = 0) {
   const ai = st.ai;
   for (const d of DIRS) {
-    const m = st.cam[d] = measure(st, d, ai.camRange);
+    const m = st.cam[d] = measureApproach(st, d, ai.camRange);
     const len = m.beyond ? ai.camRange + 30 : m.len;
     ai.press[d] = Math.max(len, ai.press[d] - 0.5 * dt);
   }
 }
 
 function phasePressure(st, P) {
-  return Math.max(...PHASE_DIRS[P].map(d => st.ai.press[d]));
+  return Math.max(...PHASE_DIRS[P].map((d) => st.ai.press[d]));
 }
 
-// Камера считает машины, въехавшие в её зону за последние 2 минуты, — интенсивность подъезда, маш/мин.
-function camFlow(st, d) {
+// Камера считает машины, въехавшие в её зону на полосе за последние 2 минуты, — интенсивность, маш/мин.
+function camFlow(st, d, i) {
   const win = Math.min(120, st.t);
-  return win > 20 ? st.camEntries[d].length * 60 / win : 0;
+  return win > 20 ? st.camEntries[d][i].length * 60 / win : 0;
 }
 
-// Полная очередь, включая машины за краем кадра.
+// Полная очередь по полосам, включая машины за краем кадра.
 function trueQueue(st, d) {
-  const m = measure(st, d, Infinity);
-  const out = st.outside[d].length;
-  return { q: m.q + out, len: m.len + out * (GEO.carLen + IDM.s0), headWait: m.headWait };
+  const lanes = LANES.map((i) => {
+    const m = measureLane(st.lanes[d][i], Infinity), out = st.outside[d][i].length;
+    return { q: m.q + out, len: m.len + out * (GEO.carLen + IDM.s0), headWait: m.headWait };
+  });
+  return {
+    lanes,
+    q: lanes.reduce((s, l) => s + l.q, 0),
+    len: Math.max(...lanes.map((l) => l.len)),
+    headWait: Math.max(...lanes.map((l) => l.headWait)),
+  };
 }
 
 function waitingCount(st) {
   let n = 0;
   for (const d of DIRS) {
-    n += st.outside[d].length;
-    for (const c of st.lanes[d]) if (!c.passed && c.v < SLOW) n++;
+    for (const i of LANES) {
+      n += st.outside[d][i].length;
+      for (const c of st.lanes[d][i]) if (!c.passed && c.v < SLOW) n++;
+    }
   }
   return n;
 }
@@ -432,15 +675,18 @@ function planGreen(st, P) {
   const prio = over && press >= 1.25 * pressOther;
   const yielding = !prio && pressOther >= ai.barrier && pressOther >= 1.25 * press;
 
-  // Нужный зелёный: разгрузить очередь и тех, кто подъедет за это время: g = (старт + N·h) / (1 − λ·h).
-  // Если приоритет у соседнего направления, даём только время на текущую очередь.
-  let need = 0, lead = PHASE_DIRS[P][0];
+  // Нужный зелёный считается по самой загруженной полосе: разгрузить очередь и тех,
+  // кто подъедет за это время: g = (старт + N·h) / (1 − λ·h).
+  // Если приоритет у пересекающего направления, даём только время на текущую очередь.
+  let need = 0, lead = PHASE_DIRS[P][0], leadLane = 1;
   for (const d of PHASE_DIRS[P]) {
-    const m = st.cam[d];
-    const n = m.q + 0.5 * m.moving + (m.beyond ? 8 : 0);
-    const lam = yielding ? 0 : camFlow(st, d) / 60;
-    const g = (ai.startLoss + n * ai.headway) / Math.max(0.35, 1 - lam * ai.headway);
-    if (g > need) { need = g; lead = d; }
+    for (const i of LANES) {
+      const m = st.cam[d].lanes[i];
+      const n = m.q + 0.5 * m.moving + (m.beyond ? 8 : 0);
+      const lam = yielding ? 0 : camFlow(st, d, i) / 60;
+      const g = (ai.startLoss + n * ai.headway) / Math.max(0.35, 1 - lam * ai.headway);
+      if (g > need) { need = g; lead = d; leadLane = i; }
+    }
   }
   const cap = over ? ai.maxGreenPrio : ai.maxGreen;
   // Приоритетное направление получает прибавку каждый цикл, пока хвост не вернётся за порог.
@@ -451,11 +697,11 @@ function planGreen(st, P) {
   ai.lastGreen[P] = green;
   ai.prio[P] = prio;
 
-  const m = st.cam[lead];
+  const m = st.cam[lead].lanes[leadLane];
   const delta = green - prev;
   const dtxt = delta === 0 ? 'без изменений' : delta > 0 ? `+${delta} с` : `−${-delta} с`;
   const qtxt = m.q
-    ? `${APPROACHES[lead].name}: ${m.q} маш., очередь ${m.beyond ? 'длиннее ' + ai.camRange : Math.round(m.len)} м`
+    ? `${APPROACHES[lead].name}, полоса «${LANE_NAME[leadLane]}»: ${m.q} маш., очередь ${m.beyond ? 'длиннее ' + ai.camRange : Math.round(m.len)} м`
     : 'очереди нет';
   const why = prio ? `хвост за порогом ${ai.barrier} м, даю приоритет`
     : yielding ? `приоритет у направления ${PHASE_NAME[other]}, даю время только на эту очередь`
@@ -465,25 +711,50 @@ function planGreen(st, P) {
   return green;
 }
 
+// Стрелка налево: если в левых полосах копится очередь, а встречный поток не даёт повернуть.
+function planArrow(st, P) {
+  const ai = st.ai;
+  if (!ai.on) return 0;
+  let n = 0, lead = PHASE_DIRS[P][0];
+  for (const d of PHASE_DIRS[P]) {
+    const q = st.cam[d].lanes[0].q + st.box[d + '0L'].length;
+    if (q > n) { n = q; lead = d; }
+  }
+  if (n < ai.arrowFrom) return 0;
+  const arrow = Math.round(clamp(2 + n * ai.headway, ai.arrowMin, ai.arrowMax));
+  pushLog(st, 'prio', `${PHASE_NAME[P]}: включаю стрелку налево на ${arrow} с: ${APPROACHES[lead].name}, в левой полосе ${n} маш., повернут без встречного потока.`);
+  return arrow;
+}
+
+function endArrow(st) {
+  const s = st.sig;
+  if (s.t >= s.arrow) return true;
+  if (s.t < 5) return false;
+  return PHASE_DIRS[s.phase].every((d) => !st.lanes[d][0].some((c) => {
+    if (c.passed) return false;
+    const dist = GEO.sStop - c.s;
+    return dist < st.ai.camRange && (c.v < CRAWL || dist / c.v < 2);
+  }));
+}
+
 function endGreen(st) {
   const s = st.sig, ai = st.ai;
   if (s.t >= s.green) return 'plan';
   if (!ai.on || s.t < ai.minGreen) return null;
   const mine = PHASE_DIRS[s.phase], other = PHASE_DIRS[OTHER[s.phase]];
-  if (!other.some(d => st.cam[d].q > 0)) return null;
-  const starving = other.find(d => st.cam[d].headWait > ai.maxRed);
-  if (starving) {
-    pushLog(st, 'norm', `${APPROACHES[starving].name} ждёт дольше ${ai.maxRed} с, переключаю раньше плана.`);
+  if (!other.some((d) => st.cam[d].q > 0)) return null;
+  if (st.t - s.lastEnd[OTHER[s.phase]] > ai.maxRed) {
+    pushLog(st, 'norm', `${PHASE_NAME[OTHER[s.phase]]} стоит на красном дольше ${ai.maxRed} с, переключаю раньше плана.`);
     return 'starve';
   }
   // Очередь разъехалась: в зоне камеры нет медленных машин и никто не подъедет к стоп-линии в ближайшие секунды.
   // Если приоритет у соседей, одиночные машины держат зелёный меньше.
   const gapT = ai.prio[OTHER[s.phase]] && !ai.prio[s.phase] ? 1.5 : 3;
-  const clear = mine.every(d => !st.lanes[d].some(c => {
+  const clear = mine.every((d) => LANES.every((i) => !st.lanes[d][i].some((c) => {
     if (c.passed) return false;
     const dist = GEO.sStop - c.s;
     return dist < ai.camRange && (c.v < CRAWL || dist / c.v < gapT);
-  }));
+  })));
   if (clear) {
     pushLog(st, 'norm', `${PHASE_NAME[s.phase]}: очередь разъехалась за ${Math.round(s.t)} с из ${s.green}, отдаю остаток другой стороне.`);
     return 'gap';
@@ -494,20 +765,25 @@ function endGreen(st) {
 function updateSignal(st, dt) {
   const s = st.sig;
   s.t += dt;
-  if (s.stage === 'green') {
+  if (s.stage === 'arrow') {
+    if (endArrow(st)) { s.stage = 'green'; s.t = 0; s.green = planGreen(st, s.phase); }
+  } else if (s.stage === 'green') {
     const why = endGreen(st);
     if (why) {
       const ai = st.ai;
       if (ai.on && why !== 'plan') {
         ai.lastGreen[s.phase] = Math.max(ai.minGreen, Math.round(s.t), ai.lastGreen[s.phase] - ai.stepDown);
       }
+      s.lastEnd[s.phase] = st.t;
       s.stage = 'yellow'; s.t = 0;
     }
   } else if (s.stage === 'yellow') {
     if (s.t >= YELLOW) { s.stage = 'allred'; s.t = 0; }
   } else if (s.t >= ALLRED) {
-    s.phase = OTHER[s.phase]; s.stage = 'green'; s.t = 0;
-    s.green = planGreen(st, s.phase);
+    s.phase = OTHER[s.phase]; s.t = 0;
+    s.arrow = planArrow(st, s.phase);
+    if (s.arrow) s.stage = 'arrow';
+    else { s.stage = 'green'; s.green = planGreen(st, s.phase); }
   }
 }
 
@@ -515,22 +791,25 @@ function stepSim(st, dt) {
   st.t += dt;
   const t = st.t;
 
+  // Прибытие: машина заранее занимает полосу под свой манёвр (ПДД 8.5), «прямо» — свободнейшую из двух.
   for (const d of DIRS) {
     while (st.nextArr[d] <= t) {
-      st.outside[d].push(st.nextArr[d]);
+      const r = st.rand();
+      const m = r < st.turns.L ? 'L' : r < st.turns.L + st.turns.R ? 'R' : 'S';
+      const load = (i) => st.lanes[d][i].length + st.outside[d][i].length;
+      const lane = m === 'L' ? 0 : m === 'R' ? 2 : load(1) <= load(2) ? 1 : 2;
+      st.outside[d][lane].push({ born: st.nextArr[d], m });
       st.nextArr[d] += arrivalGap(st, d);
     }
-    const lane = st.lanes[d], out = st.outside[d];
-    if (out.length) {
-      const last = lane[lane.length - 1];
+    for (const i of LANES) {
+      const lane = st.lanes[d][i], out = st.outside[d][i];
+      if (!out.length) continue;
+      const last = tail(lane);
       const room = last ? last.s - GEO.carLen : Infinity;
       if (room > 7) {
+        const w = out.shift();
         const v0 = V0 * (0.9 + 0.2 * st.rand());
-        lane.push({
-          id: st.nextId++, s: 0, v: last && room < 60 ? Math.min(v0, last.v) : v0, v0,
-          born: out.shift(), wait: 0, passed: false, go: null, brake: false, acc: 0,
-          paint: Math.floor(st.rand() * 6),
-        });
+        lane.push(makeCar(st, d, i, w.m, w.born, v0, last && room < 60 ? Math.min(v0, last.v) : v0));
       }
     }
   }
@@ -539,42 +818,63 @@ function stepSim(st, dt) {
   updateSignal(st, dt);
 
   for (const d of DIRS) {
-    const lane = st.lanes[d], light = lightFor(st, d);
-    for (let i = 0; i < lane.length; i++) {
-      const c = lane[i], lead = lane[i - 1];
-      let acc = lead
-        ? idmAcc(c.v, c.v0, lead.s - GEO.carLen - c.s, c.v - lead.v)
-        : idmAcc(c.v, c.v0, 1e9, 0);
-      if (!c.passed) {
-        if (light === 'green') c.go = null;
-        else {
-          // На жёлтый решение принимается один раз: успеваю остановиться — стою, нет — проезжаю.
-          if (c.go === null) {
-            const dist = GEO.sStop - c.s;
-            c.go = light === 'yellow' && c.v * c.v / (2 * Math.max(dist, 0.1)) > 3.2;
-          }
-          if (!c.go) acc = Math.min(acc, idmAcc(c.v, c.v0, GEO.sStop - c.s - 1, c.v));
-        }
-      }
-      c.acc = Math.max(acc, -9);
+    for (const i of LANES) {
+      const list = st.lanes[d][i];
+      for (let k = 0; k < list.length; k++) accelA(st, list[k], list[k - 1]);
+      const ol = st.out[d][i];
+      for (let k = 0; k < ol.length; k++) accelC(ol[k], ol[k - 1]);
     }
-    const camStart = GEO.sStop - st.ai.camRange, entries = st.camEntries[d];
-    for (const c of lane) {
+  }
+  for (const key in st.box) {
+    const bl = st.box[key];
+    for (let k = 0; k < bl.length; k++) accelB(st, bl[k], bl[k - 1]);
+  }
+
+  const camStart = GEO.sStop - st.ai.camRange;
+  forEachList(st, (list) => {
+    for (const c of list) {
       c.v = Math.max(0, c.v + c.acc * dt);
       const before = c.s;
       c.s += c.v * dt;
-      if (before < camStart && c.s >= camStart) entries.push(t);
       c.brake = c.acc < -1 || c.v < 0.5;
+      if (c.seg === 'A' && before < camStart && c.s >= camStart) st.camEntries[c.d][c.lane].push(t);
       if (!c.passed) {
         if (c.v < 1) c.wait += dt;
         if (c.s > GEO.sStop) { c.passed = true; st.passes.push(t); }
       }
     }
-    while (lane.length && lane[0].s > GEO.sEnd + GEO.carLen) {
-      const c = lane.shift();
-      st.exits.push({ t, delay: Math.max(0, t - c.born - GEO.sEnd / c.v0) });
+  });
+
+  // Переходы между участками: подъезд → зона манёвров → выезд → за кадр.
+  for (const d of DIRS) {
+    for (const i of LANES) {
+      const list = st.lanes[d][i];
+      while (list.length && list[0].s >= GEO.LA) {
+        const c = list.shift();
+        c.seg = 'B';
+        st.box[c.d + c.lane + c.m].push(c);
+      }
     }
-    while (entries.length && t - entries[0] > 120) entries.shift();
+  }
+  for (const key in st.box) {
+    const bl = st.box[key];
+    while (bl.length && bl[0].s >= GEO.LA + bl[0].LB) {
+      const c = bl.shift();
+      c.seg = 'C';
+      st.out[c.exitH][c.exitLane].push(c);
+    }
+  }
+  for (const d of DIRS) {
+    for (const i of LANES) {
+      const ol = st.out[d][i];
+      while (ol.length && ol[0].s >= ol[0].total + GEO.carLen) {
+        const c = ol.shift();
+        const free = c.total / c.v0 + (c.m === 'S' ? 0 : 4);
+        st.exits.push({ t, delay: Math.max(0, t - c.born - free) });
+      }
+      const en = st.camEntries[d][i];
+      while (en.length && t - en[0] > 120) en.shift();
+    }
   }
 
   while (st.exits.length && t - st.exits[0].t > 300) st.exits.shift();
@@ -589,10 +889,10 @@ function stepSim(st, dt) {
 
 function metrics(st) {
   const t = st.t;
-  const recent = st.exits.filter(e => t - e.t <= 180);
+  const recent = st.exits.filter((e) => t - e.t <= 180);
   const delay = recent.length ? recent.reduce((s, e) => s + e.delay, 0) / recent.length : null;
   const win = Math.min(60, t);
-  const flow = win > 10 ? st.passes.filter(p => t - p <= 60).length * 60 / win : null;
+  const flow = win > 10 ? st.passes.filter((p) => t - p <= 60).length * 60 / win : null;
   const dirs = {};
   let maxLen = 0;
   for (const d of DIRS) {
@@ -607,14 +907,15 @@ function metrics(st) {
 const $ = (id) => document.getElementById(id);
 const DT = 0.1;
 const PRESETS = {
-  rush: { W: 17, E: 12, N: 7, S: 5 },
-  north: { W: 6, E: 5, N: 17, S: 12 },
-  even: { W: 9, E: 9, N: 9, S: 9 },
+  rush: { W: 26, E: 17, N: 9, S: 7 },
+  north: { W: 9, E: 7, N: 26, S: 17 },
+  even: { W: 14, E: 14, N: 14, S: 14 },
 };
 const PAINTS = ['#d9dde1', '#7f8b97', '#c44a3b', '#3566a8', '#dcb850', '#3f7c5c'];
 const LAMP = { red: '#ff4136', yellow: '#ffbf1f', green: '#2fe072', off: '#262b30' };
 const ui = { running: true, speed: 2, hoverX: null };
 const colors = {};
+const fonts = { data: 'monospace', body: 'sans-serif' };
 let sim, S = 600, scale = 1, dpr = 1, logSeen = -1;
 
 function readColors() {
@@ -622,6 +923,8 @@ function readColors() {
   for (const k of ['bg', 'panel', 'fg', 'muted', 'line', 'accent', 'accent-soft', 'go', 'amber', 'stop', 'series', 'ground', 'asphalt', 'marking', 'curb', 'halo']) {
     colors[k] = cs.getPropertyValue('--' + k).trim();
   }
+  fonts.data = cs.getPropertyValue('--font-data').trim() || 'monospace';
+  fonts.body = cs.getPropertyValue('--font-body').trim() || 'sans-serif';
 }
 
 const fmt = (t) => {
@@ -638,9 +941,10 @@ const plural = (n, one, few, many) => {
 
 function readDemand() { return { W: +$('dW').value, E: +$('dE').value, N: +$('dN').value, S: +$('dS').value }; }
 function readFixed() { return { EW: +$('gEW').value, NS: +$('gNS').value }; }
+function readTurns() { return { L: +$('tL').value / 100, R: +$('tR').value / 100 }; }
 
 function newSim(prewarm) {
-  sim = createSim({ seed: 7, demand: readDemand(), fixed: readFixed() });
+  sim = createSim({ seed: 7, demand: readDemand(), fixed: readFixed(), turns: readTurns() });
   sim.ai.barrier = +$('barrier').value;
   for (let i = 0; i < prewarm / DT; i++) stepSim(sim, DT);
   logSeen = -1;
@@ -658,6 +962,8 @@ function syncOutputs() {
   $('ogEW').textContent = $('gEW').value + ' с';
   $('ogNS').textContent = $('gNS').value + ' с';
   $('oBarrier').textContent = $('barrier').value + ' м';
+  $('otL').textContent = $('tL').value + ' %';
+  $('otR').textContent = $('tR').value + ' %';
   const dem = readDemand();
   for (const b of document.querySelectorAll('#presets button')) {
     const p = PRESETS[b.dataset.preset];
@@ -683,7 +989,7 @@ function resizeScene() {
   scale = S / (2 * GEO.R);
 }
 
-// Точка в системе координат подъезда (x вдоль движения от центра, y — вправо от полосы) → пиксели.
+// Точка в системе координат подъезда (x вдоль движения от центра, y — вправо от осевой) → пиксели.
 function scr(a, x, y) {
   return [S / 2 + (a.dx * x - a.dy * y) * scale, S / 2 + (a.dy * x + a.dx * y) * scale];
 }
@@ -694,151 +1000,244 @@ function roundRect(ctx, x, y, w, h, r) {
   else ctx.rect(x, y, w, h);
 }
 
+function forEachArm(ctx, fn) {
+  for (const d of DIRS) {
+    const a = APPROACHES[d];
+    ctx.save();
+    ctx.rotate(Math.atan2(a.dy, a.dx));
+    fn(d);
+    ctx.restore();
+  }
+}
+
 function drawScene() {
-  const ctx = sctx, R = GEO.R, L = GEO.lane, D = GEO.stopD, px = 1 / scale, ai = sim.ai;
+  const ctx = sctx, R = GEO.R, H = GEO.H, B0 = GEO.B0, px = 1 / scale, ai = sim.ai;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = colors.ground;
   ctx.fillRect(0, 0, S, S);
 
   const k = dpr * scale;
   ctx.setTransform(k, 0, 0, k, dpr * S / 2, dpr * S / 2);
-  ctx.fillStyle = colors.curb;
-  ctx.fillRect(-R, -L - 0.9, 2 * R, 2 * L + 1.8);
-  ctx.fillRect(-L - 0.9, -R, 2 * L + 1.8, 2 * R);
+  // Дороги и скруглённые углы перекрёстка.
   ctx.fillStyle = colors.asphalt;
-  ctx.fillRect(-R, -L, 2 * R, 2 * L);
-  ctx.fillRect(-L, -R, 2 * L, 2 * R);
-
-  for (const d of DIRS) {
-    const a = APPROACHES[d], light = lightFor(sim, d);
-    ctx.save();
-    ctx.rotate(Math.atan2(a.dy, a.dx));
-
-    ctx.strokeStyle = colors.marking;
-    ctx.lineWidth = Math.max(0.2, 1.2 * px);
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(-R, 0); ctx.lineTo(-D, 0); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.lineWidth = Math.max(0.5, 2 * px);
-    ctx.beginPath(); ctx.moveTo(-D, 0.2); ctx.lineTo(-D, L - 0.1); ctx.stroke();
-    ctx.fillStyle = colors.marking;
-    ctx.globalAlpha = 0.8;
-    for (let y = -L + 0.45; y < L - 0.4; y += 1.3) ctx.fillRect(-D + 1.2, y, D - L - 2.2, 0.65);
-    ctx.globalAlpha = 1;
-
-    if (ai.on) drawCamera(ctx, d, px);
-    for (const c of sim.lanes[d]) drawCar(ctx, c);
-
-    // Светофорная секция у правого края подъезда.
-    const r = Math.max(0.7, 3.2 * px), hx = -D - 0.3, hy = L + 1.3;
-    ctx.fillStyle = '#111417';
-    roundRect(ctx, hx - 1.4 * r, hy, 2.8 * r, 7.6 * r, r * 0.8); ctx.fill();
-    ['red', 'yellow', 'green'].forEach((name, i) => {
-      ctx.fillStyle = light === name ? LAMP[name] : LAMP.off;
-      ctx.beginPath(); ctx.arc(hx, hy + 1.3 * r + i * 2.5 * r, r, 0, Math.PI * 2); ctx.fill();
-    });
-    ctx.restore();
+  ctx.fillRect(-R, -H, 2 * R, 2 * H);
+  ctx.fillRect(-H, -R, 2 * H, 2 * R);
+  ctx.fillRect(-B0, -B0, 2 * B0, 2 * B0);
+  ctx.fillStyle = colors.ground;
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      ctx.beginPath(); ctx.arc(sx * B0, sy * B0, B0 - H, 0, Math.PI * 2); ctx.fill();
+    }
   }
+
+  forEachArm(ctx, (d) => {
+    drawArmMarkings(ctx, px);
+    if (ai.on) drawCameraZone(ctx, d, px);
+  });
+  forEachList(sim, (list) => { for (const c of list) drawCar(ctx, c); });
+  forEachArm(ctx, (d) => {
+    if (ai.on) drawDetections(ctx, d, px);
+    drawSignal(ctx, d, px);
+  });
+  drawYieldSigns(ctx, px);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   for (const d of DIRS) drawLabels(ctx, d);
 }
 
-function drawCar(ctx, c) {
-  const len = GEO.carLen, w = GEO.carW, x = c.s - GEO.R - len, y = GEO.lane / 2 - w / 2;
-  ctx.fillStyle = PAINTS[c.paint];
-  roundRect(ctx, x, y, len, w, 0.55); ctx.fill();
-  ctx.fillStyle = 'rgba(14, 18, 22, .6)';
-  ctx.fillRect(x + len * 0.56, y + 0.25, len * 0.2, w - 0.5);
-  if (c.brake) {
-    ctx.fillStyle = '#ff3b2f';
-    ctx.fillRect(x - 0.05, y + 0.1, 0.4, 0.5);
-    ctx.fillRect(x - 0.05, y + w - 0.6, 0.4, 0.5);
+function drawArmMarkings(ctx, px) {
+  const R = GEO.R, H = GEO.H, B0 = GEO.B0, D = GEO.stopD, L = GEO.lane;
+  ctx.strokeStyle = colors.marking;
+  ctx.lineWidth = Math.max(0.2, 1.1 * px);
+  // Двойная сплошная по оси (разметка 1.3).
+  ctx.beginPath();
+  for (const y of [-0.35, 0.35]) { ctx.moveTo(-R, y); ctx.lineTo(-D, y); }
+  ctx.stroke();
+  // Между полосами — прерывистая; перед стоп-линией перестраиваться нельзя — сплошная (1.5 и 1.1).
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  for (const y of [L, 2 * L]) { ctx.moveTo(-R, y); ctx.lineTo(-D - 20, y); }
+  for (const y of [-L, -2 * L]) { ctx.moveTo(-R, y); ctx.lineTo(-B0, y); }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  for (const y of [L, 2 * L]) { ctx.moveTo(-D - 20, y); ctx.lineTo(-D, y); }
+  ctx.stroke();
+  // Стоп-линия (1.12) и пешеходный переход (1.14.1).
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(-D, 0.35); ctx.lineTo(-D, H); ctx.stroke();
+  ctx.fillStyle = colors.marking;
+  ctx.globalAlpha = 0.8;
+  for (let y = -H + 0.4; y < H - 0.3; y += 1.3) ctx.fillRect(-B0 + 0.6, y, B0 - H - 1.6, 0.65);
+  ctx.globalAlpha = 1;
+  for (const i of LANES) drawLaneArrow(ctx, -D - 9, laneY(i), i);
+}
+
+// Стрелки направлений на полосах (разметка 1.18): налево; прямо; прямо и направо.
+function drawLaneArrow(ctx, x, y, lane) {
+  ctx.strokeStyle = colors.marking;
+  ctx.fillStyle = colors.marking;
+  ctx.lineWidth = 0.4;
+  const head = (hx, hy, ang) => {
+    ctx.save();
+    ctx.translate(hx, hy); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(0.7, 0); ctx.lineTo(-0.35, -0.6); ctx.lineTo(-0.35, 0.6); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  };
+  ctx.beginPath();
+  if (lane === 0) {
+    ctx.moveTo(x - 3, y); ctx.lineTo(x, y); ctx.lineTo(x, y - 0.8); ctx.stroke();
+    head(x, y - 1.05, -Math.PI / 2);
+    return;
+  }
+  ctx.moveTo(x - 3, y); ctx.lineTo(x + 1.4, y); ctx.stroke();
+  head(x + 1.7, y, 0);
+  if (lane === 2) {
+    ctx.beginPath(); ctx.moveTo(x - 1, y); ctx.lineTo(x - 1, y + 0.8); ctx.stroke();
+    head(x - 1, y + 1.05, Math.PI / 2);
   }
 }
 
-function drawCamera(ctx, d, px) {
-  const ai = sim.ai, cam = sim.cam[d], L = GEO.lane, D = GEO.stopD, range = ai.camRange;
-  const over = cam.len >= ai.barrier || cam.beyond;
+function drawCar(ctx, c) {
+  const len = GEO.carLen, w = GEO.carW, p = pose(c, c.s - len / 2);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(Math.atan2(p.hy, p.hx));
+  ctx.fillStyle = PAINTS[c.paint];
+  roundRect(ctx, -len / 2, -w / 2, len, w, 0.55); ctx.fill();
+  ctx.fillStyle = 'rgba(14, 18, 22, .6)';
+  ctx.fillRect(len * 0.06, -w / 2 + 0.25, len * 0.2, w - 0.5);
+  if (c.brake) {
+    ctx.fillStyle = '#ff3b2f';
+    ctx.fillRect(-len / 2 - 0.05, -w / 2 + 0.1, 0.4, 0.5);
+    ctx.fillRect(-len / 2 - 0.05, w / 2 - 0.6, 0.4, 0.5);
+  }
+  // ПДД 8.1: указатель поворота перед манёвром и во время него.
+  if (c.m !== 'S' && c.seg !== 'C' && GEO.LA - c.s < 60 && Math.floor(sim.t * 2.5) % 2 === 0) {
+    const y = c.m === 'R' ? w / 2 - 0.35 : -w / 2 - 0.05;
+    ctx.fillStyle = '#ffb000';
+    ctx.fillRect(len / 2 - 0.55, y, 0.5, 0.4);
+    ctx.fillRect(-len / 2 + 0.05, y, 0.5, 0.4);
+  }
+  ctx.restore();
+}
 
+function drawSignal(ctx, d, px) {
+  const r = Math.max(0.6, 3 * px), hx = -GEO.stopD - 0.3, hy = GEO.H + 1.2;
+  const main = lightFor(sim, d, 1), arrowOn = lightFor(sim, d, 0) === 'green' && main !== 'green';
+  ctx.fillStyle = '#111417';
+  roundRect(ctx, hx - 1.4 * r, hy, 2.8 * r, 7.6 * r, 0.8 * r); ctx.fill();
+  ['red', 'yellow', 'green'].forEach((name, i) => {
+    ctx.fillStyle = main === name ? LAMP[name] : LAMP.off;
+    ctx.beginPath(); ctx.arc(hx, hy + 1.3 * r + i * 2.5 * r, r, 0, Math.PI * 2); ctx.fill();
+  });
+  // Дополнительная секция со стрелкой налево у умного светофора.
+  if (sim.ai.on || arrowOn) {
+    const ax = hx - 2.7 * r, ay = hy + 6.3 * r;
+    ctx.fillStyle = '#111417';
+    roundRect(ctx, ax - 1.3 * r, ay - 1.3 * r, 2.6 * r, 2.6 * r, 0.6 * r); ctx.fill();
+    ctx.fillStyle = arrowOn ? LAMP.green : LAMP.off;
+    ctx.beginPath(); ctx.moveTo(ax, ay - r); ctx.lineTo(ax - 0.8 * r, ay + 0.6 * r); ctx.lineTo(ax + 0.8 * r, ay + 0.6 * r); ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawCameraZone(ctx, d, px) {
+  const ai = sim.ai, cam = sim.cam[d], H = GEO.H, D = GEO.stopD, range = ai.camRange;
+  const over = cam.len >= ai.barrier || cam.beyond;
   ctx.fillStyle = colors['accent-soft'];
   ctx.beginPath();
-  ctx.moveTo(-D + 4, L + 2.4);
-  ctx.lineTo(-D - range, -0.3);
-  ctx.lineTo(-D - range, L + 0.3);
+  ctx.moveTo(-D + 3, H + 2.6);
+  ctx.lineTo(-D - range, 0.4);
+  ctx.lineTo(-D - range, H);
   ctx.closePath();
   ctx.fill();
-
-  ctx.lineWidth = 1.2 * px;
-  let idx = 0;
-  for (const c of sim.lanes[d]) {
-    if (c.passed) continue;
-    if (GEO.sStop - c.s > range) break;
-    ctx.strokeStyle = idx < cam.q ? colors.amber : colors.accent;
-    ctx.strokeRect(c.s - GEO.R - GEO.carLen - 0.45, L / 2 - GEO.carW / 2 - 0.45, GEO.carLen + 0.9, GEO.carW + 0.9);
-    idx++;
+  // Очередь, измеренная в каждой полосе.
+  ctx.globalAlpha = 0.3;
+  for (const i of LANES) {
+    const m = cam.lanes[i];
+    if (!m.q) continue;
+    ctx.fillStyle = m.len >= ai.barrier || m.beyond ? colors.stop : colors.amber;
+    ctx.fillRect(-D - m.len, i * GEO.lane + 0.3, m.len, GEO.lane - 0.6);
   }
-
-  if (cam.q > 0) {
-    ctx.strokeStyle = over ? colors.stop : colors.amber;
-    ctx.lineWidth = Math.max(0.6, 3 * px);
-    ctx.beginPath(); ctx.moveTo(-D, L + 0.45); ctx.lineTo(-D - cam.len, L + 0.45); ctx.stroke();
-  }
-
+  ctx.globalAlpha = 1;
   const bx = -D - ai.barrier;
   ctx.strokeStyle = over ? colors.stop : colors.accent;
   ctx.lineWidth = Math.max(0.5, (over ? 3 : 2) * px);
   ctx.setLineDash([4 * px, 3 * px]);
-  ctx.beginPath(); ctx.moveTo(bx, -0.4); ctx.lineTo(bx, L + 0.9); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx, 0.4); ctx.lineTo(bx, H + 0.8); ctx.stroke();
   ctx.setLineDash([]);
+}
 
-  // Корпус камеры смотрит навстречу потоку.
-  const cx = -D + 4, cy = L + 2.4, u = Math.max(0.5, 2.2 * px);
+function drawDetections(ctx, d, px) {
+  const ai = sim.ai, cam = sim.cam[d], D = GEO.stopD, H = GEO.H;
+  ctx.lineWidth = 1.1 * px;
+  for (const i of LANES) {
+    let idx = 0;
+    for (const c of sim.lanes[d][i]) {
+      if (c.passed) continue;
+      if (GEO.sStop - c.s > ai.camRange) break;
+      ctx.strokeStyle = idx < cam.lanes[i].q ? colors.amber : colors.accent;
+      ctx.strokeRect(c.s - GEO.R - GEO.carLen - 0.4, laneY(i) - GEO.carW / 2 - 0.4, GEO.carLen + 0.8, GEO.carW + 0.8);
+      idx++;
+    }
+  }
+  // Корпус камеры на углу смотрит навстречу потоку.
+  const cx = -D + 3, cy = H + 2.6, u = Math.max(0.5, 2.2 * px);
   ctx.fillStyle = colors.accent;
   roundRect(ctx, cx - u, cy - 1.3 * u, 3.4 * u, 2.6 * u, 0.6 * u); ctx.fill();
   ctx.beginPath(); ctx.moveTo(cx - u, cy); ctx.lineTo(cx - 2.4 * u, cy - 1.3 * u); ctx.lineTo(cx - 2.4 * u, cy + 1.3 * u); ctx.closePath(); ctx.fill();
 }
 
+// Знак «Уступите дорогу» над машинами, которые пропускают других по ПДД.
+function drawYieldSigns(ctx, px) {
+  const s = Math.max(0.9, 4.5 * px);
+  forEachList(sim, (list) => {
+    for (const c of list) {
+      if (!c.yield) continue;
+      const p = pose(c, c.s - GEO.carLen / 2), y = p.y - 2.4 * s;
+      ctx.beginPath();
+      ctx.moveTo(p.x - s, y - 0.8 * s); ctx.lineTo(p.x + s, y - 0.8 * s); ctx.lineTo(p.x, y + 0.9 * s); ctx.closePath();
+      ctx.fillStyle = '#ffffff'; ctx.fill();
+      ctx.strokeStyle = '#d6332b'; ctx.lineWidth = Math.max(0.25, 1.4 * px); ctx.stroke();
+    }
+  });
+}
+
 function drawLabels(ctx, d) {
-  const a = APPROACHES[d], ai = sim.ai, cam = sim.cam[d], L = GEO.lane, D = GEO.stopD, R = GEO.R;
-  const nx = -a.dy, ny = a.dx; // наружу от полосы, в экранных осях
+  const a = APPROACHES[d], ai = sim.ai, cam = sim.cam[d], H = GEO.H, D = GEO.stopD, R = GEO.R;
+  const nx = -a.dy, ny = a.dx; // наружу от подъезда, в экранных осях
   const align = nx > 0.5 ? 'left' : nx < -0.5 ? 'right' : 'center';
   const base = ny > 0.5 ? 'top' : ny < -0.5 ? 'bottom' : 'middle';
-  const text = (str, x, y, color, weight = 600) => {
-    ctx.font = `${weight} 11px ${getComputedStyle(document.body).getPropertyValue('--font-data') || 'monospace'}`;
+  const text = (str, x, y, color) => {
+    ctx.font = `600 11px ${fonts.data}`;
     ctx.textAlign = align; ctx.textBaseline = base;
     ctx.lineJoin = 'round'; ctx.lineWidth = 3.5; ctx.strokeStyle = colors.halo;
     ctx.strokeText(str, x, y);
     ctx.fillStyle = color; ctx.fillText(str, x, y);
   };
 
-  const [ex, ey] = scr(a, -R + 10, -L - 1.5);
-  const nameAlign = ctx.textAlign;
-  ctx.save();
-  ctx.font = `600 11px ${getComputedStyle(document.body).getPropertyValue('--font-body') || 'sans-serif'}`;
+  const [ex, ey] = scr(a, -R + 10, -H - 1.5);
+  ctx.font = `600 11px ${fonts.body}`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = colors.muted;
-  const lx = clamp(ex - nx * 22, 26, S - 26), ly = clamp(ey - ny * 12, 10, S - 10);
-  ctx.fillText(a.name.toUpperCase(), lx, ly);
-  ctx.restore();
-  ctx.textAlign = nameAlign;
+  ctx.fillText(a.name.toUpperCase(), clamp(ex - nx * 22, 26, S - 26), clamp(ey - ny * 12, 10, S - 10));
 
   if (ai.on) {
     const over = cam.len >= ai.barrier || cam.beyond;
-    const [bx, by] = scr(a, -D - ai.barrier, L + 1.6);
+    const [bx, by] = scr(a, -D - ai.barrier, H + 1.6);
     text(over ? 'порог пройден' : `порог ${ai.barrier} м`, bx + nx * 4, by + ny * 4, over ? colors.stop : colors.accent);
-    if (cam.q >= 3) {
-      const [qx, qy] = scr(a, -D - cam.len, L + 1.6);
-      const label = cam.beyond ? `${cam.q}+ маш · >${ai.camRange} м` : `${cam.q} маш · ${Math.round(cam.len)} м`;
+    if (cam.total >= 3) {
+      const [qx, qy] = scr(a, -D - cam.len, H + 1.6);
+      const label = cam.beyond ? `${cam.total}+ маш · >${ai.camRange} м` : `${cam.total} маш · ${Math.round(cam.len)} м`;
       text(label, qx + nx * 19, qy + ny * 19, over ? colors.stop : colors.amber);
     }
   }
 
-  const out = sim.outside[d].length;
+  const out = sim.outside[d].reduce((s, l) => s + l.length, 0);
   if (out > 0) {
-    const [ox, oy] = scr(a, -R + 6, L / 2);
+    const [ox, oy] = scr(a, -R + 6, laneY(1));
     const label = `+${out} за кадром`;
-    ctx.font = `600 11px ${getComputedStyle(document.body).getPropertyValue('--font-data') || 'monospace'}`;
+    ctx.font = `600 11px ${fonts.data}`;
     const w = ctx.measureText(label).width + 12, h = 18;
     const x = clamp(ox - w / 2, 4, S - w - 4), y = clamp(oy - h / 2, 4, S - h - 4);
     ctx.fillStyle = colors.stop;
@@ -854,7 +1253,7 @@ function buildRows() {
   const tb = $('dirRows');
   for (const d of DIRS) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${APPROACHES[d].name}</td><td class="num" id="q${d}"></td><td class="num" id="w${d}"></td><td><span class="chip" id="c${d}"></span></td>`;
+    tr.innerHTML = `<td>${APPROACHES[d].name}</td><td class="num" id="q${d}"></td><td class="num" id="l${d}"></td><td class="num" id="w${d}"></td><td><span class="chip" id="c${d}"></span></td>`;
     tb.appendChild(tr);
   }
 }
@@ -868,12 +1267,17 @@ function updatePanel() {
   $('kQueue').textContent = Math.round(m.maxLen);
 
   for (const P of ['EW', 'NS']) {
-    const row = $('ph' + P), light = lightFor(sim, PHASE_DIRS[P][0]);
-    row.dataset.light = light;
+    const row = $('ph' + P), light = lightFor(sim, PHASE_DIRS[P][0], 1);
     let txt;
-    if (light === 'green') txt = `зелёный · ещё ${Math.max(0, Math.ceil(sg.green - sg.t))} из ${sg.green} с`;
-    else if (light === 'yellow') txt = 'жёлтый';
-    else txt = ai.on ? `красный · дальше ~${ai.lastGreen[P]} с` : 'красный';
+    if (sg.phase === P && sg.stage === 'arrow') {
+      row.dataset.light = 'green';
+      txt = `стрелка налево · ещё ${Math.max(0, Math.ceil(sg.arrow - sg.t))} с`;
+    } else {
+      row.dataset.light = light;
+      if (light === 'green') txt = `зелёный · ещё ${Math.max(0, Math.ceil(sg.green - sg.t))} из ${sg.green} с`;
+      else if (light === 'yellow') txt = 'жёлтый';
+      else txt = ai.on ? `красный · дальше ~${ai.lastGreen[P]} с` : 'красный';
+    }
     row.querySelector('.ps').textContent = txt;
   }
 
@@ -886,18 +1290,19 @@ function updatePanel() {
     b.textContent = `${ai.lastGreen.EW} с / ${ai.lastGreen.NS} с`;
     note.append(b, ` зелёного. ${pr.length ? 'Приоритет: ' + pr.join(', ') + '.' : 'Приоритета нет, потоки в норме.'}`);
   } else {
-    note.textContent = `Фиксированный цикл: ${sim.fixed.EW} с / ${sim.fixed.NS} с зелёного, очереди не учитываются.`;
+    note.textContent = `Фиксированный цикл: ${sim.fixed.EW} с / ${sim.fixed.NS} с зелёного, без стрелки налево, очереди не учитываются.`;
   }
 
   for (const d of DIRS) {
     const q = m.dirs[d], cam = sim.cam[d];
-    $('q' + d).textContent = q.q ? `${q.q} · ${Math.round(q.len)} м` : '—';
+    $('q' + d).textContent = `←${q.lanes[0].q} ↑${q.lanes[1].q} ↱${q.lanes[2].q}`;
+    $('l' + d).textContent = q.q ? `${Math.round(q.len)} м` : '—';
     $('w' + d).textContent = q.q ? `${Math.round(q.headWait)} с` : '—';
     const chip = $('c' + d);
     let cls, label;
     if (ai.on && (cam.len >= ai.barrier || cam.beyond)) { cls = 'prio'; label = 'приоритет'; }
     else if (q.len >= ai.barrier) { cls = 'stop'; label = 'затор'; }
-    else if (q.q > 3) { cls = 'amber'; label = 'очередь'; }
+    else if (q.q > 4) { cls = 'amber'; label = 'очередь'; }
     else { cls = 'go'; label = 'свободно'; }
     chip.className = 'chip ' + cls;
     chip.textContent = label;
@@ -1046,6 +1451,9 @@ for (const P of ['EW', 'NS']) {
   $('g' + P).addEventListener('input', (e) => { sim.fixed[P] = +e.target.value; syncOutputs(); updatePanel(); });
 }
 $('barrier').addEventListener('input', (e) => { sim.ai.barrier = +e.target.value; syncOutputs(); });
+for (const k of ['L', 'R']) {
+  $('t' + k).addEventListener('input', (e) => { sim.turns[k] = +e.target.value / 100; syncOutputs(); });
+}
 for (const b of document.querySelectorAll('#presets button')) {
   b.addEventListener('click', () => {
     const p = PRESETS[b.dataset.preset];

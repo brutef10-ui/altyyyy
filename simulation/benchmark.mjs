@@ -8,9 +8,9 @@ const E = new Function(`${src}\nreturn { createSim, stepSim, setAI, metrics };`)
 
 const DT = 0.1;
 const SCENARIOS = {
-  'Час пик с запада': { W: 17, E: 12, N: 7, S: 5 },
-  'Час пик с севера': { W: 6, E: 5, N: 17, S: 12 },
-  'Равномерно': { W: 9, E: 9, N: 9, S: 9 },
+  'Час пик с запада': { W: 26, E: 17, N: 9, S: 7 },
+  'Час пик с севера': { W: 9, E: 7, N: 26, S: 17 },
+  'Равномерно': { W: 14, E: 14, N: 14, S: 14 },
 };
 
 function run(demand, aiFrom, minutes, seed) {
