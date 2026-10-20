@@ -1,0 +1,485 @@
+/* AL Studio — тема «Console Chrome» для сайта игрока (см. DESIGN.md).
+   Подключается последней: превращает базовые компоненты в детали игровой приставки —
+   металлические пластины, карбоновые плиты, выпуклые аркадные клавиши. */
+
+/* ---------- Корпус ---------- */
+
+body {
+  font-family: var(--font);
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 3px),
+    radial-gradient(900px 420px at 50% -8%, rgba(255, 255, 255, 0.38), transparent 62%),
+    linear-gradient(180deg, #8e9dcb 0%, var(--canvas) 48%, #6c7cae 100%);
+  background-attachment: fixed;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.muted,
+.view-text {
+  color: var(--chrome);
+}
+
+/* ---------- Логотип-картридж ---------- */
+
+.logo {
+  gap: 12px;
+  font-size: 0;
+}
+
+.logo-mark {
+  width: 74px;
+  height: 61px;
+  fill: none;
+  filter: drop-shadow(0 4px 0 rgba(33, 36, 46, 0.35));
+  animation: cartridge-in 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+.brand-word {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.brand-al {
+  font-family: var(--font-display);
+  font-size: 40px;
+  color: #fff;
+  -webkit-text-stroke: 2px var(--carbon);
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 var(--carbon);
+  letter-spacing: 0.04em;
+}
+
+.brand-studio {
+  margin-top: 6px;
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  color: var(--carbon);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ---------- Пластины ---------- */
+
+.panel {
+  position: relative;
+  border: 2px solid var(--chrome);
+  border-radius: var(--radius);
+  background: var(--plate);
+  box-shadow: var(--plate-edge), 0 5px 0 var(--chrome), 0 14px 28px rgba(33, 36, 46, 0.28);
+  color: var(--text);
+}
+
+.panel::before {
+  /* винты по углам пластины */
+  content: '';
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 4px 4px, rgba(33, 36, 46, 0.45) 1.6px, transparent 2.2px) top left / 8px 8px no-repeat,
+    radial-gradient(circle at 4px 4px, rgba(33, 36, 46, 0.45) 1.6px, transparent 2.2px) top right / 8px 8px no-repeat,
+    radial-gradient(circle at 4px 4px, rgba(33, 36, 46, 0.45) 1.6px, transparent 2.2px) bottom left / 8px 8px no-repeat,
+    radial-gradient(circle at 4px 4px, rgba(33, 36, 46, 0.45) 1.6px, transparent 2.2px) bottom right / 8px 8px no-repeat;
+}
+
+.panel h1 {
+  color: #fff;
+  -webkit-text-stroke: 1.5px var(--carbon);
+  paint-order: stroke fill;
+  text-shadow: 2px 3px 0 var(--carbon);
+  font-size: 30px;
+}
+
+/* ---------- Шаги ---------- */
+
+.steps li {
+  border: 2px solid var(--chrome);
+  border-radius: 4px;
+  background: var(--plate);
+  box-shadow: var(--plate-edge), 0 3px 0 var(--chrome);
+  color: var(--chrome);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12px;
+}
+
+.steps li::before {
+  background: var(--carbon);
+  color: var(--amber);
+  font-family: var(--font-pixel);
+  font-size: 8px;
+}
+
+.steps li.is-active {
+  background: var(--carbon) var(--halftone);
+  border-color: var(--carbon);
+  color: var(--amber);
+  box-shadow: 0 3px 0 #000;
+}
+
+.steps li.is-active::before {
+  background: var(--signal);
+  color: #fff;
+}
+
+.steps li.is-done::before {
+  background: var(--success);
+  color: #fff;
+}
+
+.back-link {
+  border: 2px solid var(--chrome);
+  border-radius: 50%;
+  background: var(--plate);
+  box-shadow: var(--plate-edge), 0 3px 0 var(--chrome);
+  color: var(--carbon);
+  font-weight: 800;
+}
+
+/* ---------- Поля ввода ---------- */
+
+.input {
+  border: 2px solid var(--chrome);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--carbon);
+  box-shadow: inset 0 3px 0 rgba(33, 36, 46, 0.12);
+}
+
+.input::placeholder {
+  color: rgba(61, 79, 151, 0.45);
+}
+
+.input:focus {
+  border-color: var(--signal);
+  box-shadow: inset 0 3px 0 rgba(33, 36, 46, 0.12), 0 0 0 4px rgba(246, 141, 31, 0.35);
+}
+
+.code-input {
+  font-family: var(--font-pixel);
+  font-size: 26px;
+  letter-spacing: 0.12em;
+  background:
+    linear-gradient(180deg, #f6f9ff, #e7eefc);
+}
+
+.form-error {
+  border: 2px solid var(--red);
+  border-radius: var(--radius-sm);
+  background: #fff1f1;
+  color: #a1000c;
+}
+
+.hint-row,
+.text-answer-meta {
+  color: var(--chrome);
+}
+
+/* ---------- Кнопки-клавиши ---------- */
+
+.btn {
+  font-family: var(--font);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius-sm);
+}
+
+.btn-primary {
+  border: 2px solid var(--signal-deep);
+  background: var(--accent-gradient);
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(162, 79, 0, 0.85);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55), 0 5px 0 var(--signal-deep), 0 10px 20px rgba(162, 79, 0, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.4), 0 1px 0 var(--signal-deep);
+}
+
+.btn-ghost {
+  border: 2px solid #000;
+  background: var(--carbon) var(--halftone);
+  color: #fff;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.12), 0 4px 0 #000;
+}
+
+.btn-ghost:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #000;
+}
+
+.btn:disabled {
+  filter: grayscale(0.6);
+}
+
+/* ---------- Выбор фото ---------- */
+
+.camera {
+  border: 6px solid var(--carbon);
+  background: var(--carbon) var(--halftone);
+  box-shadow: 0 0 0 4px var(--periwinkle), 0 0 0 7px var(--chrome), 0 10px 24px rgba(33, 36, 46, 0.35);
+}
+
+.photo-choice {
+  border: 2px solid var(--chrome);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #e6ecfb, #c9d5f1);
+  color: var(--carbon);
+  box-shadow: var(--plate-edge), 0 4px 0 var(--chrome);
+  font-weight: 800;
+}
+
+.photo-choice:active {
+  transform: translateY(3px);
+  box-shadow: var(--plate-edge), 0 1px 0 var(--chrome);
+}
+
+.round-action {
+  color: var(--carbon);
+}
+
+.btn-shutter {
+  border: 3px solid var(--carbon);
+  box-shadow: 0 0 0 5px var(--periwinkle), 0 5px 0 5px var(--chrome);
+}
+
+.shutter-ring {
+  background: radial-gradient(circle at 35% 30%, #ff7a7a, var(--red) 60%);
+}
+
+.avatar {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px var(--carbon);
+}
+
+.avatar-edit-badge {
+  border: 2px solid var(--carbon);
+  background: var(--signal);
+  color: #fff;
+}
+
+/* ---------- Игровой экран ---------- */
+
+.player-bar {
+  background: var(--carbon) var(--halftone);
+  border-bottom: 3px solid #000;
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.06), 0 3px 0 var(--chrome);
+  color: #fff;
+}
+
+.player-bar-name {
+  color: var(--nav-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.player-bar-score {
+  border: 2px solid #000;
+  border-radius: 4px;
+  background: #11131a;
+  color: var(--amber);
+  font-family: var(--font-pixel);
+  font-size: 12px;
+}
+
+.player-bar-score small {
+  color: rgba(236, 171, 55, 0.7);
+  font-family: var(--font);
+}
+
+.reconnect-banner {
+  background: var(--signal) var(--halftone);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pill {
+  border: 2px solid var(--chrome);
+  border-radius: 4px;
+  background: var(--plate);
+  box-shadow: var(--plate-edge), 0 3px 0 var(--chrome);
+  color: var(--carbon);
+  font-weight: 800;
+}
+
+.q-seconds,
+.read-ring-value {
+  font-family: var(--font-pixel);
+}
+
+.q-seconds {
+  border: 3px solid var(--carbon);
+  background: #11131a;
+  color: var(--amber);
+  font-size: 16px;
+}
+
+.timebar {
+  border: 2px solid var(--carbon);
+  background: #11131a;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.timebar-fill {
+  background: repeating-linear-gradient(90deg, var(--amber) 0 10px, #f6c35c 10px 12px);
+  border-radius: 0;
+}
+
+/* Текст вопроса — «ЖК-экран» */
+.q-text {
+  padding: 14px 16px;
+  border: 3px solid var(--carbon);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, #ffffff, #eef2fb);
+  color: var(--carbon);
+  box-shadow: inset 0 3px 0 rgba(33, 36, 46, 0.08), 0 4px 0 var(--chrome);
+}
+
+/* Аркадные клавиши ответа */
+.answer-button {
+  border: 3px solid rgba(0, 0, 0, 0.45);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 42%),
+    var(--tone);
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -5px 0 rgba(0, 0, 0, 0.18),
+    0 7px 0 color-mix(in srgb, var(--tone) 55%, black),
+    0 12px 18px rgba(33, 36, 46, 0.3);
+  font-weight: 800;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.answer-button:active:not(:disabled) {
+  transform: translateY(6px);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.3), 0 1px 0 color-mix(in srgb, var(--tone) 55%, black);
+}
+
+.answer-button.is-chosen {
+  outline: 4px solid #fff;
+  outline-offset: -8px;
+}
+
+.text-answer-input {
+  font-weight: 700;
+}
+
+/* ---------- «Дисплей»: результаты, ожидание, церемония, финал ---------- */
+/* На цветном или тёмном экране текст светлый. */
+
+body[data-mood]:not([data-mood='']) .view-text,
+body[data-mood]:not([data-mood='']) .muted {
+  color: inherit;
+}
+
+body[data-mood='correct'],
+body[data-mood='wrong'],
+body[data-mood='timeout'],
+body[data-mood='ceremony'],
+body[data-mood~='winner'],
+body[data-mood='neutral'] {
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.8);
+  --surface: rgba(255, 255, 255, 0.12);
+  --surface-strong: rgba(255, 255, 255, 0.2);
+  background-image:
+    var(--halftone),
+    radial-gradient(520px 400px at 50% 28%, rgba(255, 255, 255, 0.16), transparent 70%) !important;
+}
+
+body[data-mood='correct'] { background-color: #12773a; }
+body[data-mood='wrong'] { background-color: #a50a17; }
+body[data-mood='timeout'] { background-color: #8a5b08; }
+body[data-mood='ceremony'],
+body[data-mood='neutral'] { background-color: var(--carbon); }
+body[data-mood~='winner'] { background-color: #1a1d33; }
+
+body[data-mood]:not([data-mood='']) .views {
+  /* рамка «экрана» внутри корпуса */
+  box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.25);
+}
+
+body[data-mood]:not([data-mood='']) .pill {
+  border-color: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: none;
+  color: #fff;
+}
+
+body[data-mood]:not([data-mood='']) h1 {
+  color: #fff;
+  -webkit-text-stroke: 1.5px #000;
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 #000;
+}
+
+.result-points,
+.final-rank {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: #fff;
+  -webkit-text-stroke: 2px #000;
+  paint-order: stroke fill;
+  text-shadow: 4px 4px 0 #000;
+}
+
+.result-icon,
+.message-icon {
+  border: 4px solid var(--carbon);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+}
+
+.final-caption {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  color: var(--amber);
+}
+
+.final-podium li {
+  border: 2px solid rgba(0, 0, 0, 0.45);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+}
+
+.toast {
+  border: 2px solid var(--carbon);
+  background: #fff;
+  color: var(--carbon);
+  box-shadow: 0 4px 0 var(--chrome);
+}
+
+/* Экраны без настроения (ожидание, вопрос, «ответ принят») остаются на металле */
+body:not([data-mood]) .view-center h1,
+body[data-mood=''] .view-center h1 {
+  color: #fff;
+  -webkit-text-stroke: 1.5px var(--carbon);
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 var(--carbon);
+}
+
+body[data-mood=''] .view-text {
+  color: var(--chrome);
+}
+
+.spinner {
+  border-color: rgba(33, 36, 46, 0.2);
+  border-top-color: var(--signal);
+}
+
+@keyframes cartridge-in {
+  from { opacity: 0; transform: translateY(-14px) rotate(-6deg) scale(0.9); }
+}

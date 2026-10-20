@@ -16,7 +16,7 @@ function showStatus(message, { retry = false } = {}) {
 function renderEmpty() {
   list.replaceChildren(
     h('div', { class: 'empty card' },
-      h('div', { class: 'empty-art', 'aria-hidden': 'true' }, '✦'),
+      h('div', { class: 'empty-art', 'aria-hidden': 'true' }, document.querySelector('.brand-mark')?.cloneNode(true) ?? '✦'),
       h('h2', { text: 'Пока нет сохранённых игр' }),
       h('p', { class: 'muted', text: 'Создайте свой квиз или начните с демо-викторины, чтобы посмотреть, как всё работает.' }),
       h('div', { class: 'empty-actions' },

@@ -34,11 +34,11 @@ quiz-project/
 │   └── .env.example
 ├── host-site/
 │   ├── index.html  editor.html  lobby.html  game.html  results.html
-│   ├── css/style.css  css/editor.css
+│   ├── css/style.css  css/editor.css  css/console.css
 │   └── js/ config.js api.js session.js socket.js ui.js home.js editor.js lobby.js game.js results.js
 ├── player-site/
 │   ├── index.html  photo.html  name.html  play.html
-│   ├── css/style.css
+│   ├── css/style.css  css/console.css
 │   └── js/ config.js session.js socket.js ui.js join.js camera.js play.js
 └── tools/
     ├── serve.js             # мини-сервер статики без зависимостей
@@ -46,6 +46,7 @@ quiz-project/
     └── single.js            # запуск одним процессом (сервер отдаёт оба сайта)
 
 PROTOCOL.md                  # формат событий и данных между сайтами и сервером
+DESIGN.md                    # дизайн-система «Console Chrome»: цвета, шрифты, компоненты, логотип
 render.yaml                  # (в корне репозитория) деплой на Render одним сервисом
 ```
 
