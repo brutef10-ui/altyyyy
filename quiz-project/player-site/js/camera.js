@@ -9,6 +9,7 @@
 // Любое фото → квадрат из центра 200×200 → JPEG, качество 0.7 (ниже, если больше 95 КБ).
 import { flash, goTo, playerState } from './session.js';
 import { showError, vibrate } from './ui.js';
+import { curtain } from './theatre.js';
 
 const PHOTO_SIZE = 200;
 const JPEG_QUALITY = 0.7;
@@ -361,7 +362,7 @@ continueButton.addEventListener('click', () => {
     return;
   }
   cancelCamera();
-  location.href = 'name.html';
+  curtain.go('name.html');
 });
 
 window.addEventListener('pagehide', () => {

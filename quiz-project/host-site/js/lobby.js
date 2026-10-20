@@ -1,6 +1,7 @@
 // Лобби: код комнаты, игроки в реальном времени, кнопка «Старт».
 import { closeRoom, openHostRoom, request } from './socket.js';
 import { avatar, confirmDialog, formatCode, h, plural, toast } from './ui.js';
+import { curtain } from './theatre.js';
 
 const QR_LIBRARY = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
 
@@ -164,7 +165,7 @@ startButton.addEventListener('click', async () => {
   startButton.textContent = 'Запускаем…';
   try {
     await request(socket, 'host:start');
-    location.href = 'game.html';
+    curtain.go('game.html');
   } catch (error) {
     toast(error.message, 'error');
     starting = false;
@@ -183,7 +184,7 @@ document.getElementById('cancel').addEventListener('click', async () => {
   });
   if (!confirmed) return;
   await closeRoom(socket);
-  location.href = 'index.html';
+  curtain.go('index.html');
 });
 
 // ---------- Подключение ----------

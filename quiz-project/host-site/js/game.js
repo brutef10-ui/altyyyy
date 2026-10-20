@@ -6,6 +6,7 @@
 import { imageUrl } from './api.js';
 import { openHostRoom, request } from './socket.js';
 import { avatar, formatCode, formatScore, h, plural, shapeIcon, toast } from './ui.js';
+import { curtain } from './theatre.js';
 
 const RING_LENGTH = 2 * Math.PI * 54;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -406,7 +407,7 @@ socket.on('question:progress', (progress) => {
 });
 socket.on('results', (results) => renderResults(results));
 socket.on('game:end', () => {
-  location.href = 'results.html';
+  curtain.go('results.html');
 });
 socket.on('lobby:update', (update) => {
   if (update.action === 'leave') players.delete(update.playerId);

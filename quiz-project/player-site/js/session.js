@@ -1,6 +1,7 @@
 // Данные игрока между шагами входа и запросы к REST API сервера.
 // Всё хранится в sessionStorage вкладки: код комнаты, фото, ник, токен для переподключения.
 import { SERVER_URL } from './config.js';
+import { curtain } from './theatre.js';
 
 const STATE_KEY = 'alstudio.player';
 const FLASH_KEY = 'alstudio.player.flash';
@@ -50,7 +51,7 @@ export const flash = {
 
 export function goTo(page, message) {
   if (message) flash.set(message);
-  location.href = page;
+  curtain.go(page);
 }
 
 export class ApiError extends Error {

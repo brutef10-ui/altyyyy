@@ -11,6 +11,7 @@ import { api } from './api.js';
 import { editorDraft, hostSession } from './session.js';
 import { closeRoom, launchGame, openHostRoom, request } from './socket.js';
 import { avatar, confirmDialog, formatScore, h, plural, toast } from './ui.js';
+import { curtain } from './theatre.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -816,7 +817,7 @@ document.getElementById('home').addEventListener('click', async () => {
     if (!confirmed) return;
   }
   await closeRoom(socket);
-  location.href = 'index.html';
+  curtain.go('index.html');
 });
 
 document.getElementById('replay').addEventListener('click', async () => {

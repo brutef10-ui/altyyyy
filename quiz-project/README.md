@@ -34,19 +34,20 @@ quiz-project/
 │   └── .env.example
 ├── host-site/
 │   ├── index.html  editor.html  lobby.html  game.html  results.html
-│   ├── css/style.css  css/editor.css  css/console.css
-│   └── js/ config.js api.js session.js socket.js ui.js home.js editor.js lobby.js game.js results.js
+│   ├── css/theatre.css      # общая основа «Большой театр»: токены, кнопки, занавес
+│   ├── css/home.css  editor.css  lobby.css  game.css  ceremony.css   # стили экранов
+│   └── js/ config.js api.js session.js socket.js ui.js theatre.js home.js editor.js lobby.js game.js results.js
 ├── player-site/
 │   ├── index.html  photo.html  name.html  play.html
-│   ├── css/style.css  css/console.css
-│   └── js/ config.js session.js socket.js ui.js join.js camera.js play.js
+│   ├── css/theatre.css  css/style.css   # общая основа + экраны игрока
+│   └── js/ config.js session.js socket.js ui.js theatre.js join.js camera.js play.js
 └── tools/
     ├── serve.js             # мини-сервер статики без зависимостей
     ├── dev.js               # запуск всех трёх частей одной командой
     └── single.js            # запуск одним процессом (сервер отдаёт оба сайта)
 
 PROTOCOL.md                  # формат событий и данных между сайтами и сервером
-DESIGN.md                    # дизайн-система «Console Chrome»: цвета, шрифты, компоненты, логотип
+DESIGN.md                    # дизайн-система «Большой театр»: цвета, шрифты, мотивы, анимации, логотип
 render.yaml                  # (в корне репозитория) деплой на Render одним сервисом
 ```
 

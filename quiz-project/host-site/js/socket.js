@@ -13,6 +13,7 @@ import { SERVER_URL } from './config.js';
 import { getHostToken } from './api.js';
 import { flash, hostSession, launchRequest } from './session.js';
 import { hideOverlay, showOverlay } from './ui.js';
+import { curtain } from './theatre.js';
 
 const STATE_PAGES = {
   lobby: 'lobby.html',
@@ -93,14 +94,14 @@ export function goHome(message, type = 'info') {
   stop();
   if (message) flash.set(message, type);
   hostSession.clear();
-  location.href = 'index.html';
+  curtain.go('index.html');
 }
 
 /** Запуск игры: лобби создаст новую комнату с новым кодом. */
 export function launchGame({ quizId = null, quiz = null }) {
   launchRequest.set({ quizId, quiz });
   hostSession.clear();
-  location.href = 'lobby.html';
+  curtain.go('lobby.html');
 }
 
 async function attach(socket, allowCreate) {
@@ -205,7 +206,7 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
       attempt = 0;
       const target = pageForState(snapshot.state);
       if (target !== page) {
-        location.replace(target);
+        curtain.go(target, { replace: true });
         return;
       }
       hideOverlay();

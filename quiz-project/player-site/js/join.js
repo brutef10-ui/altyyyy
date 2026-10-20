@@ -2,6 +2,7 @@
 // Шаг 2 (фото) — в camera.js. Данные уходят на сервер одним событием player:join на play.html.
 import { api, flash, goTo, NICKNAME_MAX, nicknameError, normalizeNickname, playerState } from './session.js';
 import { showError } from './ui.js';
+import { curtain } from './theatre.js';
 
 // ---------- Шаг 1: код комнаты ----------
 
@@ -40,7 +41,7 @@ function initCodeStep() {
       // Новая комната — забываем токен прошлой игры, но оставляем фото и ник.
       if (state.code !== code || !state.token) playerState.leaveRoom();
       playerState.patch({ code, title: room.title });
-      location.href = 'photo.html';
+      curtain.go('photo.html');
     } catch (err) {
       showError(error, err.message);
       submit.textContent = 'Войти';
@@ -103,7 +104,7 @@ function initNameStep() {
     try {
       const result = await api(`/api/rooms/${state.code}/nickname`, { method: 'POST', body: { nickname } });
       playerState.patch({ nickname: result.nickname });
-      location.href = 'play.html';
+      curtain.go('play.html');
     } catch (err) {
       if (err.code === 'ROOM_NOT_FOUND' || err.code === 'GAME_STARTED' || err.code === 'ROOM_FULL') {
         playerState.leaveRoom();

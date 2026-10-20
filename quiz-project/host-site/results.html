@@ -3,22 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1a0910">
   <title>AL Studio — награждение</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 46'%3E%3Cpath d='M9 3h31l13 13v24a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4z' fill='#21242e' stroke='#8ba1d4' stroke-width='2.5' stroke-linejoin='round'/%3E%3Cpath d='M13 8.5h22M13 11.8h22' stroke='#60619c' stroke-width='1.6' stroke-linecap='round'/%3E%3Crect x='10' y='15.5' width='34' height='21' rx='2.5' fill='#e60012'/%3E%3Crect x='10' y='15.5' width='34' height='5' rx='2.5' fill='#ff5a5a' opacity='.55'/%3E%3Ctext x='26.5' y='32.4' text-anchor='middle' font-family='Russo One, Arial Black, Arial, sans-serif' font-weight='900' font-size='15' fill='#fff' stroke='#21242e' stroke-width='2.4' paint-order='stroke' letter-spacing='.5'%3EAL%3C/text%3E%3Ccircle cx='45' cy='36' r='7.2' fill='#f68d1f' stroke='#21242e' stroke-width='2.2'/%3E%3Cpath d='M43 32.6v6.8l5.6-3.4z' fill='#fff'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 58'%3E%3Cpath d='M5 56V19Q5 5 19 5h26q14 0 14 14v37z' fill='%23d8ac4c' stroke='%238f6a22' stroke-width='1.6'/%3E%3Cpath d='M11 56V21q0-9 9-9h24q9 0 9 9v35z' fill='%231a0910'/%3E%3Cpath d='M11 21q0-9 9-9h24q9 0 9 9v2q-4 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0Q15 28 11 23z' fill='%238c1529'/%3E%3Cpath d='M11 23.2q4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0' fill='none' stroke='%23f3d98b' stroke-width='1.2'/%3E%3Cpath d='M11 24c9 3 9 18 4.6 32H11z' fill='%23b3243d'/%3E%3Cpath d='M53 24c-9 3-9 18-4.6 32H53z' fill='%23b3243d'/%3E%3Cpath d='M13.4 27c3 5 2.6 14 .6 26M50.6 27c-3 5-2.6 14-.6 26' fill='none' stroke='%235c0c1b' stroke-width='1.1' stroke-linecap='round'/%3E%3Ccircle cx='16.8' cy='40' r='1.9' fill='%23f3d98b' stroke='%238f6a22' stroke-width='.8'/%3E%3Ccircle cx='47.2' cy='40' r='1.9' fill='%23f3d98b' stroke='%238f6a22' stroke-width='.8'/%3E%3Crect x='11' y='51.5' width='42' height='4.5' fill='%236b3f22'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-family='Georgia, serif' font-weight='900' font-size='15.5' fill='%23f3d98b'%3EAL%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;600;700;800;900&family=Russo+One&display=swap">
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/console.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=Playfair+Display:ital,wght@0,700;0,900;1,700&amp;display=swap">
+  <link rel="stylesheet" href="css/theatre.css">
+  <link rel="stylesheet" href="css/ceremony.css">
+  <script type="module" src="js/theatre.js"></script>
   <script type="module" src="js/results.js"></script>
 </head>
 <body class="page-results stage">
+  <div class="curtain" aria-hidden="true"><div class="curtain-drape curtain-left"></div><div class="curtain-drape curtain-right"></div><div class="curtain-valance"></div></div>
   <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
 
   <header class="topbar">
     <span class="brand">
-      <svg class="brand-mark" viewBox="0 0 56 46" aria-hidden="true"><path d="M9 3h31l13 13v24a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4z" fill="#21242e" stroke="#8ba1d4" stroke-width="2.5" stroke-linejoin="round"/><path d="M13 8.5h22M13 11.8h22" stroke="#60619c" stroke-width="1.6" stroke-linecap="round"/><rect x="10" y="15.5" width="34" height="21" rx="2.5" fill="#e60012"/><rect x="10" y="15.5" width="34" height="5" rx="2.5" fill="#ff5a5a" opacity=".55"/><text x="26.5" y="32.4" text-anchor="middle" font-family="Russo One, Arial Black, Arial, sans-serif" font-weight="900" font-size="15" fill="#fff" stroke="#21242e" stroke-width="2.4" paint-order="stroke" letter-spacing=".5">AL</text><circle cx="45" cy="36" r="7.2" fill="#f68d1f" stroke="#21242e" stroke-width="2.2"/><path d="M43 32.6v6.8l5.6-3.4z" fill="#fff"/></svg>
+      <svg class="brand-mark" viewBox="0 0 64 58" aria-hidden="true"><path d="M5 56V19Q5 5 19 5h26q14 0 14 14v37z" fill="#d8ac4c" stroke="#8f6a22" stroke-width="1.6"/><path d="M11 56V21q0-9 9-9h24q9 0 9 9v35z" fill="#1a0910"/><path d="M11 21q0-9 9-9h24q9 0 9 9v2q-4 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0Q15 28 11 23z" fill="#8c1529"/><path d="M11 23.2q4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0" fill="none" stroke="#f3d98b" stroke-width="1.2"/><path d="M11 24c9 3 9 18 4.6 32H11z" fill="#b3243d"/><path d="M53 24c-9 3-9 18-4.6 32H53z" fill="#b3243d"/><path d="M13.4 27c3 5 2.6 14 .6 26M50.6 27c-3 5-2.6 14-.6 26" fill="none" stroke="#5c0c1b" stroke-width="1.1" stroke-linecap="round"/><circle cx="16.8" cy="40" r="1.9" fill="#f3d98b" stroke="#8f6a22" stroke-width=".8"/><circle cx="47.2" cy="40" r="1.9" fill="#f3d98b" stroke="#8f6a22" stroke-width=".8"/><rect x="11" y="51.5" width="42" height="4.5" fill="#6b3f22"/><text x="32" y="47" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-weight="900" font-size="15.5" fill="#f3d98b">AL</text></svg>
       <span class="brand-word"><span class="brand-al">AL</span><span class="brand-studio">Studio</span></span>
     </span>
     <div class="topbar-title" id="quiz-title"></div>
