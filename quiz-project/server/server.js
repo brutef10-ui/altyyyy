@@ -18,6 +18,8 @@ import { createDb } from './src/db/index.js';
 import { migrate } from './src/db/migrate.js';
 import { createIdentity } from './src/identity/index.js';
 import { authRouter } from './src/routes/auth.js';
+import { adminRouter } from './src/admin/routes.js';
+import { AuditLog } from './src/logs/audit.js';
 import { PgQuizStore } from './src/stores/pgQuizStore.js';
 import { PgImageStore } from './src/stores/pgImageStore.js';
 import { LegacyService, importLegacyData } from './src/stores/legacy.js';
@@ -29,7 +31,7 @@ import { MAX_PHOTO_BYTES, QUIZ_LIMITS, quizImageIds, validateNickname, validateR
 const SOCKET_MAX_MESSAGE_BYTES = 256 * 1024;
 
 // Страницы сайта ведущего, которые доступны только после входа (создание и запуск игр, включая демо).
-const HOST_PAGES = new Set(['/', '/index.html', '/editor.html', '/lobby.html', '/game.html', '/results.html']);
+const HOST_PAGES = new Set(['/', '/index.html', '/editor.html', '/lobby.html', '/game.html', '/results.html', '/account.html']);
 
 // Режим SERVE_SITES: оба сайта отдаёт сам сервер, поэтому адрес сервера для них — тот же, что у страницы.
 function mountSites(app, config) {
@@ -80,7 +82,7 @@ function withTimeout(promise, ms) {
   })]).finally(() => clearTimeout(timer));
 }
 
-function createApp({ config, db, identity, legacy, quizService, images, rooms, roomLimiter }) {
+function createApp({ config, db, identity, audit, legacy, quizService, images, rooms, roomLimiter }) {
   const app = express();
   app.disable('x-powered-by');
   // Express узнаёт HTTPS (для Secure-cookie) из X-Forwarded-Proto только от доверенных прокси.
@@ -150,6 +152,9 @@ function createApp({ config, db, identity, legacy, quizService, images, rooms, r
 
   // ---------- Вход и аккаунт ----------
   app.use('/api/auth', anyCors, authRouter({ identity, config }));
+
+  // ---------- Администратор ----------
+  app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config }));
 
   // ---------- Перенос игр, созданных до появления аккаунтов ----------
   // Нужны и сессия (куда переносить), и старый токен браузера в Authorization (откуда).
@@ -283,6 +288,7 @@ export async function startServer(overrides = {}) {
     console.error('[db] перенос старых игр не удался:', error.message);
   }
   const legacy = new LegacyService(db);
+  const audit = new AuditLog(db);
 
   const store = new PgQuizStore(db);
   const images = new PgImageStore(db, { maxBytes: QUIZ_LIMITS.imageMaxBytes });
@@ -311,7 +317,7 @@ export async function startServer(overrides = {}) {
   }, 60 * 60_000);
   maintenance.unref();
 
-  const app = createApp({ config, db, identity, legacy, quizService, images, rooms, roomLimiter });
+  const app = createApp({ config, db, identity, audit, legacy, quizService, images, rooms, roomLimiter });
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: config.allOrigins, methods: ['GET', 'POST'], credentials: true },

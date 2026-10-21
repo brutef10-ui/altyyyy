@@ -11,6 +11,12 @@ export const RULES = Object.freeze({
   loginAccount: { max: 50, windowSec: 60 * 60, blockSec: 60 * 60 },
   registerVisitor: { max: 3, windowSec: 60 * 60, blockSec: 60 * 60 },
   passwordChange: { max: 10, windowSec: 15 * 60, blockSec: 15 * 60 },
+  // Восстановление доступа: с одного IP, для пары «логин + IP» и для логина в целом.
+  recoverIp: { max: 10, windowSec: 15 * 60, blockSec: 30 * 60 },
+  recoverAccountIp: { max: 5, windowSec: 60 * 60, blockSec: 60 * 60 },
+  recoverAccount: { max: 20, windowSec: 60 * 60, blockSec: 60 * 60 },
+  // Изменяющие действия администратора.
+  adminOps: { max: 300, windowSec: 10 * 60, blockSec: 5 * 60 },
 });
 
 export function throttled(seconds) {

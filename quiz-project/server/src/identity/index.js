@@ -7,6 +7,7 @@ import { Throttle } from '../security/throttle.js';
 import { AccountService } from './accounts.js';
 import { ipFromRequest, ipFromSocket } from './clientIp.js';
 import { cookieNames, cookieOptions, readCookies } from './cookies.js';
+import { RecoveryService } from './recovery.js';
 import { SessionService } from './sessions.js';
 import { safeEqual } from './tokens.js';
 import { VISITOR_COOKIE_MAX_AGE_MS, VisitorService } from './visitors.js';
@@ -29,6 +30,7 @@ export function createIdentity({ db, config }) {
   const sessions = new SessionService(db, { idleDays: config.sessionIdleDays, absoluteDays: config.sessionAbsoluteDays });
   const accounts = new AccountService(db, { adminLogin: config.adminLogin });
   const throttle = new Throttle(db);
+  const recovery = new RecoveryService(db, { accounts, sessions, codeTtlMinutes: config.recoveryCodeTtlMinutes });
 
   // CSRF-токен привязан к посетителю: его знает только страница, которой сервер его выдал.
   const csrfToken = (visitorId) => createHmac('sha256', secret).update(`csrf:${visitorId}`).digest('base64url');
@@ -162,6 +164,7 @@ export function createIdentity({ db, config }) {
     sessions,
     accounts,
     throttle,
+    recovery,
     csrfToken,
     setSessionCookie,
     clearSessionCookie,

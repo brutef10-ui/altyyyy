@@ -96,6 +96,8 @@ export function loadConfig(overrides = {}) {
     // Регистрации: не больше N с одного IP в час и не больше M на весь сайт в час (защита от авторегистраций).
     registrationsPerIpPerHour: integer(env.REGISTRATIONS_PER_IP_PER_HOUR, 5, { min: 1, max: 1_000 }),
     registrationsPerHour: integer(env.REGISTRATIONS_PER_HOUR, 300, { min: 1, max: 100_000 }),
+    // Сколько минут действует одноразовый код восстановления, выданный администратором.
+    recoveryCodeTtlMinutes: integer(env.RECOVERY_CODE_TTL_MINUTES, 60, { min: 5, max: 7 * 24 * 60 }),
     // ---------- IP клиента за прокси (docs/ACCOUNTS_PLAN.md, раздел 4) ----------
     // hops: N-й адрес справа в X-Forwarded-For; header: заголовок, который выставляет доверенный прокси.
     clientIpMode: env.CLIENT_IP_MODE === 'header' ? 'header' : 'hops',

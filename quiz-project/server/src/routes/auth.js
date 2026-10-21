@@ -116,6 +116,41 @@ export function authRouter({ identity, config }) {
     res.json({ ok: true });
   });
 
+  // Выйти на всех устройствах (в том числе на этом).
+  router.post('/logout-all', identity.csrf, async (req, res) => {
+    const { account } = req.identity;
+    if (!account) throw unauthorized();
+    await sessions.revokeAll(account.id, 'logout-all');
+    identity.clearSessionCookie(res);
+    res.status(204).end();
+  });
+
+  // Восстановление доступа: логин + резервный код или одноразовый код от администратора + новый пароль.
+  // Все сессии аккаунта отзываются, выдаётся новая сессия и новый резервный код (показывается один раз).
+  router.post('/recover', identity.csrf, async (req, res) => {
+    const input = body(req);
+    const { ip } = req.identity;
+    const login = normalizeLogin(input.login).slice(0, 64);
+    const keys = { ip: `recover:ip:${ip}`, account: `recover:acct:${login}`, pair: `recover:acct-ip:${login}|${ip}` };
+    await throttle.check(keys.ip, keys.pair, keys.account);
+    let result;
+    try {
+      result = await identity.recovery.recover({ login: input.login, code: input.code, newPassword: input.newPassword });
+    } catch (error) {
+      if (error.code === 'BAD_RECOVERY') {
+        const blocked = await Promise.all([
+          throttle.hit(keys.ip, RULES.recoverIp),
+          throttle.hit(keys.pair, RULES.recoverAccountIp),
+          throttle.hit(keys.account, RULES.recoverAccount),
+        ]);
+        if (blocked.some(Boolean)) throw throttled(RULES.recoverAccountIp.blockSec);
+      }
+      throw error;
+    }
+    await startSession(req, res, result.account);
+    res.json({ account: result.account, backupCode: result.backupCode });
+  });
+
   // Новый резервный код (старый перестаёт действовать). Показывается один раз.
   router.post('/backup-code', identity.csrf, async (req, res) => {
     const { account } = req.identity;
