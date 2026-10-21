@@ -1,0 +1,285 @@
+# Аккаунты, админ-консоль, журналы и блокировки — план интеграции
+
+Статус: **этап 1 — план, ждёт подтверждения владельца.** Код ещё не менялся.
+Файл ведётся по ходу работы: после каждого этапа ниже отмечается, что сделано и что проверено,
+чтобы работу можно было продолжить с любого места.
+
+## Журнал этапов
+
+| № | Этап | Статус | Коммит |
+|---|------|--------|--------|
+| 1 | Изучение проекта и Render, план, схема БД | готово, ждёт подтверждения | — |
+| 2 | Аккаунты, сессии, visitor_id, игры в БД | не начат | |
+| 3 | Восстановление доступа, коды от админа | не начат | |
+| 4 | Авторизация в игровой логике и Socket.IO | не начат | |
+| 5 | Журналы, блокировки, аудит | не начат | |
+| 6 | Админ-консоль | не начат | |
+| 7 | Подсказки о шаринге | не начат | |
+| 8 | Деплой на Render: БД, миграции, health check, бэкапы | не начат | |
+| 9 | Проверки безопасности и регрессия | не начат | |
+
+---
+
+## 1. Что есть сейчас (по коду, ветка `claude/interactive-quiz-game-o8s0kx`)
+
+### Структура репозитория
+
+* `quiz-project/` — квиз «AL Studio» (то, что деплоится на Render, `rootDir: quiz-project`).
+  * `server/` — Node 22, ES-модули, **Express 5**, **Socket.IO 4.8**, `cors`, `dotenv`. Тесты — `node --test` (26 тестов: unit, gameplay, integration, sites).
+    * `server.js` — HTTP API, раздача сайтов (`SERVE_SITES=true`), Socket.IO, запуск.
+    * `src/auth.js` — «владелец» игр: **токен устройства** из `localStorage` браузера ведущего (`Authorization: Bearer <64 hex>`, в Socket.IO — `handshake.auth.token`), на сервере хранится SHA-256 → `ownerId = 'device:<hash>'`. Аккаунтов нет.
+    * `src/quizzes.js` — `QuizService` (проверка, права владельца, защита от чужих id) + `JsonQuizStore` (**JSON-файл** `data/quizzes.json`, запись через временный файл).
+    * `src/images.js` — картинки вопросов **файлами на диске** `data/images/`, уборка неиспользуемых.
+    * `src/rooms.js`, `src/players.js`, `src/game.js`, `src/scoring.js`, `src/answers.js` — комнаты и игра **в памяти**: 6-значный код, `hostKey` для возврата ведущего, токен игрока для переподключения, фазы вопроса, очки на сервере, церемония.
+    * `src/sockets.js` — события: `host:create`, `host:resume`, `host:start`, `host:next`, `host:reveal`, `host:kick`, `host:close`, `player:join`, `player:rejoin`, `player:answer`; рассылка `lobby:update`, `game:started`, `question`, `question:progress`, `results`, `game:ceremony`, `game:end`, `room:closed`, `player:kicked`, `error`. Формат — `PROTOCOL.md`.
+    * `src/rateLimit.js` — лимиты в памяти; `src/validate.js` — проверка ника, кода, фото, игры.
+  * `host-site/` — сайт ведущего (главная, редактор, лобби, игра, церемония), чистый JS без сборки.
+  * `player-site/` — сайт игрока (код → фото → ник → игра).
+* В корне репозитория — отдельный проект `al-present` (`server.js`, `public/`, `package.json`). **Не трогаем.**
+
+### Как это работает сейчас
+
+* **Создание комнаты:** ведущий (без входа) запускает сохранённую игру (`quizId`) или черновик из редактора (`quiz`) — событие `host:create`; сервер создаёт комнату в памяти, отдаёт `code` и `hostKey`. Переходы лобби → игра → итоги — разные страницы; новая страница возвращает комнату через `host:resume` (`code` + `hostKey` + токен устройства).
+* **Игрок:** проверка кода и ника по REST (`/api/rooms/:code`, `/api/rooms/:code/nickname`), затем `player:join` с ником и фото; сервер выдаёт токен игрока; после обрыва — `player:rejoin` по токену. Аккаунта у игрока нет.
+* **Очки** считает только сервер (`game.js` + `scoring.js`), таймеры серверные.
+* **Конец игры:** `game:end` → церемония (`host:reveal` раскрывает места по очереди) → комната удаляется через 15 минут после финала или через 6 часов в любом случае.
+* **Где хранятся игры:** JSON-файл на диске сервиса + картинки на диске; владелец — токен устройства. **На Render free диск временный** — сохранённые игры и картинки пропадают при каждом деплое, перезапуске и засыпании сервиса.
+* **IP:** `TRUST_PROXY=true` → `trust proxy = 1`; в Socket.IO своя функция `clientIp` по тому же правилу.
+
+### Конфигурация Render (из `render.yaml`)
+
+* Web Service, `runtime: node`, **`plan: free`**, `rootDir: quiz-project`, `buildCommand: npm install`, `startCommand: npm start`, `healthCheckPath: /health`.
+* Переменные: `SERVE_SITES=true`, `TRUST_PROXY=true`, `NODE_VERSION=22`. Дисков и баз нет.
+* Неизвестно (вопросы владельцу — раздел 12): фактический тариф, есть ли уже БД, свой домен, готовность платить.
+
+### Регрессионные сценарии (проверяются после каждого этапа)
+
+1. `npm test` (сервер) — все тесты зелёные.
+2. Сквозной сценарий в браузере (Playwright): ведущий запускает игру → 2 игрока входят по коду с фото и ником → 7 вопросов (выбор, ввод ответа, фаза чтения, картинка) → церемония → итоговые места.
+3. Переподключение: игрок перезагружает страницу посреди вопроса и возвращается со своими очками; ведущий переходит лобби → игра → итоги без потери комнаты.
+4. Удаление игрока ведущим, закрытие комнаты, ошибки «комната не найдена», «ник занят».
+5. Режим `prefers-reduced-motion`, телефон и проектор — без ошибок в консоли.
+
+---
+
+## 2. Ограничения Render (по документации и странице цен)
+
+| | Free web service | Starter web ($7/мес) |
+|---|---|---|
+| Засыпание | через 15 мин без входящего трафика, просыпается ~1 мин | не засыпает |
+| Файловая система | временная, теряется при деплое, перезапуске и засыпании | временная |
+| Постоянный диск | нельзя | можно, $0.25/ГБ·мес; с диском нет деплоя без простоя и нельзя >1 экземпляра |
+| Часы | 750 бесплатных часов на workspace в месяц | — |
+| WebSocket | поддерживается | поддерживается |
+
+* **Render Postgres Free:** истекает через **30 дней** после создания (+14 дней на переход на платный, затем удаляется вместе с данными), **без бэкапов**, только одна такая БД на аккаунт. Для постоянного хранения не подходит.
+* **Render Postgres Basic-256mb:** $6/мес (+ $0.30/ГБ за расширяемое место), 100 подключений. Восстановление на момент времени (PITR): Hobby workspace — за последние 3 дня, Professional — 7 дней. Логический бэкап можно выгрузить вручную со страницы Recovery. Ежедневные логические бэкапы Render больше не делает.
+* Один экземпляр приложения: комнаты живут в памяти и при перезапуске закрываются (как сейчас — событие `room:closed` с причиной `shutdown`). Аккаунты, игры, сессии, журналы — в БД и переживают перезапуск.
+
+## 3. Хранилище — варианты и рекомендация
+
+| Вариант | Цена | Плюсы | Минусы |
+|---|---|---|---|
+| **A. Free web + Render Postgres Basic-256mb** | **$6/мес** | данные постоянные, PITR 3 дня, всё внутри Render | сайт засыпает через 15 мин простоя |
+| B. Starter web + Render Postgres Basic-256mb | $13/мес | не засыпает, PITR, рост до сотен тысяч пользователей | дороже |
+| C. Free web + внешний бесплатный Postgres (например, Neon) | $0 | бесплатно, данные постоянные | маленький объём, бэкапы и восстановление — у внешнего сервиса, ещё один аккаунт |
+| D. Starter web + диск + SQLite | ~$7.25/мес | дёшево без засыпания | нет деплоя без простоя, рост ограничен, бэкапы диска отдельно |
+
+**Рекомендация: PostgreSQL — вариант A сейчас, B при росте.** Под сотни тысяч пользователей —
+только PostgreSQL. Слой БД пишется через небольшой «репозиторий» поверх `pg` с параметризованными
+запросами; модули аккаунтов, журналов и банов не знают про конкретную СУБД.
+
+Для тестов и локальной разработки — настоящий PostgreSQL 16 (локально или в CI); без БД сервер
+не стартует в режиме аккаунтов (кроме существующих тестов игровой механики, которые не трогают БД).
+
+## 4. IP клиента за прокси Render
+
+* Перед приложением стоят Cloudflare и балансировщик Render. По сообщениям пользователей Render
+  **дописывает** адрес в `X-Forwarded-For`, а не перезаписывает его, — значит, первое значение
+  заголовка клиент может подделать. Брать его нельзя.
+* Официального числа прокси в документации нет (сообщество находит 3). Поэтому:
+  1. Одна функция `clientIp()` для Express и Socket.IO, режим задаётся переменной:
+     `CLIENT_IP_MODE=hops` + `TRUST_PROXY_HOPS=N` (берём N-й адрес **справа** в цепочке) или
+     `CLIENT_IP_MODE=header` + `CLIENT_IP_HEADER=true-client-ip` (заголовок, который выставляет Cloudflare).
+  2. Админский диагностический маршрут `/api/admin/diagnostics/ip` показывает сырую цепочку
+     заголовков и вычисленный IP — по нему значение выставляется и проверяется на реальном деплое
+     (в том числе попыткой подделать `X-Forwarded-For` вручную).
+  3. `secure`-cookie за прокси: Express узнаёт HTTPS из `X-Forwarded-Proto` через тот же `trust proxy`.
+
+## 5. Модель «единой личности»
+
+* **Посетитель (visitor):** при первом запросе к сайту или API — случайный 32-байтный токен в
+  cookie `vid` (HttpOnly, Secure, SameSite=Lax, 1 год). В БД — только SHA-256 токена; внутренний
+  `visitors.id` (UUID) — то, что видит админ (короткий ID — первые 8 символов).
+* **Игрок** — посетитель без входа, как сейчас. Логин не требуется.
+* **Создатель** — посетитель, вошедший в аккаунт. Вход привязывает посетителя к аккаунту
+  (`visitor_accounts`), вся прежняя история посетителя остаётся и показывается в карточке аккаунта
+  как «до регистрации». Связи многие-ко-многим: несколько устройств у аккаунта, несколько аккаунтов
+  на общем компьютере; автоматического склеивания нет.
+* **Админ** — аккаунт с ролью `admin`, которая выдаётся только сервером при старте из переменных
+  окружения (`ADMIN_LOGIN`, `ADMIN_PASSWORD_HASH`). Регистрация никогда не создаёт админа;
+  если логин админа уже занят обычным аккаунтом — сервер не повышает его и пишет ошибку в лог.
+
+## 6. Схема БД (PostgreSQL)
+
+Все внешние ключи — неизменяемые UUID, не логины. Время — `timestamptz`. IP — `inet`.
+
+```
+schema_migrations(version int PK, name text, applied_at timestamptz)
+
+visitors(
+  id uuid PK, token_hash bytea UNIQUE NOT NULL,
+  first_seen_at, last_seen_at timestamptz,
+  last_ip inet, last_user_agent text)
+
+accounts(
+  id uuid PK,
+  login text NOT NULL, login_normalized text UNIQUE NOT NULL,   -- нижний регистр
+  password_hash text NOT NULL,                                    -- argon2id
+  role text NOT NULL DEFAULT 'user' CHECK (role IN ('user','admin')),
+  created_at, password_changed_at, last_login_at timestamptz,
+  backup_code_hash text, backup_code_created_at timestamptz,
+  failed_logins int DEFAULT 0, locked_until timestamptz)          -- защита от перебора на аккаунт
+
+visitor_accounts(visitor_id uuid FK, account_id uuid FK, linked_at timestamptz,
+  PRIMARY KEY (visitor_id, account_id))
+
+sessions(
+  id uuid PK, token_hash bytea UNIQUE NOT NULL,                   -- cookie 'sid', в БД только хэш
+  account_id uuid FK, visitor_id uuid FK,
+  csrf_secret bytea NOT NULL,
+  created_at, last_seen_at, expires_at, revoked_at timestamptz, revoke_reason text,
+  ip inet, user_agent text)
+  INDEX (account_id) WHERE revoked_at IS NULL
+
+quizzes(id uuid PK, account_id uuid FK NOT NULL, title text, data jsonb NOT NULL,
+  created_at, updated_at timestamptz)        INDEX (account_id, updated_at DESC)
+
+images(id text PK, account_id uuid FK, content_type text, bytes bytea, size int, created_at)
+
+legacy_quizzes(...)   -- игры из старого quizzes.json, владелец = хэш токена устройства;
+                      -- переносятся в аккаунт кнопкой «Забрать игры с этого устройства»
+
+recovery_codes(                                                   -- одноразовые коды от админа
+  id uuid PK, account_id uuid FK, code_hash text, created_by uuid FK,
+  created_at, expires_at, used_at, revoked_at timestamptz, attempts int)
+
+events(                                                           -- журнал заходов
+  id bigserial PK, type text,       -- account_login | room_join | room_create | quiz_create | register | ...
+  visitor_id uuid, account_id uuid, account_login text,           -- логин на момент события
+  nickname text, room_code text,
+  ip inet, user_agent text, device text, os text, browser text,
+  created_at timestamptz)
+  INDEX (account_id, created_at), (visitor_id, created_at), (ip, created_at), (created_at)
+
+bans(
+  id uuid PK, account_id uuid NULL, visitor_id uuid NULL, ip inet NULL,
+  reason text NOT NULL, starts_at, ends_at timestamptz NULL,       -- NULL = навсегда
+  created_by uuid FK, created_at,
+  lifted_at timestamptz, lifted_by uuid, lift_reason text)          -- снятие не удаляет запись
+  CHECK (хотя бы одна цель)  INDEX по каждой цели WHERE lifted_at IS NULL
+
+admin_audit(id bigserial, admin_id uuid, action text, target_type text, target_id text,
+  details jsonb, ip inet, created_at)        -- отдельная политика хранения
+
+settings(key text PK, value jsonb, updated_at, updated_by)          -- например, sharing_hints_enabled
+sharing_hidden(account_id uuid PK, hidden_by uuid, hidden_at)       -- «скрыть из списка»
+auth_throttle(key text PK, failures int, window_started_at, blocked_until)  -- лимиты, переживающие перезапуск
+```
+
+Срок хранения (настраивается): журнал заходов — 180 дней, затем обезличивание (IP → /24 или NULL,
+user-agent → только тип устройства и браузер; строки остаются, чтобы не ломать подсчёты и связи);
+аудит админа и история блокировок — 3 года. Очистка — раз в сутки внутри процесса (лёгкий DELETE/UPDATE
+с лимитом), без постоянных тяжёлых задач.
+
+## 7. Безопасность (сервер)
+
+* Пароли: **argon2id** (пакет `argon2`, параметры OWASP: m=19 МиБ, t=2, p=1). Длина 8–128.
+  Одна и та же ошибка «Неверный логин или пароль» и одинаковое время ответа при неизвестном логине
+  (проверка против фиктивного хэша).
+* Сессии: свои, в таблице `sessions` (без MemoryStore). Cookie `sid` HttpOnly, Secure (в проде),
+  SameSite=Lax, путь `/`. Новый токен при входе, регистрации и сбросе пароля; скользящее продление
+  (14 дней простоя, максимум 60 дней); выход — отзыв строки; сброс пароля — отзыв всех сессий аккаунта.
+  Проверка сессии и банов — на каждом защищённом HTTP-запросе и при каждом подключении Socket.IO
+  (cookie читается из handshake), повторная проверка перед игровыми событиями ведущего.
+* CSRF: для всех изменяющих запросов — заголовок `X-CSRF-Token` (HMAC от секрета сессии) + проверка
+  `Origin`; плюс SameSite=Lax.
+* `helmet` с CSP под текущие сайты (свой домен, Google Fonts, jsdelivr для QR, `data:`-картинки, `wss:`).
+* Лимиты: регистрация (по IP и по visitor), вход (по IP и по аккаунту, переживают перезапуск),
+  восстановление, админ-операции; размер тел запросов уже ограничен — сохраняем.
+* Коды: резервный — 20 символов base32 (≈100 бит), код от админа — 12 символов base32 (≈60 бит) +
+  срок 1 час + лимит 5 попыток. В БД только хэши. Ни пароли, ни коды не попадают в логи,
+  ответы API (кроме однократного показа нового кода его получателю), аудит.
+* XSS: весь пользовательский текст выводится через `textContent` (как сейчас во всём проекте).
+* SQL: только параметризованные запросы.
+* Права: роль и владелец берутся только из сессии на сервере; `/admin` и `/api/admin/*` — 403 для
+  не-админа, редирект на вход для гостя; HTML админки сервер отдаёт только после проверки роли.
+
+## 8. Изменения по файлам (план)
+
+Новые (сервер):
+* `server/src/db/index.js` — пул `pg`, транзакции, единый интерфейс запросов.
+* `server/src/db/migrate.js` + `server/migrations/0001_init.sql`, … — нумерованные миграции под advisory lock, только добавляющие изменения.
+* `server/src/identity/visitors.js` — cookie `vid`, учёт посетителей.
+* `server/src/identity/accounts.js` — регистрация, вход, пароли, резервные коды.
+* `server/src/identity/sessions.js` — сессии, CSRF.
+* `server/src/identity/clientIp.js` — IP за прокси (раздел 4).
+* `server/src/security/bans.js`, `server/src/security/throttle.js`, `server/src/security/http.js` (helmet, CSRF, лимиты).
+* `server/src/logs/events.js`, `server/src/logs/audit.js`, `server/src/logs/retention.js`, `server/src/logs/userAgent.js`.
+* `server/src/admin/routes.js`, `server/src/admin/queries.js`, `server/src/admin/sharing.js` (анализ по запросу, только чтение).
+* `server/src/routes/auth.js` — `/api/auth/*` (регистрация, вход, выход, сессия, смена пароля, резервный код, восстановление).
+* `server/src/stores/pgQuizStore.js`, `server/src/stores/pgImageStore.js` — те же методы, что у `JsonQuizStore` и `ImageStore`.
+* `server/scripts/hash-password.js` (хэш пароля админа), `server/scripts/backup.js`, `server/scripts/restore-check.js`.
+
+Изменяемые (сервер): `server.js` (подключение БД, middleware, маршруты, health), `src/config.js`
+(новые переменные), `src/auth.js` (владелец = аккаунт из сессии), `src/sockets.js` (сессия и баны в
+handshake и перед событиями, журнал входа в комнату, отключение забаненных), `src/quizzes.js`
+(хранилище PG вместо JSON — интерфейс тот же), `src/images.js` (хранилище PG), `package.json`.
+
+Клиент (без секретов и проверок прав — только интерфейс):
+* `host-site/login.html` — вход, регистрация, восстановление доступа; показ резервного кода один раз.
+* `host-site/account.html` — смена пароля, новый резервный код, выход.
+* `host-site/js/api.js`, `js/socket.js` — `credentials: 'include'`, CSRF-заголовок; токен устройства
+  остаётся только для одноразового переноса старых игр.
+* `host-site/index.html`, `editor.html` — переход на вход, если нет сессии; имя пользователя в шапке.
+* `player-site` — экран «Вы заблокированы» (причина, срок, контакт), уведомление о сборе данных.
+* `admin/` — консоль (сервер отдаёт только админу), стили — существующий театральный дизайн.
+* Существующие маршруты, события, id элементов и файлы сохраняются; новые события (`access:banned`)
+  только добавляются; `PROTOCOL.md` дополняется.
+
+Зависимости: `pg`, `argon2`, `helmet`, `ua-parser-js@1` (MIT), `geoip-lite` (данные ≈115 МБ на диске;
+загружаются в память только при включённом анализе шаринга).
+
+## 9. Перенос существующих игр
+
+На Render free файл `quizzes.json` и так очищается при каждом деплое, поэтому в проде переносить,
+скорее всего, нечего. Для локальных и любых оставшихся данных: при первом старте с БД сервер
+импортирует `quizzes.json` и картинки в `legacy_quizzes`/`images` (идемпотентно); после входа в браузере,
+где остался старый токен устройства, в «Моих играх» появляется кнопка «Забрать игры с этого устройства» —
+сервер по хэшу токена переносит их в аккаунт. Чужие игры так забрать нельзя: нужен сам токен.
+
+## 10. Подсказки о шаринге
+
+Только чтение и только по запросу админа при включённом переключателе (`settings.sharing_hints_enabled`,
+по умолчанию выкл). SQL с ограничением окна (30 дней), числа аккаунтов (страница) и `statement_timeout`.
+Сигналы и веса — в `config` (раздел задачи 8). GeoIP — локальная база `geoip-lite`, без внешних сервисов.
+Результат: балл, уровень, причины текстом; никаких записей в БД, кроме ручного «скрыть из списка».
+
+## 11. Деплой и бэкапы
+
+* `render.yaml`: БД (`databases:`) + `DATABASE_URL` из `fromDatabase`, секреты — `sync: false`
+  (вводятся в панели Render), `healthCheckPath: /health` (проверяет и БД).
+* Миграции — при старте под `pg_advisory_lock`, в транзакции, только добавляющие; повторный старт безопасен.
+* Бэкапы: PITR Render (на платной БД) + периодический экспорт `pg_dump` во внешнее **приватное**
+  хранилище, зашифрованный (репозиторий публичный — артефакты GitHub Actions для бэкапов не годятся).
+  Восстановление проверяется скриптом: дамп разворачивается во временную БД и сверяются количества строк.
+
+## 12. Вопросы владельцу (нужны ответы до этапа 2)
+
+1. Тариф: сервис сейчас на **Free**? Какой вариант хранилища выбираете — A ($6/мес), B ($13/мес) или C ($0, внешний Postgres)?
+2. Есть ли уже в Render базы данных, диски, свой домен или Cloudflare перед сайтом?
+3. Логин администратора и почта для апелляций (`ADMIN_CONTACT`). Пароль в чат **не присылать** — будет скрипт, который сделает хэш у вас.
+4. Куда складывать внешние бэкапы: Backblaze B2, Cloudflare R2, Google Drive или другое приватное хранилище?
+5. Сроки хранения: журнал заходов 180 дней, аудит и баны 3 года — подходит?
+6. Разрешать ли смену логина? (по умолчанию — нет)
+7. Подтвердите: после изменений запуск любой игры (включая демо) требует входа в аккаунт.
