@@ -1,4 +1,4 @@
-/* AL Studio — «Большой театр». Основа обоих сайтов: токены, база, общие компоненты, занавес.
+/* Luminous — «Большой театр». Основа обоих сайтов: токены, база, общие компоненты, занавес.
    Файл одинаковый на сайте ведущего и игрока (меняйте оба). Стили отдельных экранов — в своих файлах.
    Стилизация иллюстративная: плоские цвета, золотой контур, объём через 3D и слои. См. DESIGN.md. */
 
@@ -202,38 +202,29 @@ img {
   text-decoration: none;
 }
 
+/* Две золотые звезды с гранями и бликами (свет сверху слева). */
 .brand-mark {
   flex: none;
   width: 44px;
-  height: 40px;
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+  height: 44px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 10px rgba(243, 217, 139, 0.3));
   transition: transform var(--t-element) var(--ease-spring);
 }
 
 a.brand:hover .brand-mark {
-  transform: perspective(300px) rotateY(-14deg) scale(1.06);
+  transform: rotate(-10deg) scale(1.08);
 }
 
 .brand-word {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.28em;
   font-family: var(--font-display);
-  font-size: 25px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.brand-al {
-  font-weight: 900;
-  color: var(--gold-light);
-  letter-spacing: 0.02em;
-}
-
-.brand-studio {
+  font-size: 26px;
   font-style: italic;
   font-weight: 700;
-  color: var(--ivory);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--gold-light);
+  text-shadow: 0 0 16px rgba(243, 217, 139, 0.35);
+  white-space: nowrap;
 }
 
 /* ---------- Шапка: ламбрекен над сценой ---------- */
@@ -1459,7 +1450,7 @@ a.brand:hover .brand-mark {
 
   .brand-mark {
     width: 36px;
-    height: 33px;
+    height: 36px;
   }
 
   .brand-word {

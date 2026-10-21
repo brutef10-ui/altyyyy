@@ -22,7 +22,7 @@ try {
     if (!storage) throw new Error('Не задано хранилище бэкапов (GOOGLE_DRIVE_* или BACKUP_DIR), а --file не указан.');
     const [latest] = await storage.list();
     if (!latest) throw new Error('В хранилище нет ни одной копии.');
-    temp = path.join(os.tmpdir(), `alstudio-restore-check-${process.pid}.alsb`);
+    temp = path.join(os.tmpdir(), `luminous-restore-check-${process.pid}.alsb`);
     await storage.download(latest.id, temp);
     file = temp;
     console.log(`Проверяю копию ${latest.name}`);

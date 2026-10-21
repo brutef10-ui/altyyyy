@@ -403,7 +403,7 @@ socket = await openHostRoom({
   page: 'game.html',
   onReady(snapshot) {
     document.getElementById('room-code').textContent = formatCode(snapshot.code);
-    document.title = `AL Studio — ${snapshot.title}`;
+    document.title = `Luminous — ${snapshot.title}`;
     players.clear();
     snapshot.players.forEach((player) => players.set(player.id, player));
     if (snapshot.state === 'question') renderQuestion(snapshot.question);

@@ -160,7 +160,7 @@
 
 ### Структура репозитория
 
-* `quiz-project/` — квиз «AL Studio» (то, что деплоится на Render, `rootDir: quiz-project`).
+* `quiz-project/` — квиз «Luminous» (то, что деплоится на Render, `rootDir: quiz-project`).
   * `server/` — Node 22, ES-модули, **Express 5**, **Socket.IO 4.8**, `cors`, `dotenv`. Тесты — `node --test` (26 тестов: unit, gameplay, integration, sites).
     * `server.js` — HTTP API, раздача сайтов (`SERVE_SITES=true`), Socket.IO, запуск.
     * `src/auth.js` — «владелец» игр: **токен устройства** из `localStorage` браузера ведущего (`Authorization: Bearer <64 hex>`, в Socket.IO — `handshake.auth.token`), на сервере хранится SHA-256 → `ownerId = 'device:<hash>'`. Аккаунтов нет.

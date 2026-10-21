@@ -59,7 +59,7 @@ export async function restoreBackup(db, file, key, { allowNonEmpty = false, log 
  */
 export async function restoreCheck({ url, ssl, file, key, log = console.log }) {
   const schema = `restore_check_${randomBytes(4).toString('hex')}`;
-  const db = createDb({ url, ssl, schema, max: 2, statementTimeoutMs: 120_000, applicationName: 'al-studio-restore-check' });
+  const db = createDb({ url, ssl, schema, max: 2, statementTimeoutMs: 120_000, applicationName: 'luminous-restore-check' });
   const started = Date.now();
   try {
     const restored = await restoreBackup(db, file, key, { log: null });

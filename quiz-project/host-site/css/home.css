@@ -1,4 +1,4 @@
-/* AL Studio — главная ведущего: «Репертуар». Игры висят афишами на стене фойе.
+/* Luminous — главная ведущего: «Репертуар». Игры висят афишами на стене фойе.
    Основа — theatre.css. */
 
 /* Стена фойе: шёлковые обои с золотой решёткой */
@@ -212,7 +212,7 @@
 
 .empty-art .brand-mark {
   width: 128px;
-  height: 116px;
+  height: 128px;
   filter: drop-shadow(0 12px 18px rgba(43, 18, 24, 0.35));
   animation: sway 5s ease-in-out infinite;
 }

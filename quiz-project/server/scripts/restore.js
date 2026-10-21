@@ -27,7 +27,7 @@ try {
     const storage = storageFromConfig(config);
     const [latest] = storage ? await storage.list() : [];
     if (!latest) throw new Error('В хранилище нет копий.');
-    temp = path.join(os.tmpdir(), `alstudio-restore-${process.pid}.alsb`);
+    temp = path.join(os.tmpdir(), `luminous-restore-${process.pid}.alsb`);
     await storage.download(latest.id, temp);
     file = temp;
     console.log(`Восстанавливаю ${latest.name}`);

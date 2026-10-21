@@ -47,7 +47,7 @@ export async function decryptFileStream(file, key) {
   try {
     const head = Buffer.alloc(HEADER);
     await handle.read(head, 0, HEADER, 0);
-    if (!head.subarray(0, 4).equals(MAGIC) || head[4] !== VERSION) throw new Error('Это не файл бэкапа AL Studio.');
+    if (!head.subarray(0, 4).equals(MAGIC) || head[4] !== VERSION) throw new Error('Это не файл бэкапа Luminous.');
     const tag = Buffer.alloc(TAG);
     await handle.read(tag, 0, TAG, size - TAG);
     const decipher = createDecipheriv('aes-256-gcm', key, head.subarray(5, HEADER));

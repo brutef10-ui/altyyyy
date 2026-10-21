@@ -1,8 +1,8 @@
 {
-  "name": "al-studio-server",
+  "name": "luminous-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Сервер квиз-игры «AL Studio»: Express + Socket.IO. Вся игровая логика, таймер и подсчёт очков выполняются здесь.",
+  "description": "Сервер квиз-игры «Luminous»: Express + Socket.IO. Вся игровая логика, таймер и подсчёт очков выполняются здесь.",
   "type": "module",
   "main": "server.js",
   "engines": {

@@ -26,7 +26,7 @@ const jpeg = () => {
 
 before(async () => {
   server = await startTestServer('backup', { trustProxyHops: 1 });
-  dir = await mkdtemp(path.join(os.tmpdir(), 'alstudio-backup-test-'));
+  dir = await mkdtemp(path.join(os.tmpdir(), 'luminous-backup-test-'));
   // Немного живых данных во всех таблицах.
   const host = new Browser(server, { headers: { 'X-Forwarded-For': '203.0.113.5' } });
   await host.register(uniqueLogin('Backup'), 'backup-password-1');
@@ -189,9 +189,9 @@ test('Google Drive: токен, папка, загрузка, список, ск
     const drive = new GoogleDriveStorage({ clientId: 'c', clientSecret: 's', refreshToken: 'refresh-ok', endpoints });
     const file = path.join(dir, 'drive.alsb');
     await createBackup(server.db, file, key);
-    const uploaded = await drive.upload('alstudio-test.alsb', file);
+    const uploaded = await drive.upload('luminous-test.alsb', file);
     assert.equal(uploaded.id, 'file-1');
-    assert.deepEqual((await drive.list()).map((item) => item.name), ['alstudio-test.alsb']);
+    assert.deepEqual((await drive.list()).map((item) => item.name), ['luminous-test.alsb']);
     const copy = path.join(dir, 'drive-copy.alsb');
     await drive.download('file-1', copy);
     assert.ok((await readFile(copy)).equals(await readFile(file)));
@@ -199,6 +199,49 @@ test('Google Drive: токен, папка, загрузка, список, ск
     await drive.remove('file-1');
     assert.deepEqual(await drive.list(), []);
     assert.ok(log.includes('POST /api/files'), 'папка создана');
+  } finally {
+    fake.close();
+  }
+});
+
+test('Google Drive: старая папка «AL Studio backups» переименовывается в «Luminous backups», копии ложатся в неё', async () => {
+  const seen = { renamed: null, parents: null, query: '' };
+  const fake = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = Buffer.concat(chunks).toString();
+    const url = new URL(req.url, 'http://x');
+    const json = (status, data, headers = {}) => {
+      res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
+      res.end(JSON.stringify(data));
+    };
+    if (url.pathname === '/token') return json(200, { access_token: 'access-1', expires_in: 3600 });
+    if (url.pathname === '/api/files' && req.method === 'GET') {
+      seen.query = url.searchParams.get('q');
+      return json(200, { files: [{ id: 'old-1', name: 'AL Studio backups' }] });
+    }
+    if (url.pathname === '/api/files/old-1' && req.method === 'PATCH') {
+      seen.renamed = JSON.parse(body).name;
+      return json(200, { id: 'old-1' });
+    }
+    if (url.pathname === '/upload/files' && req.method === 'POST') {
+      seen.parents = JSON.parse(body).parents;
+      res.writeHead(200, { Location: `http://127.0.0.1:${fake.address().port}/session/1` });
+      return res.end();
+    }
+    if (url.pathname === '/session/1') return json(200, { id: 'file-1', name: 'x.alsb', size: '1' });
+    return json(404, { error: 'unknown' });
+  });
+  await new Promise((resolve) => fake.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${fake.address().port}`;
+  try {
+    const drive = new GoogleDriveStorage({ clientId: 'c', clientSecret: 's', refreshToken: 'r', endpoints: { token: `${base}/token`, api: `${base}/api`, upload: `${base}/upload` } });
+    const file = path.join(dir, 'old-folder.alsb');
+    await writeFile(file, 'x');
+    await drive.upload('luminous-test.alsb', file);
+    assert.match(seen.query, /name='Luminous backups' or name='AL Studio backups'/);
+    assert.equal(seen.renamed, 'Luminous backups');
+    assert.deepEqual(seen.parents, ['old-1']);
   } finally {
     fake.close();
   }

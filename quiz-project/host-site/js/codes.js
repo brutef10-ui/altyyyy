@@ -22,10 +22,10 @@ export async function copyCode(code) {
 }
 
 export function downloadCode(login, code) {
-  const text = `AL Studio — резервный код\nЛогин: ${login}\nКод: ${code}\n\nКод нужен, чтобы восстановить доступ, если вы забудете пароль. Он одноразовый: после восстановления вы получите новый.\nХраните его в надёжном месте.\n`;
+  const text = `Luminous — резервный код\nЛогин: ${login}\nКод: ${code}\n\nКод нужен, чтобы восстановить доступ, если вы забудете пароль. Он одноразовый: после восстановления вы получите новый.\nХраните его в надёжном месте.\n`;
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-  link.download = `al-studio-${login}-backup-code.txt`;
+  link.download = `luminous-${login}-backup-code.txt`;
   link.dataset.curtain = 'off';
   document.body.append(link);
   link.click();

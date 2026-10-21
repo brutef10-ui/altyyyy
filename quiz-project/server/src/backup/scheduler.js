@@ -81,8 +81,8 @@ export class BackupScheduler {
     let locked = false;
     const attemptAt = new Date();
     const previous = await this.status().catch(() => null);
-    const tmp = path.join(os.tmpdir(), `alstudio-backup-${randomBytes(4).toString('hex')}`);
-    const name = `alstudio-${stamp(attemptAt)}.alsb`;
+    const tmp = path.join(os.tmpdir(), `luminous-backup-${randomBytes(4).toString('hex')}`);
+    const name = `luminous-${stamp(attemptAt)}.alsb`;
     const local = `${tmp}.alsb`;
     const check = `${tmp}-check.alsb`;
     try {

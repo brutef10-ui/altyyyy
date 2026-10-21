@@ -1,7 +1,7 @@
 // Общее для тестов: сервер на отдельной схеме PostgreSQL и «браузер» с cookie.
 //
 // Тестам нужна база: TEST_DATABASE_URL (или DATABASE_URL), например
-//   TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/alstudio_test npm test
+//   TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/luminous_test npm test
 // Каждый файл тестов работает в своей схеме, которая удаляется после тестов.
 import { randomBytes } from 'node:crypto';
 import { io as connect } from 'socket.io-client';

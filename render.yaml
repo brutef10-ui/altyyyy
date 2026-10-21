@@ -1,4 +1,4 @@
-# Blueprint для Render: квиз-игра «AL Studio» — один веб-сервис (сервер + оба сайта + админ-консоль)
+# Blueprint для Render: квиз-игра «Luminous» — один веб-сервис (сервер + оба сайта + админ-консоль)
 # и база PostgreSQL. Пошаговая инструкция — quiz-project/docs/DEPLOY.md.
 # Render → New → Blueprint → этот репозиторий и ветка с игрой.
 # После деплоя: игрок — https://<адрес>/, ведущий — https://<адрес>/host/, админ — https://<адрес>/admin/
@@ -7,7 +7,7 @@
 # (репозиторий публичный). SESSION_SECRET Render генерирует сам.
 services:
   - type: web
-    name: al-studio
+    name: luminous
     runtime: node
     plan: starter
     region: frankfurt
@@ -33,7 +33,7 @@ services:
         value: "1"
       - key: DATABASE_URL
         fromDatabase:
-          name: al-studio-db
+          name: luminous-db
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
@@ -53,12 +53,12 @@ services:
         sync: false
 
 databases:
-  - name: al-studio-db
+  - name: luminous-db
     plan: basic-256mb
     region: frankfurt
-    databaseName: alstudio
-    user: alstudio
+    databaseName: luminous
+    user: luminous
     postgresMajorVersion: "16"
     diskSizeGB: 1
-    # Пусто — доступ только из внутренней сети Render (из сервиса al-studio), снаружи — нет.
+    # Пусто — доступ только из внутренней сети Render (из сервиса luminous), снаружи — нет.
     ipAllowList: []

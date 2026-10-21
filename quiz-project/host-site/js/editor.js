@@ -1010,7 +1010,7 @@ async function init() {
     questionsList.replaceChildren(h('li', { class: 'card question-card skeleton' }));
     try {
       quiz = normalize(await api.getQuiz(quizId));
-      document.title = `AL Studio — ${quiz.title}`;
+      document.title = `Luminous — ${quiz.title}`;
     } catch (error) {
       toast(error.message, 'error', 6000);
       quizId = null;

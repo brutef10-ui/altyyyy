@@ -43,7 +43,9 @@ const GOOGLE = {
   api: 'https://www.googleapis.com/drive/v3',
   upload: 'https://www.googleapis.com/upload/drive/v3',
 };
-const FOLDER_NAME = 'AL Studio backups';
+const FOLDER_NAME = 'Luminous backups';
+// Так папка называлась до переименования проекта: найденную старую папку переименовываем, копии остаются вместе.
+const OLD_FOLDER_NAMES = ['AL Studio backups'];
 
 export class GoogleDriveStorage {
   #token = null;
@@ -88,10 +90,19 @@ export class GoogleDriveStorage {
 
   async #folder() {
     if (this.folderId) return this.folderId;
-    const q = `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`;
-    const found = await (await this.#request(`${this.endpoints.api}/files?q=${encodeURIComponent(q)}&fields=files(id,name)`)).json();
-    if (found.files?.length) {
-      this.folderId = found.files[0].id;
+    const names = [FOLDER_NAME, ...OLD_FOLDER_NAMES].map((name) => `name='${name}'`).join(' or ');
+    const q = `mimeType='application/vnd.google-apps.folder' and (${names}) and trashed=false`;
+    const found = (await (await this.#request(`${this.endpoints.api}/files?q=${encodeURIComponent(q)}&fields=files(id,name)`)).json()).files ?? [];
+    const folder = found.find((item) => item.name === FOLDER_NAME) ?? found[0];
+    if (folder) {
+      this.folderId = folder.id;
+      if (folder.name !== FOLDER_NAME) {
+        await this.#request(`${this.endpoints.api}/files/${folder.id}?fields=id`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: FOLDER_NAME }),
+        }).catch(() => {}); // не удалось переименовать — не страшно, копии продолжат ложиться в старую папку
+      }
     } else {
       const created = await (await this.#request(`${this.endpoints.api}/files?fields=id`, {
         method: 'POST',

@@ -19,7 +19,7 @@ function sslOption(mode) {
   return { rejectUnauthorized: false };
 }
 
-export function createDb({ url, ssl, schema, max = 10, statementTimeoutMs = 15_000, applicationName = 'al-studio' }) {
+export function createDb({ url, ssl, schema, max = 10, statementTimeoutMs = 15_000, applicationName = 'luminous' }) {
   if (!url) throw new Error('Не задан DATABASE_URL — адрес базы PostgreSQL (см. .env.example).');
   const options = [];
   if (schema) {

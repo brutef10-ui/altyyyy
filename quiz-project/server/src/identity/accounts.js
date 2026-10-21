@@ -15,7 +15,7 @@ export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
 export const BACKUP_CODE_LENGTH = 20;
 const PRINTABLE_ASCII = /^[\x20-\x7E]+$/;
-const RESERVED = new Set(['admin', 'administrator', 'root', 'support', 'system', 'moderator', 'alstudio', 'al-studio', 'host', 'player']);
+const RESERVED = new Set(['admin', 'administrator', 'root', 'support', 'system', 'moderator', 'luminous', 'alstudio', 'al-studio', 'host', 'player']);
 
 const HASH_OPTIONS = { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 };
 

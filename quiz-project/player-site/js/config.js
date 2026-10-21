@@ -1,6 +1,6 @@
 // Адрес сервера игры.
 //
-// Для продакшена впишите сюда адрес сервера, например 'https://al-studio-server.onrender.com'.
+// Для продакшена впишите сюда адрес сервера, например 'https://luminous-server.onrender.com'.
 // tools/serve.js умеет подставлять его сам из переменной окружения SERVER_URL.
 const PRODUCTION_SERVER_URL = '';
 

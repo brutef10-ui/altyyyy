@@ -1,12 +1,12 @@
-# Деплой AL Studio на Render
+# Деплой Luminous на Render
 
 Один веб-сервис (сервер + сайт игрока `/` + сайт ведущего `/host/` + админ-консоль `/admin/`) и база
 PostgreSQL. Всё описано в `render.yaml` в корне репозитория (Blueprint).
 
 | Что | План Render | Цена в месяц |
 |---|---|---|
-| Веб-сервис `al-studio` | Starter (512 МБ, не засыпает) | $7 |
-| База `al-studio-db` | Postgres Basic-256mb, диск 1 ГБ | $6 + ≈$0,30 за диск |
+| Веб-сервис `luminous` | Starter (512 МБ, не засыпает) | $7 |
+| База `luminous-db` | Postgres Basic-256mb, диск 1 ГБ | $6 + ≈$0,30 за диск |
 | Итого | | ≈ $13,3 |
 
 Секреты (пароль администратора, ключ шифрования бэкапов, доступ к Google Drive) **в репозиторий не
@@ -38,10 +38,12 @@ npm install
 
 ## Шаг 2. Доступ к Google Drive (для бэкапов)
 
-Бэкапы шифруются на сервере и складываются в папку «AL Studio backups» на вашем Google Диске.
+Бэкапы шифруются на сервере и складываются в папку «Luminous backups» на вашем Google Диске.
 Приложение получает доступ **только к файлам, которые создало само** (scope `drive.file`), а не ко всему Диску.
+Если копии уже лежали в папке «AL Studio backups» (старое название проекта), сервер сам переименует её
+в «Luminous backups» при следующей копии — старые и новые копии останутся вместе.
 
-1. Откройте https://console.cloud.google.com → создайте проект (например, «AL Studio backups»).
+1. Откройте https://console.cloud.google.com → создайте проект (например, «Luminous backups»).
 2. «APIs & Services» → «Library» → **Google Drive API** → «Enable».
 3. «OAuth consent screen» (Google Auth Platform):
    * тип пользователей — **External**, название приложения, ваша почта;
@@ -60,7 +62,7 @@ npm install
 ## Шаг 3. Создание сервиса и базы
 
 1. Render → **New → Blueprint** → подключите репозиторий → выберите ветку с игрой.
-2. Render покажет два ресурса: `al-studio` (Web Service, Starter) и `al-studio-db` (Postgres Basic-256mb).
+2. Render покажет два ресурса: `luminous` (Web Service, Starter) и `luminous-db` (Postgres Basic-256mb).
    Регион в `render.yaml` — Frankfurt (ближе к России); при желании поменяйте **до** первого создания.
 3. Заполните переменные с `sync: false`:
 
@@ -87,7 +89,7 @@ npm install
    откройте демо, запустите игру, войдите игроком с телефона по коду.
 4. `https://<адрес>/admin/` → войдите администратором. Должны быть видны аккаунт и гость-игрок,
    строка «Резервные копии…». Нажмите **«Сделать копию сейчас»** → «проверена после загрузки»;
-   в Google Диске появится папка «AL Studio backups» с файлом `alstudio-….alsb`.
+   в Google Диске появится папка «Luminous backups» с файлом `luminous-….alsb`.
 
 ## Шаг 5. Проверка IP за прокси (обязательно)
 
@@ -120,7 +122,7 @@ npm install
    хранит `BACKUP_KEEP` последних): логический дамп всех таблиц в одной транзакции → gzip → AES-256-GCM
    → загрузка → **скачивание обратно и сверка со сводкой** (количество строк и SHA-256 каждой таблицы).
    Состояние видно в админ-консоли. Сессии в копию не входят — после восстановления пользователи входят заново.
-3. **Проверка восстановления** — раз в месяц (и после изменения схемы): Render → `al-studio` → **Shell**,
+3. **Проверка восстановления** — раз в месяц (и после изменения схемы): Render → `luminous` → **Shell**,
    перейдите в папку сервера (`cd quiz-project/server` или `cd server` — смотря где откроется Shell, проверьте `ls`):
    ```bash
    npm run restore-check
@@ -132,7 +134,7 @@ npm install
 **Полное восстановление после аварии** (база потеряна или испорчена):
 
 1. Render → New → PostgreSQL (тот же план и регион) → скопируйте его **Internal Database URL**.
-2. Render → `al-studio` → Shell, в папке сервера:
+2. Render → `luminous` → Shell, в папке сервера:
    ```bash
    DATABASE_URL='<Internal URL новой базы>' npm run restore -- --latest --yes
    ```
@@ -159,7 +161,7 @@ npm install
 
 | Переменная | Откуда |
 |---|---|
-| `DATABASE_URL` | Render, из базы `al-studio-db` |
+| `DATABASE_URL` | Render, из базы `luminous-db` |
 | `SESSION_SECRET` | Render генерирует (`generateValue`) |
 | `ADMIN_LOGIN`, `ADMIN_PASSWORD_HASH` | вы (шаг 3) |
 | `ADMIN_CONTACT` | `render.yaml` (почта поддержки, показывается заблокированным) |

@@ -1,4 +1,4 @@
-// Сервер квиз-игры «AL Studio»: REST API для сохранённых игр + Socket.IO для живой игры.
+// Сервер квиз-игры «Luminous»: REST API для сохранённых игр + Socket.IO для живой игры.
 import http from 'node:http';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
@@ -166,7 +166,7 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
   if (config.serveSites) mountSites(app, config);
   mountAdmin(app, config);
 
-  app.get('/', (req, res) => res.json({ name: 'AL Studio — сервер квиз-игры', status: 'ok' }));
+  app.get('/', (req, res) => res.json({ name: 'Luminous — сервер квиз-игры', status: 'ok' }));
   app.get('/health', async (req, res) => {
     let database = 'ok';
     try {
@@ -497,11 +497,11 @@ if (isMain) {
   try {
     instance = await startServer();
   } catch (error) {
-    console.error(`AL Studio: сервер не запущен. ${error.message}`);
+    console.error(`Luminous: сервер не запущен. ${error.message}`);
     process.exit(1);
   }
   const { config } = instance;
-  console.log(`AL Studio: сервер запущен на порту ${instance.port}`);
+  console.log(`Luminous: сервер запущен на порту ${instance.port}`);
   if (config.serveSites) {
     console.log(`  Сайт ведущего: http://localhost:${instance.port}/host/`);
     console.log(`  Сайт игрока:   http://localhost:${instance.port}/`);

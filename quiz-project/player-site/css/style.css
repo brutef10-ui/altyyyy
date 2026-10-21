@@ -1,4 +1,4 @@
-/* AL Studio — экраны игрока. Основа (токены, кнопки, поля, занавес) — theatre.css.
+/* Luminous — экраны игрока. Основа (токены, кнопки, поля, занавес) — theatre.css.
    Вход — билетная касса: билет, портрет для афиши, имя в программке. Игра — зрительный зал:
    вопрос опускается с колосников, варианты — камни в золотой оправе, итоги — под прожектором.
    Mobile-first: телефон в руке, крупные зоны нажатия. */
@@ -78,7 +78,7 @@ body::after {
 
 .logo .brand-mark {
   width: 98px;
-  height: 89px;
+  height: 98px;
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 22px rgba(243, 217, 139, 0.25));
   animation: logo-rise 900ms var(--ease-spring) 520ms backwards;
 }
@@ -2500,7 +2500,7 @@ body > .toast {
 
   .logo .brand-mark {
     width: 64px;
-    height: 58px;
+    height: 64px;
   }
 
   .logo .brand-word {

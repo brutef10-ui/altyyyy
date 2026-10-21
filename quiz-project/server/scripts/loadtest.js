@@ -2,7 +2,7 @@
 // Нагрузочный тест: имитирует наплыв игроков из одной Wi-Fi сети (у всех один IP, как в классе или зале).
 //
 //   npm run loadtest --prefix server                      # 80 игроков против http://localhost:3000
-//   node scripts/loadtest.js https://al-studio-xxxx.onrender.com 120
+//   node scripts/loadtest.js https://luminous-xxxx.onrender.com 120
 //
 // Комнату создаёт вошедший ведущий: LOADTEST_LOGIN и LOADTEST_PASSWORD — существующий аккаунт,
 // без них тест регистрирует временный (регистраций с одного IP — не больше 5 в час).

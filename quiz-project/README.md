@@ -1,4 +1,4 @@
-# AL Studio — квиз-игра в реальном времени
+# Luminous — квиз-игра в реальном времени
 
 Ведущий выводит вопросы на большой экран, игроки отвечают с телефонов. Проект состоит из трёх независимых частей:
 
@@ -82,13 +82,13 @@ render.yaml                  # (в корне репозитория) депло
 
 ```bash
 # Например, через Docker:
-docker run -d --name alstudio-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
-docker exec alstudio-db createdb -U postgres alstudio
-docker exec alstudio-db createdb -U postgres alstudio_test   # для тестов
+docker run -d --name luminous-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+docker exec luminous-db createdb -U postgres luminous
+docker exec luminous-db createdb -U postgres luminous_test   # для тестов
 
 cd quiz-project/server
 cp .env.example .env
-# в .env:  DATABASE_URL=postgresql://postgres:postgres@localhost:5432/alstudio
+# в .env:  DATABASE_URL=postgresql://postgres:postgres@localhost:5432/luminous
 ```
 
 Администратор задаётся только в `.env` (или в настройках Render): `ADMIN_LOGIN` и `ADMIN_PASSWORD_HASH` —
@@ -208,7 +208,7 @@ PLAYER_SITE_URL=http://192.168.1.5:3000 npm run single
 
 ```bash
 cd quiz-project/server
-TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/alstudio_test npm test
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/luminous_test npm test
                                        # 81 тест: аккаунты и сессии, CSRF, лимиты, восстановление доступа, админ из окружения,
                                        # чужие игры, журналы, блокировки, админ-консоль, подсказки о шаринге, бэкапы,
                                        # безопасность (CSP, инъекции, права на каждом маршруте), полный цикл игры, наплыв игроков

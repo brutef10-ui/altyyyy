@@ -718,7 +718,7 @@ function init(final) {
   const playerCount = final.playerCount ?? final.leaderboard?.length ?? 0;
   document.getElementById('quiz-title').textContent = final.title;
   document.getElementById('player-total').textContent = `${playerCount} ${playersWord(playerCount)}`;
-  document.title = `AL Studio — награждение: ${final.title}`;
+  document.title = `Luminous — награждение: ${final.title}`;
   introTitle.textContent = final.title;
   introMeta.textContent = `${playerCount} ${playersWord(playerCount)} · ${final.totalQuestions} ${questionsWord(final.totalQuestions)}`;
 

@@ -116,7 +116,7 @@ async function init() {
   account = await requireAccount();
   if (!account) return;
   $('account-login').textContent = account.login;
-  document.title = `AL Studio — ${account.login}`;
+  document.title = `Luminous — ${account.login}`;
   if (account.role === 'admin') {
     $('account-note').textContent = 'Это аккаунт администратора: пароль и восстановление доступа задаются в настройках сервера.';
     for (const id of ['password-form', 'backup-card']) {

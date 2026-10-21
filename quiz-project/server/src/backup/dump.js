@@ -25,6 +25,7 @@ export const BACKUP_TABLES = [
   { name: 'sharing_hidden', order: 'account_id' },
 ];
 
+// Идентификатор формата файла, а не название проекта: не меняется, чтобы читались и старые копии.
 export const FORMAT = 'al-studio-backup';
 
 /** Перебрать строки всех таблиц в одной транзакции: onRow(table, jsonText). */
