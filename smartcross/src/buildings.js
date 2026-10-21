@@ -34,6 +34,7 @@ const jit = (c, R, a) => {
 };
 const pick = (R, arr) => arr[Math.floor(R() * arr.length) % arr.length];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
 /* =============================================================================================
  * geometry accumulator (one per material) — writes indexed, world-space triangles directly
@@ -188,6 +189,7 @@ class Inst {
  * procedural textures (CanvasTexture, ≤ 512 px)
  * ============================================================================================= */
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+const ctx2d = (c) => c.getContext('2d', { willReadFrequently: true });
 function finishTex(cv, repeat = true) {
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -212,9 +214,9 @@ function textures() {
   if (TEX) return TEX;
   const R = mulberry32(1234);
   // plaster / concrete
-  const cn = canvas(256, 256); noiseFill(cn.getContext('2d'), 256, R, 236, 30, 10);
+  const cn = canvas(256, 256); noiseFill(ctx2d(cn), 256, R, 236, 30, 10);
   // panel: one panel per repeat; joints on the left (u=0) and bottom (v=0) edges, stain below the window
-  const cp = canvas(256, 256), gp = cp.getContext('2d'); noiseFill(gp, 256, R, 238, 22, 8);
+  const cp = canvas(256, 256), gp = ctx2d(cp); noiseFill(gp, 256, R, 238, 22, 8);
   let gr = gp.createLinearGradient(0, 180, 0, 250);
   gr.addColorStop(0, 'rgba(90,90,90,0.10)'); gr.addColorStop(1, 'rgba(90,90,90,0)');
   gp.fillStyle = gr; gp.fillRect(78, 182, 100, 68);
@@ -222,7 +224,7 @@ function textures() {
   gp.fillStyle = '#7a7a78'; gp.fillRect(0, 0, 3, 256); gp.fillRect(0, 253, 256, 3);
   gp.fillStyle = 'rgba(255,255,255,0.35)'; gp.fillRect(3, 0, 1, 256); gp.fillRect(0, 252, 256, 1);
   // brick: repeat = 1.04 m × 1.0 m (4 bricks × 13 courses)
-  const cb = canvas(256, 256), gb = cb.getContext('2d');
+  const cb = canvas(256, 256), gb = ctx2d(cb);
   gb.fillStyle = '#e6e3de'; gb.fillRect(0, 0, 256, 256);
   const ch = 256 / 13;
   for (let r = 0; r < 13; r++) {
@@ -361,9 +363,6 @@ function windowFrameGeo(W, H, dep, kind) {
     const mx = 0.1, ty = h - 0.48;
     box(A, F, mx - 0.035, mx + 0.035, -h + ft, h - ft, zg, zf, white, FR | LF | RT);
     box(A, F, -w + ft, mx - 0.035, ty - 0.03, ty + 0.03, zg, zf, white, FR | TP | BT);
-    // sash edge lines (thin raised strips) for a double-frame look
-    box(A, F, -w + ft, mx - 0.035, -h + ft, -h + ft + 0.03, zf, zf + 0.012, shade, FR | TP);
-    box(A, F, mx + 0.035, w - ft, -h + ft, -h + ft + 0.03, zf, zf + 0.012, shade, FR | TP);
   } else {
     const m1 = -w / 3, m2 = w / 3, ty = h - 0.55;
     for (const mx of [m1, m2]) box(A, F, mx - 0.035, mx + 0.035, -h + ft, h - ft, zg, zf, white, FR | LF | RT);
@@ -558,6 +557,14 @@ function wall(F, L, zones, ops, revealK = 0.8) {
   }
 }
 
+/**
+ * Hidden shadow core: a closed box inset behind every facade (behind all glass and doors). It makes the
+ * hollow shell cast a solid shadow, so windows/glass/doors don't need to be in the shadow pass.
+ */
+function core(K, B, top, inset = 0.5) {
+  const { w, d } = B;
+  box(K.A.plaster, B.C, -w / 2 + inset, w / 2 - inset, 0.05, top, -d / 2 + inset, d / 2 - inset, [0.3, 0.3, 0.3], FR | BK | LF | RT | TP);
+}
 /* kit-level adders */
 function winA(K, F, ops, u, lo, w, h, frame, R) {
   ops.push({ a: u - w / 2, b: u + w / 2, lo, hi: lo + h, dep: WA.dep });
@@ -608,7 +615,7 @@ function antenna(K, B, x, z, y0, R) {
   for (let k = 0; k < n; k++) {
     const y = y0 + h - 0.15 - k * 0.38, L = 1.5 - k * 0.25;
     box(M, C, x - L / 2, x + L / 2, y - 0.012, y + 0.012, z - 0.012, z + 0.012, col, ALL);
-    for (let j = -2; j <= 2; j++) box(M, C, x + j * L / 5 - 0.008, x + j * L / 5 + 0.008, y - 0.012, y + 0.012, z - 0.28, z + 0.28, col, TP | BT | LF | RT);
+    for (let j = -1; j <= 1; j++) box(M, C, x + j * L / 3.4 - 0.008, x + j * L / 5 + 0.008, y - 0.012, y + 0.012, z - 0.28, z + 0.28, col, TP | BT | LF | RT);
   }
   // tripod base
   box(M, C, x - 0.25, x + 0.25, y0, y0 + 0.06, z - 0.25, z + 0.25, mul(col, 0.8), NOBOT);
@@ -712,6 +719,26 @@ function glazing(K, F, a, b, lo, hi, n, frameCol, R, opt = {}) {
     box(M, F, hx - 0.02, hx + 0.02, lo + 0.75, lo + 1.45, n + fd + 0.06, n + fd + 0.1, lin(0xc9cdd0), ALL);
   }
 }
+/** converted ground-floor shop in a residential block: shopfront, sign, porch with steps (floor at y = base). */
+function groundShop(K, F, R, a, b, base, ops) {
+  const P = K.A.plaster, hi = base + 2.55;
+  ops.push({ a, b, lo: base + 0.05, hi, dep: 0.3 });
+  glazing(K, F, a, b, base + 0.05, hi, -0.25, lin(pick(R, [0x2e3236, 0x7d858c, 0x5b4636])), R, { step: 1.4, transom: base + 2.15, door: true });
+  const uc = (a + b) / 2, sw = Math.min(b - a, 7);
+  sign(K, F, uc, hi + 0.2, sw, 0.62, 0.02, (R() * SHOP_SIGNS) | 0, lin(0x2a2c2e));
+  const pc = lin(0xa9a59c);
+  box(P, F, uc - 1.6, uc + 1.6, 0, base, 0, 1.6, pc, NOBOT & ~BK);
+  const st = Math.max(1, Math.round(base / 0.17)), sh = base / st;
+  for (let k = 0; k < st - 1; k++) box(P, F, uc - 1.2, uc + 1.2, 0, base - (k + 1) * sh, 1.6, 1.6 + (st - 1 - k) * 0.3, mul(pc, 0.96), NOBOT & ~BK);
+  // thin steel railing along both sides of the landing
+  const rc = lin(0x2c2f33);
+  for (const s of [-1, 1]) {
+    const x = uc + s * 1.52;
+    box(K.A.metal, F, x - 0.025, x + 0.025, base + 0.9, base + 0.95, 0.1, 1.55, rc, ALL & ~BK);
+    for (const n of [0.15, 0.85, 1.5]) box(K.A.metal, F, x - 0.02, x + 0.02, base, base + 0.9, n - 0.02, n + 0.02, rc, FR | BK | LF | RT);
+  }
+  if (R() < 0.5) awning(K, F, a, b, hi + 0.12, 1.1, 0.45, jit(lin(pick(R, AWNING_PAL)), R, 0.05));
+}
 /** shop sign: box with an atlas face on its front. */
 function sign(K, F, uc, y0, sw, sh, n, idx, backCol) {
   const M = K.A.metal, S = K.A.sign, depth = 0.16;
@@ -759,6 +786,21 @@ function genPanel(K, B, R) {
   {
     const F = B.front, ops = [];
     for (let i = 0; i < ncol; i++) stackCol[i] = R() < 0.55 ? lin(0xf3f1ec) : jit(lin(pick(R, BALC_PAL)), R, 0.05);
+    // Bishkek: ground-floor flats converted into shops on the street side
+    const shops = [];
+    if (ncol >= 6 && R() < 0.45) {
+      // only under columns without balconies (signs and awnings must stay visible)
+      const free = (s, n) => { for (let i = s; i < s + n; i++) if (i <= 0 || i >= ncol - 1 || bpat(i)) return false; return true; };
+      const cand = [];
+      for (let s = 1; s < ncol - 2; s++) if (free(s, 2)) cand.push(s);
+      if (cand.length) {
+        const i0 = pick(R, cand); shops.push([i0, 2]);
+        const far = cand.filter((s) => s > i0 + 4 || s < i0 - 4);
+        if (far.length && ncol >= 14 && R() < 0.5) shops.push([pick(R, far), 2]);
+      }
+    }
+    const inShop = (i) => shops.some(([s, n]) => i >= s && i < s + n);
+    for (const [s, n] of shops) groundShop(K, F, R, s * bay + 0.3, (s + n) * bay - 0.3, base, ops);
     for (let f = 0; f < floors; f++) {
       const yF = base + f * fh;
       for (let i = 0; i < ncol; i++) {
@@ -776,6 +818,7 @@ function genPanel(K, B, R) {
             if (f === floors - 1 || !hasBal(i, f + 1)) box(K.A.metal, F, uc - bw / 2 - 0.06, uc + bw / 2 + 0.06, yF - 0.16 + 2.98, yF - 0.16 + 3.05, 0, 1.3, lin(pick(R, [0x8a8d90, 0x9b5a3c, 0x6f8a6a, 0xa0a4a8])), ALL);
           }
         }
+        if (f === 0 && inShop(i)) continue;
         if (!glazed) winA(K, F, ops, uc, yF + 0.85, ww, 1.5, fcol(), R);
         if (!hasBal(i, f) && !hasBal(i + 1, f) && i < ncol - 1 && bay - ww > 1.35 && R() < 0.09)
           K.I.ac.add(F, uc + ww / 2 + 0.58, yF + 0.95, 0, 1, 1, 1, jit([0.95, 0.95, 0.93], R, 0.05));
@@ -825,6 +868,7 @@ function genPanel(K, B, R) {
   }
   // ---- roof
   flatRoof(K, B, H, ph, mul(wallCol, 0.85), lin(0x55575a), lin(0x9a9b98));
+  core(K, B, H - 0.05);
   const rcol = mul(wallCol, 0.95);
   for (const i of stairs) {
     const x = w / 2 - (i + 0.5) * bay;
@@ -858,10 +902,17 @@ function genBrick(K, B, R) {
   // front
   {
     const F = B.front, ops = [];
+    let shop = null;
+    if (ncol >= 6 && R() < 0.35) {
+      const cand = [];
+      for (let s = 1; s < ncol - 2; s++) if (!bpat(s) && !bpat(s + 1)) cand.push(s);
+      if (cand.length) { const i0 = pick(R, cand); shop = [i0, 2]; groundShop(K, F, R, i0 * bay + 0.3, (i0 + 2) * bay - 0.3, base, ops); }
+    }
     for (let f = 0; f < floors; f++) {
       const yF = base + f * fh;
       for (let i = 0; i < ncol; i++) {
         const uc = (i + 0.5) * bay;
+        if (f === 0 && shop && i >= shop[0] && i < shop[0] + 2) continue;
         let glazed = false;
         if (hasBal(i, f)) {
           if (R() < 0.4) {
@@ -921,6 +972,7 @@ function genBrick(K, B, R) {
   // cornice band (corbelled brick)
   const cc = mul(brickCol, 0.92);
   const top = H + ph;
+  core(K, B, H - 0.05);
   for (const [F, L] of B.sides) {
     box(BR, F, 0, L + 0.18, top - 0.45, top - 0.3, 0, 0.1, cc, FR | TP | BT | RT, 1.04, 1.0);
     box(BR, F, 0, L + 0.22, top - 0.3, top - 0.15, 0, 0.18, cc, FR | TP | BT | RT, 1.04, 1.0);
@@ -949,7 +1001,7 @@ function genBrick(K, B, R) {
 function genOffice(K, B, R) {
   const { w, d } = B, floors = B.floors, lobby = 4.5, fh = 3.3, H = lobby + (floors - 1) * fh, crown = 1.3;
   const variant = pick(R, ['grid', 'fins', 'bands']);
-  const gl = lin(pick(R, OFFICE_GLASS)), glass = mul(gl, 1.6);
+  const gl = lin(pick(R, OFFICE_GLASS)), glass = mix(mul(gl, 1.5), [0.5, 0.62, 0.8], 0.35);
   const mullCol = jit(lin(pick(R, [0xb9bec2, 0x3a3f44, 0xd5d7d6, 0x8c939a])), R, 0.03);
   const stone = jit(lin(pick(R, [0xe6e1d6, 0xcfc9bd, 0xd9d6cf, 0x9fa3a6])), R, 0.03);
   const spand = variant === 'bands' ? stone : mul(gl, 0.7);
@@ -967,7 +1019,8 @@ function genOffice(K, B, R) {
       if (variant === 'bands') {
         box(P, F, 0, L + 0.12, y0, y0 + sp, 0, 0.12, stone, FR | TP | BT | RT);
       } else face(M, F, 0, 0, 0, L, y0, y0 + sp, spand);
-      for (let k = 0; k < nb; k++) face(G, F, 0, variant === 'bands' ? -0.15 : 0, k * bw, (k + 1) * bw, y0 + sp, y0 + fh, jit(glass, R, 0.14));
+      const gk = 0.72 + 0.55 * (y0 / H), fk = 0.92 + R() * 0.16;
+      for (let k = 0; k < nb; k++) face(G, F, 0, variant === 'bands' ? -0.15 : 0, k * bw, (k + 1) * bw, y0 + sp, y0 + fh, jit(mul(glass, gk * fk), R, 0.12));
       if (variant === 'bands') {
         // reveal of the ribbon window (top/bottom), mullions
         face(P, F, 4, y0 + sp, 0, L, -0.15, 0, mul(stone, 0.8));
@@ -1007,6 +1060,7 @@ function genOffice(K, B, R) {
     box(M, F, 0, L + 0.08, H - 0.1, H, 0, 0.08, mullCol, FR | TP | BT | RT);
   }
   flatRoof(K, B, H, crown, lin(0x9a9c9c), lin(0x5f6164), lin(0xa9abab), 0.25);
+  core(K, B, H - 0.05, 0.6);
   // entrance canopy + sign on the main facade
   {
     const F = B.front, uc = w / 2, cw = Math.min(9, w * 0.4);
@@ -1089,6 +1143,7 @@ function genShop(K, B, R) {
     wall(F, L, [Z(P, 0, gh, gfCol, 3, 3), Z(P, gh, H + ph, wallCol, 4, 4)], ops);
   }
   flatRoof(K, B, H, ph, mul(wallCol, 0.85), lin(0x5b5c5e), lin(0x9b9c9a));
+  core(K, B, H - 0.05);
   const RF = B.C;
   const na = 1 + (R() * 3 | 0);
   for (let k = 0; k < na; k++) K.I.ac.add(RF, (R() - 0.5) * (w - 4), H + 0.1, -d / 2 + 2 + R() * (d - 5), 1, 1, 1, [0.95, 0.95, 0.93]);
@@ -1139,6 +1194,7 @@ function genCampus(K, B, R) {
     box(P, F, 0, L + 0.08, base - 0.08, base, 0, 0.08, lin(0x9c968a), FR | TP | RT);
   }
   flatRoof(K, B, H + ph - 0.01, 0.01, mul(wallCol, 0.9), lin(0x5d5f61), lin(0xa0a19e), 0.4);
+  core(K, B, H + ph - 0.06, 0.6);
   // portico with columns
   {
     const F = B.front, uc = w / 2, pd = 5.2, ch = 2 * fh, top = base + ch;
@@ -1226,6 +1282,7 @@ function genHouse(K, B, R) {
   const gable = R() < 0.45, ov = 0.5, pitch = (24 + R() * 9) * Math.PI / 180, tp = Math.tan(pitch);
   const ye = Hw + 0.13 - ov * tp;
   face(P, B.C, 4, Hw, -w / 2, w / 2, -d / 2, d / 2, lin(0x6a6a68), 6, 6);
+  core(K, B, Hw - 0.05, 0.4);
   const r = pitchedRoof(K, B, -w / 2 - ov, w / 2 + ov, -d / 2 - ov, d / 2 + ov, ye, pitch, roofCol, lin(0xe9e4d8), gable, ov, P, wallCol);
   // chimney
   {
@@ -1282,8 +1339,8 @@ export function createBuildingKit() {
         if (!A.v) continue;
         const m = new THREE.Mesh(A.geometry(), accMat[k]);
         m.name = 'bld-' + k;
-        // building glass is opaque (it closes the hollow shell), so it casts shadows too; signs do not
-        m.castShadow = k !== 'sign'; m.receiveShadow = true;
+        // the hidden shadow core closes the shells, so glass and signs only receive shadows
+        m.castShadow = k !== 'sign' && k !== 'glass'; m.receiveShadow = true;
         m.matrixAutoUpdate = false; m.updateMatrix();
         group.add(m);
       }
@@ -1295,7 +1352,8 @@ export function createBuildingKit() {
         im.instanceMatrix = new THREE.InstancedBufferAttribute(I.m.slice(0, I.n * 16), 16);
         im.instanceColor = new THREE.InstancedBufferAttribute(I.c.slice(0, I.n * 3), 3);
         im.name = 'bld-' + k;
-        im.castShadow = true; im.receiveShadow = true;
+        // only parts that project from the facade cast shadows (cheaper shadow pass); flush parts receive only
+        im.castShadow = k === 'balc' || k === 'rail' || k === 'ac'; im.receiveShadow = true;
         im.matrixAutoUpdate = false;
         im.computeBoundingSphere();
         group.add(im);
@@ -1336,9 +1394,11 @@ export function demo() {
   return kit.finish();
 }
 
-/** Stress test (preview only): ~250 buildings laid out like the integrator's city; logs timing. */
-export function demoStress() {
+/** Stress test (preview only): the integrator's city layout (~400 buildings, or `limit` with 60 houses); logs timing. */
+export function demoStress(limit = 0) {
   const R0 = mulberry32(99), Rr = (a, b) => a + (b - a) * R0(), RI = (a, b) => Math.floor(Rr(a, b + 1)), pk = (a) => a[Math.floor(R0() * a.length)];
+  const tm = performance.now();
+  materials(); geos();
   const t0 = performance.now();
   const kit = createBuildingKit();
   const xInt = [[-520, -312], [-288, -12], [12, 168], [192, 378], [422, 640]];
@@ -1352,7 +1412,8 @@ export function demoStress() {
     tallpanel: () => ({ style: 'panel', w: Rr(30, 44), d: Rr(14, 16), floors: RI(12, 14) }),
   };
   const zoneStyle = { center: ['shop', 'shop', 'panel', 'panel', 'office', 'brick'], residential: ['panel', 'panel', 'brick', 'brick', 'tallpanel'], business: ['office', 'office', 'office', 'tallpanel', 'panel'] };
-  const add = (b) => { kit.add({ ...b, seed: seed++ }); n++; };
+  const list = [];
+  const add = (b) => { list.push({ ...b, seed: seed++ }); };
   for (const [x0, x1] of xInt) for (const [z0, z1] of zInt) {
     if (x0 === -288 && z0 === 192) continue;
     if (x0 === -520) {
@@ -1386,6 +1447,13 @@ export function demoStress() {
   add({ style: 'campus', x: -250, z: 386, w: 52, d: 20, floors: 3, rotY: Math.PI });
   add({ style: 'panel', x: -130, z: 398, w: 56, d: 13, floors: 5, rotY: Math.PI });
   add({ style: 'campus', x: -40, z: 392, w: 40, d: 20, floors: 4, rotY: Math.PI });
+  let sel = list;
+  if (limit) {
+    const houses = list.filter((b) => b.style === 'house').slice(0, 60);
+    const others = list.filter((b) => b.style !== 'house').reverse().slice(0, limit - houses.length);
+    sel = houses.concat(others);
+  }
+  for (const b of sel) { kit.add(b); n++; }
   const t1 = performance.now();
   const g = kit.finish();
   const t2 = performance.now();
@@ -1396,6 +1464,9 @@ export function demoStress() {
     tris += o.isInstancedMesh ? t * o.count : t;
     if (o.isInstancedMesh) inst += o.count;
   });
-  console.warn(`[buildings] n=${n} add=${(t1 - t0).toFixed(0)}ms finish=${(t2 - t1).toFixed(0)}ms meshes=${g.children.length} instances=${inst} tris=${(tris / 1e6).toFixed(2)}M`);
+  console.warn(`[buildings] n=${n} textures+materials=${(t0 - tm).toFixed(0)}ms add=${(t1 - t0).toFixed(0)}ms finish=${(t2 - t1).toFixed(0)}ms meshes=${g.children.length} instances=${inst} tris=${(tris / 1e6).toFixed(2)}M`);
   return g;
 }
+
+/** Stress test with 250 buildings (60 houses, campus + city mix), preview only. */
+export function demoStress250() { return demoStress(250); }

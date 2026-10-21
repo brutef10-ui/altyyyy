@@ -31,6 +31,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+[hidden] { display: none !important; }
 
 .stage {
   position: relative; overflow: hidden; isolation: isolate;
@@ -107,8 +108,8 @@ body {
 /* road km chart */
 .km { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1cqw; align-items: end; height: 10.5cqw; padding-bottom: .2cqw; border-bottom: 1px solid var(--line); }
 .km div { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: .5cqw; height: 100%; }
-.km .bar { width: 100%; border-radius: .5cqw .5cqw 0 0; background: linear-gradient(#5a6774, #2c3640); transform-origin: bottom; }
-.km .bar--plan { background: repeating-linear-gradient(135deg, #2c3640 0 .5cqw, #5a6774 .5cqw 1cqw); }
+.km .km-bar { width: 100%; border-radius: .5cqw .5cqw 0 0; background: linear-gradient(#5a6774, #2c3640); transform-origin: bottom; }
+.km .km-bar--plan { background: repeating-linear-gradient(135deg, #2c3640 0 .5cqw, #5a6774 .5cqw 1cqw); }
 .km strong { font: 800 1.6cqw/1 var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; }
 .km-labels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1cqw; text-align: center; font: 500 .8cqw/1.2 var(--f-mono); color: var(--ink-2); margin-top: -.6cqw; }
 .result { display: flex; gap: 1cqw; align-items: center; padding: 1cqw 1.2cqw; border-radius: 1cqw; background: rgba(226, 72, 61, .1); color: var(--ink); line-height: 1.4; }
@@ -269,9 +270,9 @@ body {
       <h2 data-r>Больше асфальта</h2>
       <div data-r>
         <div class="km">
-          <div><strong>62 км</strong><span class="bar" style="height:42%"></span></div>
-          <div><strong>92 км</strong><span class="bar" style="height:63%"></span></div>
-          <div><strong>120 км</strong><span class="bar bar--plan" style="height:82%"></span></div>
+          <div><strong>62 км</strong><span class="km-bar" style="height:42%"></span></div>
+          <div><strong>92 км</strong><span class="km-bar" style="height:63%"></span></div>
+          <div><strong>120 км</strong><span class="km-bar km-bar--plan" style="height:82%"></span></div>
         </div>
       </div>
       <div class="km-labels" data-r><span>2024</span><span>2025</span><span>2026, план</span></div>

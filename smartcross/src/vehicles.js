@@ -16,8 +16,9 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 /** All vehicle types understood by createFleet(). */
 export const VEHICLE_TYPES = ['sedan', 'hatch', 'suv', 'minibus', 'bus', 'pickup'];
 
-/** Overall length (m) of every type, bumper to bumper — use for queue spacing. */
-export const VEHICLE_LENGTH = { sedan: 4.85, hatch: 4.05, suv: 4.9, minibus: 6.95, bus: 12.0, pickup: 5.33 };
+/** Overall length (m) of every type, bumper to bumper incl. plates/steps (bus: body, its high mirrors
+ *  reach 0.4 m further forward) — use for queue spacing. Each vehicle is centred on its origin. */
+export const VEHICLE_LENGTH = { sedan: 4.93, hatch: 4.11, suv: 4.99, minibus: 7.15, bus: 12.07, pickup: 5.49 };
 
 /* ------------------------------------------------------------------------------------------------
  * Palette: every key is a "material" baked into vertex attributes.
@@ -37,7 +38,7 @@ const PAL = {
   rim: { c: 0xc9cdd2, r: 0.26, m: 0.9 },
   rimDark: { c: 0x2b2d31, r: 0.55, m: 0.4 },
   steel: { c: 0xb4b8bd, r: 0.4, m: 0.6 },
-  head: { c: 0xdde6ee, r: 0.05, m: 0.75, e: 0.1 },
+  head: { c: 0xeef3f7, r: 0.08, m: 0.3, e: 0.3 },
   drl: { c: 0xf2f6ff, r: 0.2, m: 0, e: 2.0 },
   tail: { c: 0xb4121c, r: 0.16, m: 0.1, e: -1 },
   amber: { c: 0xf0901e, r: 0.2, m: 0.1, e: 0.15 },
@@ -262,8 +263,9 @@ function makeStations(S, hero) {
   const L2 = S.L / 2, zs = [];
   S.keys.forEach(k => zs.push(k[0]));
   specBreaks(S).forEach(z => zs.push(z));
+  if (hero && S.seals) S.seals.flat().forEach(z => zs.push(z));
   for (const ax of S.axles) {
-    const N = hero ? 20 : 10;
+    const N = hero ? 20 : 8;
     for (let i = 0; i <= N; i++) zs.push(ax.z + ax.arch * Math.cos((Math.PI * i) / N));
     zs.push(ax.z - ax.arch - 0.002, ax.z + ax.arch + 0.002);
   }
@@ -279,7 +281,7 @@ function makeStations(S, hero) {
 /** sweep the rings and emit triangles (auto-smoothed normals with a crease angle) */
 function loft(P, S, at, hero) {
   const zs = makeStations(S, hero), ringFn = S.family === 'box' ? boxRing : carRing;
-  const mat = S.family === 'box' ? boxMat(S) : carMat(S);
+  const mat = S.family === 'box' ? boxMat(S) : carMat(S, hero);
   const NS = zs.length, half = zs.map(z => ringFn(at(z))), n = half[0].length, m = 2 * n - 2;
   const V = half.map((h, k) => {
     const row = new Array(m);
@@ -337,7 +339,7 @@ const inR = (z, r) => r && z > r[0] && z < r[1];
 const anyR = (z, list) => !!list && list.some(r => inR(z, r));
 const nearSeam = (z, list) => !!list && list.some(s => Math.abs(z - s) < 0.0045);
 
-function carMat(S) {
+function carMat(S, hero) {
   return (z, seg, side, y) => {
     if (seg === 0) return 'under';
     if (S.bed && inR(z, S.bed) && seg >= 6) return 'bedliner';
@@ -350,9 +352,10 @@ function carMat(S) {
       if (seg === 4 && z < S.tailWrap) return 'tail';
       return 'paint';
     }
+    if (hero && seg >= 6 && anyR(z, S.seals)) return 'black';
     if (seg === 5) return inR(z, S.belt) ? S.beltKey || 'black' : nearSeam(z, S.seams) ? 'seam' : 'paint';
     if (seg === 6) return anyR(z, S.side) ? 'glass' : anyR(z, S.pillars) ? 'black' : 'paint';
-    if (seg === 7) return inR(z, S.roofRange) ? S.roofKey : 'paint';
+    if (seg === 7) return hero && inR(z, S.frame) ? 'black' : inR(z, S.roofRange) ? S.roofKey : 'paint';
     if (inR(z, S.wind) || inR(z, S.rear)) return 'glass';
     if (nearSeam(z, S.topSeams)) return 'seam';
     return inR(z, S.roofRange) ? S.roofKey : 'paint';
@@ -456,13 +459,15 @@ function plate(P, x, y, z, dir) {
   P.add(box(0.035, 0.024, 0.004), 'flag', mul(m, M(-0.225, 0.022, 0.007)));
   P.add(box(0.008, 0.095, 0.004), 'ink', mul(m, M(-0.19, 0, 0.007)));
   for (let i = 0; i < 6; i++) P.add(box(0.036, 0.066, 0.004), 'ink', mul(m, M(-0.13 + i * 0.062 + (i > 2 ? 0.02 : 0), -0.004, 0.007)));
-  P.add(box(0.03, 0.022, 0.004), 'ink', mul(m, M(-0.225, -0.02, 0.007)));
 }
 /** wheel: tyre + rim; axle along X, outer face toward `side` (±1) */
 function wheel(P, { x, y, z, r, w, seg, style = 'alloy', side, hero = false }) {
   const base = M(x, y, z, 0, 0, side > 0 ? -Math.PI / 2 : Math.PI / 2);   // local +Y → outward
   const rimR = r * (style === 'steel' ? 0.6 : 0.66);
-  P.add(new THREE.LatheGeometry([V2(rimR * 0.98, -w * 0.42), V2(r * 0.9, -w * 0.5), V2(r * 0.985, -w * 0.42), V2(r, -w * 0.3), V2(r, w * 0.3), V2(r * 0.985, w * 0.42), V2(r * 0.9, w * 0.5), V2(rimR * 0.98, w * 0.42)], seg), 'tyre', base);
+  const tp = hero
+    ? [V2(rimR * 0.98, -w * 0.42), V2(r * 0.9, -w * 0.5), V2(r * 0.985, -w * 0.42), V2(r, -w * 0.3), V2(r, w * 0.3), V2(r * 0.985, w * 0.42), V2(r * 0.9, w * 0.5), V2(rimR * 0.98, w * 0.42)]
+    : [V2(rimR * 0.98, -w * 0.42), V2(r * 0.93, -w * 0.5), V2(r, -w * 0.34), V2(r, w * 0.34), V2(r * 0.93, w * 0.5), V2(rimR * 0.98, w * 0.42)];
+  P.add(new THREE.LatheGeometry(tp, seg), 'tyre', base);
   const lip = style === 'steel' ? 'steel' : 'rim';
   P.add(new THREE.LatheGeometry([V2(rimR + 0.006, w * 0.43), V2(rimR * 0.93, w * 0.39)], seg), lip, base);
   if (style === 'steel') {
@@ -475,7 +480,7 @@ function wheel(P, { x, y, z, r, w, seg, style = 'alloy', side, hero = false }) {
     return;
   }
   P.add(new THREE.LatheGeometry([V2(rimR * 0.93, w * 0.39), V2(rimR * 0.86, w * 0.16), V2(rimR * 0.3, w * 0.2)], seg), 'rimDark', base);
-  P.add(new THREE.LatheGeometry([V2(rimR * 0.3, w * 0.2), V2(rimR * 0.24, w * 0.36), V2(0.0005, w * 0.37)], seg), 'rim', base);
+  P.add(new THREE.LatheGeometry(hero ? [V2(rimR * 0.3, w * 0.2), V2(rimR * 0.24, w * 0.36), V2(0.0005, w * 0.37)] : [V2(rimR * 0.26, w * 0.36), V2(0.0005, w * 0.37)], seg), 'rim', base);
   const ns = 5;
   for (let i = 0; i < ns; i++) {
     const a = (i / ns) * Math.PI * 2 + 0.3;
@@ -488,18 +493,21 @@ function wheel(P, { x, y, z, r, w, seg, style = 'alloy', side, hero = false }) {
     for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; P.add(cyl(0.011, 0.011, 0.02, 6), 'chrome', mul(base, M(Math.cos(a) * 0.05, w * 0.38, Math.sin(a) * 0.05))); }
   }
 }
-/** side mirror on both sides (housing in paint or black, stalk, mirror glass facing back) */
-function mirrors(P, x, y, z, { key = 'paint', w = 0.2, h = 0.12, d = 0.1, out = 0.13, van = false } = {}) {
-  const m = M(x + out, y, z, 0, -0.12, 0);
-  if (van) {
-    P.pair(rbox(0.08, 0.05, 0.05, 0.015), 'plastic', M(x + 0.05, y - 0.05, z));
-    P.pair(box(0.14, 0.03, 0.03), 'plastic', M(x + 0.1, y - 0.05, z - 0.01, 0, -0.1, 0));
-  } else {
-    P.pair(box(out, 0.035, 0.06), 'plastic', M(x + out * 0.4, y - 0.025, z + 0.02, 0, -0.1, 0));
-  }
+/** side mirrors (both sides): mounted at the body/glass surface x = xg, housing reaching outward */
+function mirrors(P, xg, y, z, { key = 'paint', w = 0.17, h = 0.105, d = 0.09, reach = 0.17, van = false } = {}) {
+  const cx = xg + reach, m = M(cx, y, z, 0, -0.1, 0), arm = reach - w / 2 + 0.05;
+  P.pair(box(0.05, van ? 0.1 : 0.07, 0.12), 'plastic', M(xg + 0.005, y - (van ? 0.08 : 0.03), z + 0.02));
+  P.pair(box(arm, 0.032, 0.05), van ? 'plastic' : key, M(xg + arm / 2, y - (van ? 0.08 : 0.025), z + 0.01, 0, -0.1, 0));
+  if (van) P.pair(box(arm, 0.025, 0.04), 'plastic', M(xg + arm / 2, y + 0.08, z + 0.01, 0, -0.1, 0));
   P.pair(rbox(w, h, d, Math.min(0.035, h / 3), 1), key, m);
   P.pair(box(w * 0.86, h * 0.8, 0.01), 'mirrorGlass', mul(m, M(0, 0, -d / 2 - 0.002)));
   P.pair(box(w * 0.4, 0.012, 0.006), 'amber', mul(m, M(w * 0.18, -h * 0.28, d / 2 - 0.004, 0, 0.5, 0)));
+}
+/** cylinder rod between two points */
+function rod(P, key, a, b, r, seg = 8) {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), len = d.length();
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+  P.add(cyl(r, r, len, seg), key, new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1)));
 }
 /** windshield wiper pair lying on a slope (base at y, z; slope angle a from horizontal) */
 function wipers(P, xs, y, z, a, len) {
@@ -531,7 +539,8 @@ const SEDAN = {
   ],
   axles: [{ z: 1.4, r: 0.335, w: 0.215, arch: 0.385, x: 0.785 }, { z: -1.42, r: 0.335, w: 0.215, arch: 0.385, x: 0.785 }],
   wind: [0.42, 1.32], rear: [-1.62, -0.95],
-  side: [[-1.1, -0.4], [-0.32, 1.33]], pillars: [[-0.4, -0.32]],
+  side: [[-1.1, -0.43], [-0.31, 1.33]], pillars: [[-0.43, -0.31]], frame: [-1.16, 1.33],
+  seals: [[0.42, 0.45], [1.285, 1.32], [-1.62, -1.585], [-0.985, -0.95], [-1.1, -1.075]],
   belt: [-1.1, 1.3], beltKey: 'chrome',
   seams: [0.97, -0.36, -1.15], topSeams: [2.28, -1.68],
   lowF: 2.2, lowR: -2.24, headWrap: 2.3, tailWrap: -2.3,
@@ -541,7 +550,7 @@ const SEDAN = {
     ribbon(P, 'drl', cornerPath(this, at, F, 1, 0.36, 0.17, 0.603, 0.617, 0.665, 0.676), 0.013, 0.05);
     ribbon(P, 'tail', cornerPath(this, at, R, -1, 0.36, 0.2, 0.79, 0.865, 0.83, 0.9), 0.01, 0.06);
     P.add(box(0.6, 0.05, 0.03), 'black', M(0, 0.665, F));                           // upper grille
-    P.add(rbox(1.04, 0.23, 0.06, 0.03), 'plastic', M(0, 0.43, F - 0.015));            // lower grille
+    P.add(box(1.04, 0.23, 0.06), 'plastic', M(0, 0.43, F - 0.015));            // lower grille
     for (let i = 0; i < 3; i++) P.add(box(0.98, 0.014, 0.02), 'black', M(0, 0.36 + i * 0.07, F + 0.02));
     P.add(cyl(0.05, 0.05, 0.012, 16), 'chrome', M(0, 0.665, F + 0.016, Math.PI / 2, 0, 0));
     plate(P, 0, 0.45, F + 0.03, 1);
@@ -550,10 +559,10 @@ const SEDAN = {
     P.add(box(0.7, 0.06, 0.04), 'plastic', M(0, 0.38, R));                          // rear diffuser
     P.pair(cyl(0.035, 0.035, 0.08, 10), 'chrome', M(0.45, 0.3, R - 0.0, Math.PI / 2, 0, 0));
     P.pair(box(0.1, 0.03, 0.02), 'tail', M(0.66, 0.46, R + 0.02));                    // reflectors
-    mirrors(P, 0.88, 1.03, 1.08, { key: 'paint' });
-    for (const z of [-0.18, -0.98]) P.pair(rbox(0.03, 0.03, 0.15, 0.012), 'chrome', M(0.915, 0.875, z));
+    mirrors(P, 0.79, 1.0, 1.12, { key: 'paint' });
+    for (const z of [-0.18, -0.98]) P.pair(box(0.026, 0.03, 0.15), 'chrome', M(0.92, 0.875, z));
     wipers(P, [0.32, -0.12], 0.985, 1.26, -0.47, 0.55);
-    P.add(rbox(0.06, 0.06, 0.16, 0.025, 1), 'black', M(0, 1.47, -0.75));            // shark fin
+    P.add(box(0.05, 0.05, 0.15), 'black', M(0, 1.47, -0.75));            // shark fin
     P.pair(box(0.012, 0.03, 0.08), 'amber', M(0.905, 0.79, 1.92));                    // side repeater
     if (hero) P.add(box(0.02, 0.04, 0.012), 'chrome', M(0.6, 0.98, -1.72));          // fuel cap hinge hint
   },
@@ -587,14 +596,14 @@ const HATCH = {
     ribbon(P, 'head', cornerPath(this, at, F, 1, 0.3, 0.24, 0.6, 0.69, 0.67, 0.75), 0.01, 0.06);
     ribbon(P, 'tail', cornerPath(this, at, R, -1, 0.5, 0.16, 0.78, 0.96, 0.82, 1.06), 0.01, 0.05);
     P.add(box(0.5, 0.06, 0.03), 'black', M(0, 0.655, F));
-    P.add(rbox(0.86, 0.2, 0.06, 0.03), 'plastic', M(0, 0.42, F - 0.015));
+    P.add(box(0.86, 0.2, 0.06), 'plastic', M(0, 0.42, F - 0.015));
     for (let i = 0; i < 2; i++) P.add(box(0.8, 0.014, 0.02), 'black', M(0, 0.39 + i * 0.07, F + 0.02));
     plate(P, 0, 0.44, F + 0.03, 1);
     plate(P, 0, 0.66, R - 0.012, -1);
     P.add(box(0.8, 0.05, 0.04), 'plastic', M(0, 0.4, R));
     P.add(rbox(1.18, 0.05, 0.16, 0.02), 'black', M(0, 1.52, -1.66));                 // roof spoiler
-    mirrors(P, 0.81, 0.98, 1.16, { key: 'black', w: 0.18, h: 0.11 });
-    for (const z of [-0.12, -0.92]) P.pair(rbox(0.03, 0.03, 0.14, 0.012), 'paint', M(0.85, 0.85, z));
+    mirrors(P, 0.74, 0.96, 1.22, { key: 'black', w: 0.16, h: 0.1, reach: 0.16 });
+    for (const z of [-0.12, -0.92]) P.pair(box(0.026, 0.03, 0.14), 'paint', M(0.855, 0.85, z));
     wipers(P, [0.3, -0.12], 0.945, 1.36, -0.5, 0.5);
   },
 };
@@ -638,14 +647,14 @@ const SUV = {
     P.add(rbox(1.4, 0.16, 0.1, 0.04), 'plastic', M(0, 0.52, R + 0.02));
     P.pair(box(0.12, 0.03, 0.02), 'tail', M(0.7, 0.55, R - 0.035));
     for (const s of [1, -1]) {                                                          // roof rails
-      P.add(rbox(0.04, 0.04, 2.5, 0.015), 'black', M(s * 0.6, 1.86, -0.55));
+      P.add(box(0.04, 0.04, 2.5), 'black', M(s * 0.6, 1.86, -0.55));
       for (const z of [-1.7, 0.6]) P.add(box(0.05, 0.06, 0.12), 'black', M(s * 0.6, 1.82, z));
     }
-    mirrors(P, 0.9, 1.15, 1.15, { key: 'paint', w: 0.22, h: 0.14 });
-    for (const z of [-0.12, -1.0]) P.pair(rbox(0.03, 0.03, 0.15, 0.012), 'chrome', M(0.935, 0.97, z));
-    P.pair(rbox(0.04, 0.05, 1.5, 0.015), 'plastic', M(0.9, 0.3, -0.03));             // side steps
+    mirrors(P, 0.82, 1.13, 1.2, { key: 'paint', w: 0.2, h: 0.125, reach: 0.18 });
+    for (const z of [-0.12, -1.0]) P.pair(box(0.026, 0.03, 0.15), 'chrome', M(0.94, 0.97, z));
+    P.pair(box(0.05, 0.05, 1.5), 'plastic', M(0.9, 0.3, -0.03));             // side steps
     wipers(P, [0.34, -0.12], 1.12, 1.33, -0.6, 0.55);
-    P.add(rbox(0.06, 0.06, 0.16, 0.025, 1), 'black', M(0, 1.84, -1.85));
+    P.add(box(0.05, 0.05, 0.15), 'black', M(0, 1.84, -1.85));
   },
 };
 
@@ -689,9 +698,9 @@ const PICKUP = {
     P.add(box(0.2, 0.05, 0.02), 'chrome', M(0, 1.0, R - 0.005));
     P.add(box(1.36, 0.42, 0.03), 'glass', M(0, 1.5, -0.955));                         // cab rear window
     P.pair(box(0.06, 0.035, 1.65), 'plastic', M(0.875, 1.19, -1.79));                // bed rail caps
-    mirrors(P, 0.89, 1.24, 1.3, { key: 'black', w: 0.22, h: 0.15 });
-    for (const z of [0.0, -0.78]) P.pair(rbox(0.03, 0.035, 0.15, 0.012), 'chrome', M(0.925, 1.06, z));
-    P.pair(rbox(0.12, 0.05, 2.0, 0.02), 'plastic', M(0.88, 0.36, 0.06));              // running boards
+    mirrors(P, 0.83, 1.21, 1.32, { key: 'black', w: 0.21, h: 0.14, reach: 0.18 });
+    for (const z of [0.0, -0.78]) P.pair(box(0.026, 0.035, 0.15), 'chrome', M(0.93, 1.06, z));
+    P.pair(box(0.12, 0.05, 2.0), 'plastic', M(0.88, 0.36, 0.06));              // running boards
     wipers(P, [0.34, -0.12], 1.18, 1.42, -0.6, 0.55);
   },
 };
@@ -729,7 +738,7 @@ const MINIBUS = {
     P.add(rbox(1.84, 0.3, 0.2, 0.05), 'grey', M(0, 0.5, F - 0.04));                   // bumper
     P.pair(rbox(0.12, 0.06, 0.03, 0.02), 'head', M(0.66, 0.5, F + 0.065));
     plate(P, 0, 0.5, F + 0.07, 1);
-    mirrors(P, 0.99, 1.48, 2.5, { key: 'black', w: 0.14, h: 0.3, d: 0.08, out: 0.2, van: true });
+    mirrors(P, 0.96, 1.5, 2.5, { key: 'black', w: 0.13, h: 0.3, d: 0.08, reach: 0.2, van: true });
     wipers(P, [0.42, -0.1], 1.3, 2.55, -0.82, 0.62);
     // rear: doors, windows, lamps
     P.add(box(0.012, 1.95, 0.01), 'seam', M(0, 1.48, R - 0.002));
@@ -737,7 +746,7 @@ const MINIBUS = {
     P.pair(rbox(0.13, 0.62, 0.05, 0.02), 'tail', M(0.81, 0.98, R + 0.01));
     P.add(box(0.3, 0.05, 0.03), 'tail', M(0, 2.5, R));
     P.add(rbox(1.84, 0.22, 0.16, 0.04), 'grey', M(0, 0.5, R + 0.03));
-    P.add(box(0.5, 0.05, 0.25), 'plastic', M(0, 0.42, R - 0.08));                      // rear step
+    P.add(box(0.5, 0.05, 0.16), 'plastic', M(0, 0.42, R - 0.04));                      // rear step
     plate(P, 0, 0.8, R - 0.012, -1);
     P.add(box(0.04, 0.12, 0.02), 'chrome', M(0.1, 1.2, R - 0.01));
     // roof vent hatch
@@ -794,9 +803,10 @@ const BUS = {
     plate(P, 0, 0.62, F + 0.06, 1);
     wipers(P, [0.5, -0.5], 1.08, F + 0.04, -1.45, 0.9);
     for (const s of [1, -1]) {                                                         // rabbit-ear mirrors
-      P.add(cyl(0.02, 0.02, 0.62, 8), 'plastic', M(s * 1.22, 2.62, F + 0.22, 1.0, 0, -s * 0.25));
-      P.add(rbox(0.16, 0.36, 0.07, 0.03), 'plastic', M(s * 1.3, 2.18, F + 0.44, 0, s * 0.2, 0));
-      P.add(box(0.13, 0.32, 0.01), 'mirrorGlass', M(s * 1.3 - s * 0.007, 2.18, F + 0.405, 0, s * 0.2, 0));
+      rod(P, 'plastic', [s * 1.1, 2.95, F - 0.06], [s * 1.28, 2.86, F + 0.26], 0.022);
+      rod(P, 'plastic', [s * 1.28, 2.86, F + 0.26], [s * 1.36, 2.42, F + 0.36], 0.022);
+      P.add(rbox(0.16, 0.38, 0.07, 0.03), 'plastic', M(s * 1.37, 2.22, F + 0.37, 0, s * 0.25, 0));
+      P.add(box(0.13, 0.33, 0.01), 'mirrorGlass', mul(M(s * 1.37, 2.22, F + 0.37, 0, s * 0.25, 0), M(0, 0, -0.04)));
     }
     // side LED route board (door side) and corner lamps
     P.add(box(0.012, 0.22, 0.95), 'ledBg', M(-1.272, 2.18, 3.8));
@@ -829,7 +839,7 @@ function buildVehicle(P, type, { hero = false, wheels = true } = {}) {
   loft(P, S, at, hero);
   if (wheels) {
     for (const a of S.axles) for (const s of [1, -1]) {
-      wheel(P, { x: s * a.x, y: a.r, z: a.z, r: a.r, w: a.w, seg: hero ? 30 : 14, style: S.family === 'box' ? 'steel' : 'alloy', side: s, hero });
+      wheel(P, { x: s * a.x, y: a.r, z: a.z, r: a.r, w: a.w, seg: hero ? 30 : 12, style: S.family === 'box' ? 'steel' : 'alloy', side: s, hero });
     }
   }
   S.details(P, at, hero);
@@ -934,7 +944,7 @@ function heroInterior(P) {
   P.add(box(1.5, 0.022, 0.012), 'trim', M(0, 0.86, 0.783));                           // trim strip
   for (const x of [-0.62, -0.18, 0.18, 0.62]) P.add(box(0.14, 0.045, 0.01), 'black', M(x, 0.9, 0.787));
   // instrument binnacle + dials (in front of the driver)
-  P.add(new THREE.CylinderGeometry(0.15, 0.15, 0.36, 16, 1, false, -Math.PI / 2, Math.PI), 'dash', M(H.x, 0.965, 0.86, 0, 0, Math.PI / 2));
+  P.add(rbox(0.36, 0.075, 0.15, 0.035, 2), 'dash', M(H.x, 1.0, 0.85, 0.12, 0, 0));
   for (const dx of [-0.08, 0.08]) {
     P.add(cyl(0.055, 0.055, 0.01, 20), 'black', M(H.x + dx, 0.985, 0.8, Math.PI / 2 + 0.35, 0, 0));
     P.add(new THREE.TorusGeometry(0.05, 0.004, 4, 24), 'dial', M(H.x + dx, 0.986, 0.795, 0.35, 0, 0));
@@ -968,7 +978,6 @@ function heroInterior(P) {
     P.add(box(0.05, 0.2, 2.05), 'seatDark', M(s * 0.84, 0.36, -0.07));
     P.add(box(0.08, 0.04, 0.5), 'seatDark', M(s * 0.8, 0.68, 0.2));
     P.add(box(0.08, 0.04, 0.4), 'seatDark', M(s * 0.8, 0.68, -0.75));
-    P.add(box(0.03, 0.06, 0.95), 'dash', M(s * 0.85, 0.95, 0.4));                      // window sill trim
   }
   // headliner, visors, rear-view mirror
   P.add(box(1.24, 0.016, 1.3), 'liner', M(0, 1.392, -0.27));
@@ -1000,6 +1009,26 @@ function steeringWheelGeometry() {
   return P.build();
 }
 
+/** see-through tinted glass that still reads as glass: base opacity 0.46, alpha rises with Fresnel at
+ *  grazing angles, and specular/env reflections plus a sky sheen are not attenuated by alpha (env boosted ×2.6). */
+function heroGlassMaterial() {
+  const m = new THREE.MeshPhysicalMaterial({ color: 0x0e171d, metalness: 0, roughness: 0.035, specularIntensity: 1, ior: 1.52, transparent: true, opacity: 0.46, depthWrite: false });
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader
+      .replace('vec3 totalSpecular = reflectedLight.directSpecular + reflectedLight.indirectSpecular;',
+        'vec3 totalSpecular = reflectedLight.directSpecular + reflectedLight.indirectSpecular * 2.6;')
+      .replace('#include <opaque_fragment>', `
+  float gFr = pow( 1.0 - saturate( abs( dot( normal, geometryViewDir ) ) ), 3.0 );
+  float gA = clamp( diffuseColor.a + gFr * 0.5, 0.0, 0.96 );
+  vec3 gR = inverseTransformDirection( reflect( - geometryViewDir, normal ), viewMatrix );
+  float gSky = smoothstep( -0.25, 0.7, gR.y );
+  vec3 gSheen = vec3( 0.6, 0.7, 0.8 ) * ( 0.07 + 0.6 * gFr ) * ( 0.3 + 0.7 * gSky );
+  gl_FragColor = vec4( outgoingLight + ( totalSpecular + gSheen ) * ( 1.0 / gA - 1.0 ) + gSheen, gA );`);
+  };
+  m.customProgramCacheKey = () => 'smartcross-hero-glass';
+  return m;
+}
+
 /**
  * Extra-detailed sedan for close-ups. Returns { group, driverSeat, steeringWheel, update(t, dt) }.
  * driverSeat = driver's H-point (+X side, facing +Z); steering wheel centre at driverSeat-local
@@ -1015,7 +1044,7 @@ export function createHeroCar({ color = 0xb8bcc2 } = {}) {
   buildVehicle(P, 'sedan', { hero: true, wheels: false });
   heroInterior(P);
   const paintMat = new THREE.MeshPhysicalMaterial({ color, metalness: 0.55, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.07, side: THREE.DoubleSide });
-  const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x24313a, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.3, depthWrite: false });
+  const glassMat = heroGlassMaterial();
   const misc = vehicleMaterial('hero');
   const paint = new THREE.Mesh(P.build(['paint']), paintMat);
   const glass = new THREE.Mesh(P.build(['glass']), glassMat);
@@ -1096,6 +1125,18 @@ export function demo() {
   const hero = createHeroCar({ color: 0xb8bcc2 });
   hero.group.position.set(-1.5, 0, 7.5);
   group.add(hero.group);
+  // preview-only stand-in for the people.js driver (torso + head + arms to the rim)
+  const skin = new THREE.MeshStandardMaterial({ color: 0xd9a27e, roughness: 0.7 }), shirt = new THREE.MeshStandardMaterial({ color: 0x3b6ea8, roughness: 0.8 });
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.36, 4, 12), shirt);
+  torso.position.set(0, 0.36, -0.1); torso.rotation.x = -0.32;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), skin);
+  head.position.set(0, 0.76, -0.24);
+  hero.driverSeat.add(torso, head);
+  for (const sx of [1, -1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.42, 4, 8), shirt);
+    arm.position.set(sx * 0.19, 0.45, 0.2); arm.rotation.set(1.2, 0, 0);
+    hero.driverSeat.add(arm);
+  }
   const mover = pl.length - 1;
   const update = (t, dt) => {
     const a = t * 0.25;

@@ -67,6 +67,14 @@ export async function buildWorld(scene, progress = () => {}) {
   const world = { animated };
   const root = new THREE.Group();
   scene.add(root);
+  const CHUNK = 320;
+  const chunkOf = (x, z) => Math.floor((x + 640) / CHUNK) + '_' + Math.floor((z + 480) / CHUNK);
+  const chunks = [];    // { group, x, z } — hidden when the camera is far away
+  const addChunk = (key, group) => {
+    const [i, j] = key.split('_').map(Number);
+    chunks.push({ group, x: i * CHUNK - 640 + CHUNK / 2, z: j * CHUNK - 480 + CHUNK / 2 });
+    root.add(group);
+  };
 
   /* ---------- ground, mountains ---------- */
   root.add(createGround({ size: 6000 }));
@@ -106,13 +114,30 @@ export async function buildWorld(scene, progress = () => {}) {
     [[-90, 318], [-90, 352], [-90, 408]],
   ];
   campusPaths.forEach(p => net.addPath(p.map(([x, z]) => new THREE.Vector2(x, z)), 3.2));
-  root.add(net.finish());
+  const roadGroup = net.finish();
+  // lawns are pulled forward (−1, −2) against the ground; campus footpaths lie 1 cm above lawns, so pull them further
+  roadGroup.traverse(o => {
+    if (!o.isMesh || o.name !== 'paths') return;
+    o.material = o.material.clone();
+    o.material.polygonOffsetFactor = -3;
+    o.material.polygonOffsetUnits = -8;
+  });
+  root.add(roadGroup);
   progress(.15, 'Дороги');
   await yieldFrame();
 
   /* ---------- blocks: lawns, buildings, trees ---------- */
-  const kit = createBuildingKit();
-  const veg = createVegetationKit();
+  // The city is split into CHUNK × CHUNK m chunks, each with its own building / vegetation / traffic batches,
+  // so frustum culling, distance culling and the shadow pass only touch what is near the camera.
+  const kits = new Map(), vegKits = new Map();
+  const kitAt = (x, z) => { const k = chunkOf(x, z); if (!kits.has(k)) kits.set(k, createBuildingKit()); return kits.get(k); };
+  const vegAt = (x, z) => { const k = chunkOf(x, z); if (!vegKits.has(k)) vegKits.set(k, createVegetationKit()); return vegKits.get(k); };
+  const veg = {
+    addTree: (x, z, o) => vegAt(x, z).addTree(x, z, o),
+    addBush: (x, z, o) => vegAt(x, z).addBush(x, z, o),
+    addHedge: (x1, z1, x2, z2, o) => vegAt(x1, z1).addHedge(x1, z1, x2, z2, o),
+    addFlowerBed: (x, z, w, d) => vegAt(x, z).addFlowerBed(x, z, w, d),
+  };
   const xInt = [[-520, -312], [-288, -12], [12, 168], [192, 378], [422, 640]];
   const zInt = [[-420, -192], [-168, -12], [12, 168], [192, 420]];
   const footprints = [];   // [x0, z0, x1, z1] for tree avoidance
@@ -133,7 +158,7 @@ export async function buildWorld(scene, progress = () => {}) {
   };
 
   const addBuilding = (b) => {
-    kit.add({ ...b, seed: seed++ });
+    kitAt(b.x, b.z).add({ ...b, seed: seed++ });
     const c = Math.cos(b.rotY), s = Math.abs(Math.sin(b.rotY));
     const hw = (Math.abs(c) * b.w + s * b.d) / 2, hd = (s * b.w + Math.abs(c) * b.d) / 2;
     footprints.push([b.x - hw, b.z - hd, b.x + hw, b.z + hd]);
@@ -153,7 +178,9 @@ export async function buildWorld(scene, progress = () => {}) {
       // frontage on the main avenue (z = 0) in the centre gets shops
       const onAvenue = zone === 'center' && sd.along === 'x' && Math.abs(sd.edge) < 20;
       while (s < end - 12) {
-        const key = onAvenue && rnd() < .55 ? 'shop' : pick(zoneStyle[zone]);
+        // keep the hero junction open to the sky: only low shops within 75 m of M on its two streets
+        const nearM = zone === 'center' && Math.abs(sd.edge) < 20 && Math.abs(s + 10) < 75;
+        const key = nearM ? 'shop' : onAvenue && rnd() < .55 ? 'shop' : pick(zoneStyle[zone]);
         const st = STYLES[key]();
         const w = Math.min(st.w, end - s);
         if (w < 12) break;
@@ -190,9 +217,13 @@ export async function buildWorld(scene, progress = () => {}) {
 
   for (const [x0, x1] of xInt) for (const [z0, z1] of zInt) {
     const bl = { x0, x1, z0, z1 };
-    const lawn = createLawn(x1 - x0, z1 - z0, { seed: seed++ });
-    lawn.position.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
-    root.add(lawn);
+    // the campus lawn is split around the new street so the asphalt (y = 0.01) is not covered
+    const bands = x0 === -288 && z0 === 192 ? [[z0, CAMPUS_ROAD_Z - 3.75], [CAMPUS_ROAD_Z + 3.75, z1]] : [[z0, z1]];
+    for (const [a, b] of bands) {
+      const lawn = createLawn(x1 - x0, b - a, { seed: seed++ });
+      lawn.position.set((x0 + x1) / 2, 0, (a + b) / 2);
+      root.add(lawn);
+    }
     if (x0 === -288 && z0 === 192) continue;             // campus, built below
     if (x0 === -520) { privateSector(bl); continue; }
     const zone = x0 >= 192 ? 'business' : (z0 === -168 || z0 === 12) && x0 > -300 && x1 < 200 ? 'center' : 'residential';
@@ -245,7 +276,7 @@ export async function buildWorld(scene, progress = () => {}) {
   ];
   for (const f of fences) {
     const fence = createFence({ length: f.length, height: 2.2, gaps: f.gaps });
-    fence.position.set(f.x, .15, f.z); fence.rotation.y = f.rotY;
+    fence.position.set(f.x, .02, f.z); fence.rotation.y = f.rotY;
     root.add(fence);
   }
   progress(.42, 'Кампус');
@@ -257,7 +288,7 @@ export async function buildWorld(scene, progress = () => {}) {
     const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
     const ux = dx / len, uz = dz / len, nx = -uz, nz = ux;
     for (const side of [-1, 1]) {
-      for (let s = 8; s < len - 8; s += 9) {
+      for (let s = 8; s < len - 8; s += 11) {
         const x = x1 + ux * s + nx * side * (edge - 1.1), z = z1 + uz * s + nz * side * (edge - 1.1);
         if (skipNear(x, z)) continue;
         if (!free(x, z, 1.5)) continue;
@@ -292,10 +323,10 @@ export async function buildWorld(scene, progress = () => {}) {
   progress(.5, 'Деревья');
   await yieldFrame();
 
-  root.add(kit.finish());
+  for (const [k, kt] of kits) addChunk(k, kt.finish());
   progress(.62, 'Здания');
   await yieldFrame();
-  root.add(veg.finish());
+  for (const [k, kt] of vegKits) addChunk(k, kt.finish());
   progress(.72, 'Зелень');
   await yieldFrame();
 
@@ -306,7 +337,7 @@ export async function buildWorld(scene, progress = () => {}) {
     W: { x: 11, z: 11, rotY: -Math.PI / 2, edge: [13.6, 11.4, 0] },
     E: { x: -11, z: -11, rotY: Math.PI / 2, edge: [-13.6, -11.4, Math.PI] },
     N: { x: -11, z: 11, rotY: Math.PI, edge: [-11.4, 13.6, -Math.PI / 2] },
-    S: { x: 11, z: -11, rotY: 0, edge: [11.4, -13.6, Math.PI] },
+    S: { x: 11, z: -11, rotY: 0, edge: [11.4, -13.6, 0] },
   };
   const poles = {};
   for (const [k, d] of Object.entries(poleDefs)) {
@@ -339,6 +370,7 @@ export async function buildWorld(scene, progress = () => {}) {
   const groups = {};                     // fleet name → placements
   const records = [];                    // every car: { fleet, i, type, len, x, z, rotY, lane }
   const addCar = (fleet, rec) => {
+    if (fleet !== 'M') fleet = fleet + '@' + chunkOf(rec.x, rec.z);
     (groups[fleet] ||= []).push(rec);
     rec.fleet = fleet; rec.i = groups[fleet].length - 1;
     records.push(rec);
@@ -376,7 +408,7 @@ export async function buildWorld(scene, progress = () => {}) {
   ];
   const eastIn = [
     ...queue('M', { fx: STOP + .4, fz: -1.75, ux: 1, uz: 0, count: 20, lane: 'E1', skip: { at: 4, len: 4.9, place: (x, z) => { heroPos = new THREE.Vector3(x, 0, z); } } }),
-    ...queue('M', { fx: STOP + .4, fz: -5.25, ux: 1, uz: 0, count: 19, lane: 'E2' }),
+    ...queue('M', { fx: STOP + .4, fz: -5.25, ux: 1, uz: 0, count: 19, lane: 'E2', types: ['sedan', 'sedan', 'suv', 'hatch', 'sedan', 'pickup'] }),
   ];
   queue('M', { fx: -1.75, fz: -STOP - .4, ux: 0, uz: -1, count: 21, lane: 'N1' });
   queue('M', { fx: -5.25, fz: -STOP - .4, ux: 0, uz: -1, count: 19, lane: 'N2' });
@@ -421,8 +453,8 @@ export async function buildWorld(scene, progress = () => {}) {
 
   // --- the boulevard: 4 + 4 lanes, jammed both ways along the stretch the camera sees
   for (let k = 0; k < 4; k++) {
-    queue('blvd', { fx: BLVD_X - 2 - 1.75 - k * LANE, fz: 150 + R(0, 6), ux: 0, uz: -1, count: 52, lane: 'B' + k, gapMin: 1.4, gapMax: 3 });
-    queue('blvd', { fx: BLVD_X + 2 + 1.75 + k * LANE, fz: -320 + R(0, 6), ux: 0, uz: 1, count: 54, lane: 'C' + k, gapMin: 1.4, gapMax: 3 });
+    queue('blvd', { fx: BLVD_X - 2 - 1.75 - k * LANE, fz: 150 + R(0, 6), ux: 0, uz: -1, count: 40, lane: 'B' + k, gapMin: 1.4, gapMax: 3 });
+    queue('blvd', { fx: BLVD_X + 2 + 1.75 + k * LANE, fz: -320 + R(0, 6), ux: 0, uz: 1, count: 42, lane: 'C' + k, gapMin: 1.4, gapMax: 3 });
   }
 
   // --- the campus street: jammed and honking
@@ -434,8 +466,8 @@ export async function buildWorld(scene, progress = () => {}) {
     const f = createFleet(list.map(r => ({ type: r.type, color: r.color, x: r.x, z: r.z, rotY: r.rotY, brake: r.brake })));
     f.commit?.();
     f.group.traverse(o => { if (o.isInstancedMesh) o.computeBoundingSphere(); });
-    root.add(f.group);
     fleets[name] = f;
+    if (name.includes('@')) addChunk(name.split('@')[1], f.group); else root.add(f.group);
   }
   progress(.82, 'Машины');
   await yieldFrame();
@@ -610,7 +642,12 @@ export async function buildWorld(scene, progress = () => {}) {
 
   /* ---------- per-frame ---------- */
   const tmp = new THREE.Vector3();
+  const CULL = 950;
   world.update = (t, dt, camera) => {
+    for (const c of chunks) {
+      const dx = camera.position.x - c.x, dz = camera.position.z - c.z;
+      c.group.visible = dx * dx + dz * dz < (CULL + CHUNK * .7) ** 2;
+    }
     if (tau > 0) setSignals('red', 'green'); else { const [ns, ew] = fixedTime(t); setSignals(ns, ew); }
     // animate only what is near the camera; far people are also hidden to save draw calls
     for (const a of animated) {

@@ -69,43 +69,54 @@ const mulc = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 
 const MATS = {};
 
-/** seamless 512 px foliage pattern (grey, multiplies the vertex colours), plus its mean value */
+/** soft-edged, wrap-around ellipse splat into a float luminance buffer (procedural texture painting) */
+function splat(buf, S, cx, cy, rx, ry, rot, val, alpha) {
+  const c = Math.cos(rot), sn = Math.sin(rot), R = Math.ceil(Math.max(rx, ry)), ix = Math.round(cx), iy = Math.round(cy);
+  for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) {
+    const u = (x * c + y * sn) / rx, v = (-x * sn + y * c) / ry, d = u * u + v * v;
+    if (d > 1) continue;
+    const i = (((iy + y) % S + S) % S) * S + (((ix + x) % S + S) % S);
+    buf[i] += (val - buf[i]) * alpha * Math.min(1, (1 - d) * 3);
+  }
+}
+/** RGBA DataTexture from a luminance buffer with a slight per-channel tint */
+function lumTexture(buf, S, tint, colorSpace) {
+  const data = new Uint8Array(S * S * 4);
+  for (let i = 0; i < S * S; i++) {
+    const v = buf[i] * 255;
+    data[i * 4] = clamp(v * tint[0], 0, 255); data[i * 4 + 1] = clamp(v * tint[1], 0, 255); data[i * 4 + 2] = clamp(v * tint[2], 0, 255); data[i * 4 + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(data, S, S, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+  tex.anisotropy = 4;
+  tex.colorSpace = colorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** seamless 512 px foliage pattern (grey, multiplies the vertex colours); userData.mean = average value */
 function leafTexture() {
   if (MATS.leafTex) return MATS.leafTex;
-  const S = 512, cv = document.createElement('canvas');
-  cv.width = cv.height = S;
-  const g = cv.getContext('2d'), rng = mulberry32(4242);
-  g.fillStyle = 'rgb(118,118,118)'; g.fillRect(0, 0, S, S);
-  const wrap = (fn, x, y, r) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) if (x + ox > -r && x + ox < S + r && y + oy > -r && y + oy < S + r) fn(x + ox, y + oy); };
-  // leaf clusters: each cluster = a darker shadow blob, then sunlit leaves on top
+  const S = 512, buf = new Float32Array(S * S).fill(118 / 255), rng = mulberry32(4242);
+  // leaf clusters: a darker shadow blob, then leaves that are lighter on the cluster's upper side
   for (let i = 0; i < 230; i++) {
     const cx = rng() * S, cy = rng() * S, cr = 14 + rng() * 26;
-    const sh = 60 + rng() * 40;
-    g.fillStyle = `rgba(${sh | 0},${sh | 0},${sh | 0},0.55)`;
-    wrap((x, y) => { g.beginPath(); g.ellipse(x + 3, y + 5, cr, cr * 0.8, 0, 0, 6.283); g.fill(); }, cx, cy, cr + 8);
+    splat(buf, S, cx + 3, cy + 5, cr, cr * 0.8, 0, (60 + rng() * 40) / 255, 0.55);
     const n = 10 + (rng() * 14 | 0);
     for (let k = 0; k < n; k++) {
       const a = rng() * 6.283, d = Math.sqrt(rng()) * cr, x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
-      const L = 5 + rng() * 6, Wd = L * (0.45 + 0.2 * rng()), rot = rng() * 3.1416;
-      const up = 1 - (y - cy + cr) / (2 * cr);                   // lighter on the upper side of a cluster
-      const v = 130 + up * 80 + rng() * 45;
-      g.fillStyle = `rgb(${Math.min(255, v) | 0},${Math.min(255, v + 4) | 0},${Math.min(255, v - 6) | 0})`;
-      wrap((xx, yy) => { g.beginPath(); g.ellipse(xx, yy, L, Wd, rot, 0, 6.283); g.fill(); }, x, y, L);
+      const L = 5 + rng() * 6, up = 1 - (y - cy + cr) / (2 * cr);
+      splat(buf, S, x, y, L, L * (0.45 + 0.2 * rng()), rng() * 3.1416, Math.min(255, 130 + up * 80 + rng() * 45) / 255, 1);
     }
   }
-  // fine scattered leaves everywhere
   for (let i = 0; i < 2600; i++) {
-    const x = rng() * S, y = rng() * S, L = 3 + rng() * 4, v = 100 + rng() * 140, rot = rng() * 3.1416;
-    g.fillStyle = `rgba(${v | 0},${v | 0},${v | 0},0.8)`;
-    wrap((xx, yy) => { g.beginPath(); g.ellipse(xx, yy, L, L * 0.5, rot, 0, 6.283); g.fill(); }, x, y, L);
+    const L = 3 + rng() * 4;
+    splat(buf, S, rng() * S, rng() * S, L, L * 0.5, rng() * 3.1416, (100 + rng() * 140) / 255, 0.8);
   }
-  const data = g.getImageData(0, 0, S, S).data;
-  let sum = 0; for (let i = 0; i < data.length; i += 4) sum += data[i];
-  const tex = new THREE.CanvasTexture(cv);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.NoColorSpace;
-  tex.anisotropy = 4;
-  tex.userData.mean = sum / (S * S) / 255;
+  let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i];
+  const tex = lumTexture(buf, S, [1, 1, 1], THREE.NoColorSpace);
+  tex.userData.mean = sum / buf.length;
   MATS.leafTex = tex;
   return tex;
 }
@@ -117,8 +128,7 @@ function leafTexture() {
 function vegMaterial() {
   if (MATS.veg) return MATS.veg;
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0, name: 'vegetation' });
-  const hasDoc = typeof document !== 'undefined';
-  if (hasDoc) {
+  {
     const tex = leafTexture();
     m.onBeforeCompile = (sh) => {
       sh.uniforms.leafMap = { value: tex };
@@ -708,31 +718,14 @@ export function createVegetationKit() {
 
 function lawnTexture() {
   if (MATS.lawnTex) return MATS.lawnTex;
-  const S = 512, cv = document.createElement('canvas');
-  cv.width = cv.height = S;
-  const g = cv.getContext('2d'), rng = mulberry32(77);
-  g.fillStyle = 'rgb(214,218,206)'; g.fillRect(0, 0, S, S);
-  // soft blotches
-  for (let i = 0; i < 260; i++) {
-    const x = rng() * S, y = rng() * S, r = 6 + rng() * 26, l = 190 + rng() * 60;
-    g.fillStyle = `rgba(${l | 0},${(l + 8) | 0},${(l - 20) | 0},0.18)`;
-    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { g.beginPath(); g.arc(x + ox, y + oy, r, 0, 6.283); g.fill(); }
+  const S = 512, buf = new Float32Array(S * S).fill(0.84), rng = mulberry32(77);
+  for (let i = 0; i < 260; i++) { const r = 6 + rng() * 26; splat(buf, S, rng() * S, rng() * S, r, r, 0, 0.74 + rng() * 0.24, 0.18); }
+  for (let i = 0; i < 14000; i++) {       // grass blades and a few soil specks
+    const l = rng(), v = l < 0.45 ? 0.5 + rng() * 0.1 : l < 0.9 ? 0.98 : 0.55;
+    splat(buf, S, rng() * S, rng() * S, 1.5 + rng() * 2.5, 0.6 + rng() * 0.5, rng() * 3.1416, v, 0.25 + rng() * 0.35);
   }
-  // blades
-  g.lineCap = 'round';
-  for (let i = 0; i < 14000; i++) {
-    const x = rng() * S, y = rng() * S, a = rng() * 6.283, len = 2 + rng() * 5;
-    const l = rng();
-    g.strokeStyle = l < 0.45 ? `rgba(120,140,100,${0.25 + rng() * 0.3})` : l < 0.9 ? `rgba(250,255,225,${0.2 + rng() * 0.35})` : `rgba(150,120,80,0.35)`;
-    g.lineWidth = 0.8 + rng() * 1.2;
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); g.stroke();
-  }
-  const tex = new THREE.CanvasTexture(cv);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  MATS.lawnTex = tex;
-  return tex;
+  MATS.lawnTex = lumTexture(buf, S, [1, 1.02, 0.95], THREE.SRGBColorSpace);
+  return MATS.lawnTex;
 }
 
 /**
@@ -762,7 +755,10 @@ export function createLawn(w, d, { seed = 1 } = {}) {
     cols.set(c, i * 3);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-  const mat = MATS.lawn || (MATS.lawn = new THREE.MeshStandardMaterial({ map: lawnTexture(), vertexColors: true, roughness: 0.96, metalness: 0, name: 'lawn' }));
+  const mat = MATS.lawn || (MATS.lawn = new THREE.MeshStandardMaterial({
+    map: lawnTexture(), vertexColors: true, roughness: 0.96, metalness: 0, name: 'lawn',
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2,     // never z-fight with the ground at y = 0
+  }));
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'lawn';
   mesh.receiveShadow = true;
@@ -774,12 +770,12 @@ export function createLawn(w, d, { seed = 1 } = {}) {
 
 /**
  * Snowy Ala-Too range on the far southern horizon, already in world coordinates
- * (z ≈ +1750 … +2800, x ≈ −3400 … +3400, peaks 350–700 m). Lighting and aerial perspective are baked into
+ * (z ≈ +1750 … +2800, x ≈ −4600 … +4600 so the range never visibly ends, peaks 350–700 m). Lighting and aerial perspective are baked into
  * vertex colours (unlit, fog-free, not tone-mapped) so the range reads crisp and bright against the sky.
  * @returns {THREE.Group}
  */
 export function createMountains() {
-  const X0 = -3400, X1 = 3400, Z0 = 1720, Z1 = 2800, DX = 15, DZ = 14;
+  const X0 = -4600, X1 = 4600, Z0 = 1720, Z1 = 2800, DX = 17, DZ = 14;
   const nx = Math.round((X1 - X0) / DX), nz = Math.round((Z1 - Z0) / DZ);
   const W = nx + 1, Hn = nz + 1;
   const hts = new Float32Array(W * Hn), env = new Float32Array(W * Hn), rid = new Float32Array(W * Hn);
@@ -806,7 +802,7 @@ export function createMountains() {
     let h = main, e = crestH, rr = r * 0.7 + det * 0.3;
     if (back > h) { h = back; e = bH; rr = rb; }
     if (front > h) { h = front; e = fH * 1.6; rr = rf; }
-    const ends = 0.3 + 0.7 * smooth(3450, 2500, Math.abs(x));
+    const ends = 0.12 + 0.88 * smooth(4700, 3300, Math.abs(x));
     const base = smooth(1725, 1890, z) * smooth(2800, 2720, z);
     return [h * ends * base, e * ends, rr];
   };

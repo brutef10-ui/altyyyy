@@ -101,7 +101,7 @@ const lensWorld = (cam) => {
 };
 const poleS = world.poles.S, poleW = world.poles.W;
 const starPos = wp(world.star.group);
-const driverHead = wp(world.driver.group, V(0, 0.72, 0));
+const driverHead = wp(world.driver.group, V(0, 0.70, -0.1));
 const workerPos = wp(world.worker.group);
 const headS = poleS.signalHead ? wp(poleS.signalHead) : wp(poleS.group, V(-6.6, 5.4, 0));
 const lensS = lensWorld(poleS.smartCam);
@@ -112,14 +112,14 @@ const officer = wp(world.finaleOfficer.group, V(0, 1.55, 0));
 
 const SHOTS = [
   { id: 'title', pos: starPos.clone().add(V(9, -3, 27)), target: starPos.clone().add(V(1, 0.5, 0)), shift: .2 },
-  { id: 'city', pos: V(-150, 118, 236), target: V(4, 0, -6), shift: .12, drift: { pos: V(-104, 78, 166), dur: 28 } },
-  { id: 'driver', pos: driverHead.clone().add(V(-4.3, 0.28, 2.5)), target: driverHead.clone().add(V(0, -0.1, 0)), shift: .2, fov: 38 },
+  { id: 'city', pos: V(-104, 150, 178), target: V(4, 0, -4), shift: .13, drift: { pos: V(-66, 98, 118), dur: 28 } },
+  { id: 'driver', pos: driverHead.clone().add(V(-2.7, 0.22, 1.75)), target: driverHead.clone().add(V(0.15, -0.12, 0)), shift: .22, fov: 36 },
   { id: 'works', pos: workerPos.clone().add(V(-3.4, 1.65, 7.2)), target: workerPos.clone().add(V(0, 1.05, 0)), shift: .19 },
   { id: 'avenue', pos: V(388, 17, 168), target: V(405, 2, -60), shift: .16 },
   { id: 'campus', pos: V(-64, 7.5, 342), target: V(-34, 1.4, 309), shift: .2 },
   { id: 'signal', pos: headS.clone().add(V(-5.2, -0.7, 9.4)), target: headS.clone(), shift: .2 },
   { id: 'camera', pos: lensS.p.clone().add(V(-2.4, 0.45, 3.9)), target: lensS.p.clone(), shift: .2, fov: 38 },
-  { id: 'regulator', pos: regS.clone().add(V(-8.6, -3.1, 13.5)), target: regS.clone(), shift: .17 },
+  { id: 'regulator', pos: regS.clone().add(V(-5.6, -2.5, 8.8)), target: regS.clone().add(V(0, -0.3, 0)), shift: .17 },
   { id: 'pov', pos: lensS.p, target: null, pov: true, shift: -.12, fov: 50 },
   { id: 'seconds', pos: V(-3, 27, 31), target: V(0, 0, -1), shift: -.19 },
   { id: 'benefits', pos: lensW.p.clone().add(V(-4.6, 0.7, -2.7)), target: lensW.p.clone(), shift: .2, fov: 38 },
@@ -188,7 +188,7 @@ function showPanel(i) {
   if (reduce) { G.set(el, { opacity: 1 }); G.set(items, { opacity: 1, y: 0 }); return; }
   G.fromTo(el, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .55, ease: 'power3.out' });
   G.fromTo(items, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: .6, stagger: .07, ease: 'power3.out', delay: .1 });
-  const bars = el.querySelectorAll('.km .bar, .track .fill');
+  const bars = el.querySelectorAll('.km .km-bar, .track .fill');
   if (bars.length) G.fromTo(bars, { scaleY: 0, scaleX: (i2, b) => b.classList.contains('fill') ? 0 : 1 }, { scaleY: 1, scaleX: 1, duration: 1, stagger: .15, ease: 'power3.out', delay: .4, transformOrigin: 'left bottom' });
 }
 function hidePanel(i) {
@@ -498,5 +498,5 @@ window.__sc = {
     world.star.group.visible = s.id === 'title';
     cur = n; hud(); showPanel(n); enterShot(n);
   },
-  go, state: () => ({ cur, busy }), shots: SHOTS.map(s => s.id),
+  go, state: () => ({ cur, busy, frames, t: clock.elapsedTime, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }), shots: SHOTS.map(s => s.id),
 };

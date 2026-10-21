@@ -10,7 +10,8 @@ const root = path.resolve(__dirname, '..');
       // until a real model module exists in src/, resolve it to its stub (for early integration tests)
       b.onResolve({ filter: /^\.\/(vehicles|buildings|nature|people|roads|devices|logo)\.js$/ }, a => {
         const real = path.join(root, 'src', a.path.slice(2));
-        if (fs.existsSync(real) && !process.env.STUBS) return { path: real };
+        const forced = (process.env.STUBS || '').split(',');
+        if (fs.existsSync(real) && !forced.includes('all') && !forced.includes(a.path.slice(2, -3))) return { path: real };
         console.log('  stub:', a.path);
         return { path: path.join(root, 'stubs', a.path.slice(2)) };
       });

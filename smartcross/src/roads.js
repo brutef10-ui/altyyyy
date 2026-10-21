@@ -359,6 +359,21 @@ function texBrick() {
   ctx.putImageData(img, 0, 0);
   return (TEX.brick = { map: toTex(c), normal: heightToNormal(h, S, 2.2) });
 }
+/** Tactile warning tiles (truncated domes), 0.3 m tile. */
+function texTactile() {
+  if (TEX.tactile) return TEX.tactile;
+  const S = 128, c = makeCanvas(S, S), ctx = c.getContext('2d'), rnd = mulberry32(123);
+  const h = new Float32Array(S * S), img = ctx.createImageData(S, S), d = img.data, P = S / 5;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = (x % P) - P / 2 + 0.5, dy = (y % P) - P / 2 + 0.5, r = Math.hypot(dx, dy) / (P * 0.36);
+    const hh = r < 0.75 ? 1 : r < 1 ? (1 - r) / 0.25 : 0;
+    h[y * S + x] = hh;
+    const n = (rnd() - 0.5) * 14 + hh * 10, i = 4 * (y * S + x);
+    d[i] = clamp(196 + n, 0, 255); d[i + 1] = clamp(160 + n, 0, 255); d[i + 2] = clamp(70 + n * 0.5, 0, 255); d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return (TEX.tactile = { map: toTex(c), normal: heightToNormal(h, S, 2.5) });
+}
 function texWood() {
   if (TEX.wood) return TEX.wood;
   const c = makeCanvas(256, 64), ctx = c.getContext('2d'), rnd = mulberry32(99);
@@ -427,6 +442,7 @@ const M = {
   curb: () => mat('curb', () => std({ map: texCurb(), roughness: 0.86 })),
   paving: () => mat('paving', () => { const t = texPaving(); return std({ map: t.map, normalMap: t.normal, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.9 }); }),
   median: () => mat('median', () => std({ map: texGrass(), color: 0xd8dcc8, roughness: 1 })),
+  tactile: () => mat('tactile', () => { const t = texTactile(); return std({ map: t.map, normalMap: t.normal, roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }); }),
   path: () => mat('path', () => { const t = texPath(); return std({ map: t.map, normalMap: t.normal, normalScale: new THREE.Vector2(0.7, 0.7), roughness: 0.88, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }); }),
   ground: () => mat('ground', () => std({ map: texGround(), vertexColors: true, roughness: 1, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 4 })),
   pole: () => mat('pole', () => std({ color: 0x9aa0a4, metalness: 0.65, roughness: 0.4 })),
@@ -578,9 +594,9 @@ function markDashed(gb, F, l, s0, s1, w = LINE_W) {
 }
 /** Lane arrow on the road: tail at strip s = sTail, pointing toward −u (dirSign −1) or +u (+1), lane centre lc. */
 function markArrow(gb, F, sTail, lc, dirSign, kind) {
-  // local (r, f): r to the traveller's right, f forward. world: s = sTail + dirSign*f ; l = lc + dirSign*r*(−1)…
-  // travelling along dirSign*u, the traveller's right is −dirSign*n  → l = lc − dirSign * r
-  const map = (r, f) => F.P(sTail + dirSign * f, lc - dirSign * r);
+  // local (r, f): r to the traveller's right, f forward. Travelling along d = dirSign*u, the traveller's right is
+  // (−d.z, d.x) = dirSign*n  →  s = sTail + dirSign*f, l = lc + dirSign*r
+  const map = (r, f) => F.P(sTail + dirSign * f, lc + dirSign * r);
   const poly = pts => markPoly(gb, pts.map(([r, f]) => map(r, f)));
   const sw = 0.075;
   poly([[-sw, 0], [sw, 0], [sw, 3.5], [-sw, 3.5]]);
@@ -716,6 +732,21 @@ function buildQuadrant(B, Q) {
   }
   hpoly(asphaltGB, mp(asphalt), Y_ROAD, aUV, aCol);
   hpoly(B.paving, mp(walk), Y_WALK, pUV);
+  if (Q.cross) {   // tactile warning pads behind the curb at both ends of each crosswalk
+    const [c0, c1] = Q.cross, ca = cz + R, cb = cx + R;
+    const curbA = b => mode === 'concave' && b < cb ? ca - Math.sqrt(Math.max(0, R * R - (b - cb) ** 2)) : cz;
+    const curbB = a => mode === 'concave' && a < ca ? cb - Math.sqrt(Math.max(0, R * R - (a - ca) ** 2)) : cx;
+    const pad = (fn, swap) => {
+      const inner = [], outer = [];
+      for (let i = 0; i <= 8; i++) {
+        const t = c0 + (c1 - c0) * i / 8, o = fn(t) + W + 0.05;
+        inner.push(swap ? [t, o] : [o, t]); outer.push(swap ? [t, o + 0.6] : [o + 0.6, t]);
+      }
+      hpoly(B.tactile, mp([...inner, ...outer.reverse()]), Y_WALK + 0.004, (x, z) => [x / 0.3, z / 0.3]);
+    };
+    if (mode === 'concave' || mode === 'z') pad(curbA, false);
+    if (mode === 'concave' || mode === 'x') pad(curbB, true);
+  }
   sweep(B.curb, mp(curb), curbN.map(dirW), PROF_CURB, { vScale: 2 });
   for (const [p0, p1, n] of exposed) sweep(B.curb, mp([p0, p1]), [dirW(n), dirW(n)], PROF_EDGE, { uScale: 2, vScale: 2 });
 }
@@ -759,7 +790,7 @@ export function createRoadNetwork() {
 
   /** Builds and merges everything; returns a THREE.Group (≈ 8 meshes). */
   function finish() {
-    const B = { asphalt: new GB(), asphaltFresh: new GB(), mark: new GB(), curb: new GB(), paving: new GB(), median: new GB(), path: new GB(), grate: new GB() };
+    const B = { asphalt: new GB(), asphaltFresh: new GB(), mark: new GB(), curb: new GB(), paving: new GB(), median: new GB(), path: new GB(), grate: new GB(), tactile: new GB() };
     const R = CORNER_R;
     // --- detect T-joins: a strip end touching another strip's outer sidewalk edge, perpendicular to it
     const tjoins = [];
@@ -793,6 +824,7 @@ export function createRoadNetwork() {
         const hasX = (sa > 0 ? J.arms.e : J.arms.w) > J.core + 0.5, hasZ = (sb > 0 ? J.arms.s : J.arms.n) > J.core + 0.5;
         buildQuadrant(B, {
           map: (a, b) => [J.x + sa * a, J.z + sb * b], cz: J.hw, cx: J.hw, ea: J.core, eb: J.core, full: true, fresh: J.fresh,
+          cross: [J.hw + 1.5, J.hw + 5.5],
           mode: hasX && hasZ ? 'concave' : hasX ? 'x' : hasZ ? 'z' : 'convex',
         });
       }
@@ -823,6 +855,7 @@ export function createRoadNetwork() {
     add(B.paving, M.paving(), { name: 'sidewalks' });
     add(B.median, M.median(), { name: 'medianGrass' });
     add(B.path, M.path(), { cast: false, name: 'paths' });
+    add(B.tactile, M.tactile(), { cast: false, name: 'tactilePaving' });
     return grp;
   }
 

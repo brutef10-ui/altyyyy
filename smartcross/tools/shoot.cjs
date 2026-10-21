@@ -33,23 +33,26 @@ server.listen(0, async () => {
     await page.waitForFunction('window.__sc', null, { timeout: 300000 });
   } catch (e) { console.log('TIMEOUT waiting for world', logs.join('\n')); process.exit(1); }
   console.log('world ready in', ((Date.now() - t0) / 1000).toFixed(1), 's');
-  const stage = await page.$('#stage');
+  const box = await (await page.$('#stage')).boundingBox();
+  const snap = (file) => page.screenshot({ path: file, clip: box, timeout: 300000, animations: 'allow', caret: 'initial' });
   const shots = (opt('shots') || '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14').split(',').map(Number);
   await page.waitForTimeout(2500);
   if (argv.includes('--fly')) {
     for (const n of shots) {
       if (n > 0) await page.evaluate(n => window.__sc.go(n), n);
       await page.waitForTimeout(1200);
-      await stage.screenshot({ path: path.join(root, `${out}-${n}-mid.png`) });
+      await snap(path.join(root, `${out}-${n}-mid.png`));
       await page.waitForFunction('!window.__sc.state().busy', null, { timeout: 120000 });
       await page.waitForTimeout(1500);
-      await stage.screenshot({ path: path.join(root, `${out}-${n}.png`) });
+      await snap(path.join(root, `${out}-${n}.png`));
+      console.log('shot', n, JSON.stringify(await page.evaluate(() => window.__sc.state())));
     }
   } else {
     for (const n of shots) {
       await page.evaluate(n => window.__sc.jump(n), n);
-      await page.waitForTimeout(2600);
-      await stage.screenshot({ path: path.join(root, `${out}-${n}.png`) });
+      await page.waitForTimeout(4000);
+      await snap(path.join(root, `${out}-${n}.png`));
+      console.log('shot', n, JSON.stringify(await page.evaluate(() => window.__sc.state())));
     }
   }
   const info = await page.evaluate(() => { const c = document.getElementById('gl'); return { w: c.width, h: c.height }; });
