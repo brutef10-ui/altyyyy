@@ -138,7 +138,18 @@ async function* linesOf(stream) {
   if (rest) yield rest;
 }
 
-export async function readBackup(file, key, { onHeader, onRow } = {}) {
+export async function readBackup(file, key, options = {}) {
+  try {
+    return await readBackupUnchecked(file, key, options);
+  } catch (error) {
+    if (/authenticate|incorrect header check|invalid (stored|distance|code)|unexpected end/i.test(error.message)) {
+      throw new Error('Не удалось расшифровать копию: неверный BACKUP_ENCRYPTION_KEY или файл повреждён.');
+    }
+    throw error;
+  }
+}
+
+async function readBackupUnchecked(file, key, { onHeader, onRow } = {}) {
   const decrypted = await decryptFileStream(file, key);
   const gunzip = createGunzip();
   decrypted.on('error', (error) => gunzip.destroy(error));
