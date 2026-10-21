@@ -132,8 +132,15 @@ export async function buildWorld(scene, progress = () => {}) {
   const kits = new Map(), vegKits = new Map();
   const kitAt = (x, z) => { const k = chunkOf(x, z); if (!kits.has(k)) kits.set(k, createBuildingKit()); return kits.get(k); };
   const vegAt = (x, z) => { const k = chunkOf(x, z); if (!vegKits.has(k)) vegKits.set(k, createVegetationKit()); return vegKits.get(k); };
+  // obstacles the camera must not fly through (buildings as boxes, tree crowns as cylinders)
+  const obstacles = { boxes: [], trees: [] };
+  const TREE_SIZE = { poplar: [2.8, 25], elm: [5.5, 12], maple: [5, 11], oak: [6, 13], spruce: [3.5, 15], birch: [3.5, 14] };
   const veg = {
-    addTree: (x, z, o) => vegAt(x, z).addTree(x, z, o),
+    addTree: (x, z, o) => {
+      const [r, h] = TREE_SIZE[o.type] || TREE_SIZE.elm, k = o.scale || 1;
+      obstacles.trees.push({ x, z, r: r * k, h: h * k });
+      return vegAt(x, z).addTree(x, z, o);
+    },
     addBush: (x, z, o) => vegAt(x, z).addBush(x, z, o),
     addHedge: (x1, z1, x2, z2, o) => vegAt(x1, z1).addHedge(x1, z1, x2, z2, o),
     addFlowerBed: (x, z, w, d) => vegAt(x, z).addFlowerBed(x, z, w, d),
@@ -162,6 +169,9 @@ export async function buildWorld(scene, progress = () => {}) {
     const c = Math.cos(b.rotY), s = Math.abs(Math.sin(b.rotY));
     const hw = (Math.abs(c) * b.w + s * b.d) / 2, hd = (s * b.w + Math.abs(c) * b.d) / 2;
     footprints.push([b.x - hw, b.z - hd, b.x + hw, b.z + hd]);
+    const f = b.floors;
+    const h = { panel: f * 3 + 5, brick: f * 3 + 5.5, office: 4.5 + 3.3 * (f - 1) + 7, shop: 4 + 3 * (f - 1) + 3, campus: 3.6 * f + 6, house: 2.9 * f + 4.5 }[b.style] || f * 3.4 + 6;
+    obstacles.boxes.push({ x0: b.x - hw, z0: b.z - hd, x1: b.x + hw, z1: b.z + hd, h });
   };
 
   const perimeter = (bl, zone) => {
@@ -662,7 +672,7 @@ export async function buildWorld(scene, progress = () => {}) {
 
   Object.assign(world, {
     root, poles, regulators, hero, driver, worker, works, star, fenceGroup, fenceMats, post, finaleOfficer,
-    records, fleets, westIn, setRelease, heroPos,
+    records, fleets, westIn, setRelease, heroPos, obstacles,
     getRelease: () => tau,
     anchors: {
       M: new THREE.Vector3(0, 0, 0),

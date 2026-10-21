@@ -37,7 +37,18 @@ server.listen(0, async () => {
   const snap = (file) => page.screenshot({ path: file, clip: box, timeout: 300000, animations: 'allow', caret: 'initial' });
   const shots = (opt('shots') || '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14').split(',').map(Number);
   await page.waitForTimeout(2500);
-  if (argv.includes('--fly')) {
+  if (opt('pose')) {
+    // --pose "2-3:0.2,0.5,0.8;3-4:0.5" → mid-flight frames
+    for (const part of opt('pose').split(';')) {
+      const [ij, us] = part.split(':'); const [i, j] = ij.split('-').map(Number);
+      for (const u of us.split(',').map(Number)) {
+        const at = await page.evaluate(([i, j, u]) => window.__sc.pose(i, j, u), [i, j, u]);
+        await page.waitForTimeout(2500);
+        await snap(path.join(root, `${out}-${i}-${j}-${u}.png`));
+        console.log('pose', i, j, u, JSON.stringify(at));
+      }
+    }
+  } else if (argv.includes('--fly')) {
     for (const n of shots) {
       if (n > 0) await page.evaluate(n => window.__sc.go(n), n);
       await page.waitForTimeout(1200);

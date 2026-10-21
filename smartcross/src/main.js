@@ -138,47 +138,193 @@ const SHOTS = [
 }
 
 /* ---------- camera rig + flights ---------- */
-const rig = { pos: SHOTS[0].pos.clone(), target: SHOTS[0].target.clone(), shift: SHOTS[0].shift, fov: 40 };
+// At rest the camera looks at rig.target; during a flight it is driven by rig.quat (slerped orientation).
+const rig = { pos: SHOTS[0].pos.clone(), target: SHOTS[0].target.clone(), quat: null, shift: SHOTS[0].shift, fov: 40 };
 const focus = rig.target.clone();
 let drift = null;
 function applyRig() {
   camera.position.copy(rig.pos);
   camera.up.set(0, 1, 0);
-  camera.lookAt(rig.target);
+  if (rig.quat) camera.quaternion.copy(rig.quat); else camera.lookAt(rig.target);
   if (camera.fov !== rig.fov) camera.fov = rig.fov;
   camera.setViewOffset(SW, SH, -rig.shift * SW, 0, SW, SH);
   camera.updateProjectionMatrix();
 }
-const bez = (a, b, c, d, t) => {
-  const u = 1 - t;
-  return a.clone().multiplyScalar(u * u * u).addScaledVector(b, 3 * u * u * t).addScaledVector(c, 3 * u * t * t).addScaledVector(d, t * t * t);
-};
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const lookQuat = (from, to) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(from, to, V(0, 1, 0)));
 
-function flight(to, onUpdate) {
+/* Obstacles: buildings (boxes), tree crowns and poles (cylinders), and cars at their current spots.
+   They are bucketed into a 16 m grid so a point test only looks at its own cell. */
+const OB = world.obstacles;
+for (const p of Object.values(world.poles)) {
+  const a = wp(p.group), b = wp(p.group, V(-9.2, 0, 0));
+  OB.boxes.push({ x0: Math.min(a.x, b.x) - .8, z0: Math.min(a.z, b.z) - .8, x1: Math.max(a.x, b.x) + .8, z1: Math.max(a.z, b.z) + .8, y0: 4.4, h: 7.2 });
+  OB.trees.push({ x: a.x, z: a.z, r: .9, h: 10 });
+}
+const CAR_H = { bus: 3.5, minibus: 3, suv: 2.1, pickup: 2.1 };
+const CELL = 16, MAXPAD = 5, PAD = 1.4;
+const cellKey = (x, z) => Math.floor(x / CELL) * 100003 + Math.floor(z / CELL);
+function bucket(map, o, x0, z0, x1, z1) {
+  for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(z0 / CELL); j <= Math.floor(z1 / CELL); j++) {
+    const k = i * 100003 + j;
+    let a = map.get(k);
+    if (!a) map.set(k, a = []);
+    a.push(o);
+  }
+}
+const grid = new Map();
+for (const b of OB.boxes) { b.box = true; bucket(grid, b, b.x0 - MAXPAD, b.z0 - MAXPAD, b.x1 + MAXPAD, b.z1 + MAXPAD); }
+for (const t of OB.trees) bucket(grid, t, t.x - t.r - MAXPAD, t.z - t.r - MAXPAD, t.x + t.r + MAXPAD, t.z + t.r + MAXPAD);
+let carGrid = new Map();
+function snapshotCars() {
+  carGrid = new Map();
+  for (const c of world.records) {
+    const o = { x: c.x, z: c.z, r: c.len * .5 + .3, h: CAR_H[c.type] || 1.9 };
+    bucket(carGrid, o, o.x - o.r - 1, o.z - o.r - 1, o.x + o.r + 1, o.z + o.r + 1);
+  }
+}
+const hit = (o, p, pad) => o.box
+  ? p.y < o.h + pad && p.y > (o.y0 ?? -9) - pad && p.x > o.x0 - pad && p.x < o.x1 + pad && p.z > o.z0 - pad && p.z < o.z1 + pad
+  : p.y < o.h + Math.min(pad, 1.5) && (p.x - o.x) ** 2 + (p.z - o.z) ** 2 < (o.r + pad) ** 2;
+function blocked(p, pad = PAD) {
+  if (p.y < .7) return true;
+  const k = cellKey(p.x, p.z);
+  const a = grid.get(k);
+  if (a) for (const o of a) if (hit(o, p, pad)) return true;
+  const c = carGrid.get(k);
+  if (c) for (const o of c) if (hit(o, p, Math.min(pad, .6))) return true;
+  return false;
+}
+// a path is clear when every sample away from its two ends (fixed shot positions) is free
+function clearAlong(fn, n, a, b, skipA = 3, skipB = 3, pad = PAD) {
+  for (let i = 1; i < n; i++) {
+    const p = fn(i / n);
+    if (p.distanceTo(a) < skipA || p.distanceTo(b) < skipB) continue;
+    if (blocked(p, pad)) return false;
+  }
+  return true;
+}
+const segClear = (a, b, skip = 3, pad = PAD) => clearAlong(k => a.clone().lerp(b, k), Math.max(4, Math.ceil(a.distanceTo(b) / .8)), a, b, skip, skip, pad);
+const columnClear = (e, H, pad) => { for (let y = e.y; y <= H + 2; y += 1.5) if (blocked(V(e.x, y, e.z), pad)) return false; return true; };
+function corridorTop(a, b) {
+  // tallest obstacle near the straight line between a and b (in plan), so the cruise altitude clears it
+  const ax = a.x, az = a.z, dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1;
+  const near = (x, z, r) => { const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)); return (x - ax - dx * t) ** 2 + (z - az - dz * t) ** 2 < r * r; };
+  let top = 0;
+  for (const o of OB.boxes) if (near((o.x0 + o.x1) / 2, (o.z0 + o.z1) / 2, Math.max(o.x1 - o.x0, o.z1 - o.z0) / 2 + 30)) top = Math.max(top, o.h);
+  for (const t of OB.trees) if (near(t.x, t.z, t.r + 30)) top = Math.max(top, t.h);
+  return top;
+}
+// the nearest point a few metres up from a street-level shot whose vertical column to the cruise altitude
+// stays well clear of facades and crowns; points behind the view are preferred (the camera pulls back)
+function escape(p, view, H) {
+  if (p.y >= H - 4) return p.clone();
+  const back = V(-view.x, 0, -view.z);
+  if (back.lengthSq() < 1e-4) back.set(0, 0, 1);
+  back.normalize();
+  let best = null, bestScore = Infinity;
+  for (let r = 0; r <= 30; r += 2) {
+    if (best && r >= bestScore) break;
+    const steps = r === 0 ? 1 : Math.ceil(2 * Math.PI * r / 2.5);
+    for (let s = 0; s < steps; s++) {
+      const ang = s / steps * Math.PI * 2, dir = V(Math.cos(ang), 0, Math.sin(ang));
+      for (const up of [4, 8]) {
+        const score = r + (r ? (1 - dir.dot(back)) * 3 : 0) + up * .25;
+        if (score >= bestScore) continue;
+        const e = p.clone().addScaledVector(dir, r).add(V(0, up, 0));
+        if (!columnClear(e, H, 3.2) || !segClear(p, e, 2.5)) continue;
+        best = e; bestScore = score;
+      }
+    }
+  }
+  return best;
+}
+
+function planPath(p0, v0, p1, v1, approachIn, approachOut) {
+  snapshotCars();
+  const pts = (arr) => arr.filter((q, i) => i === 0 || q.distanceTo(arr[i - 1]) > .8);
+  const build = (arr, type = 'centripetal') => new THREE.CatmullRomCurve3(pts(arr), false, type, .5);
+  // flying into / out of the SmartCross lens passes through the housing on purpose
+  const skipA = approachOut ? 8 : 3, skipB = approachIn ? 8 : 3;
+  const ok = (c) => clearAlong(k => c.getPointAt(k), Math.max(320, Math.ceil(c.getLength() / .6)), p0, p1, skipA, skipB);
+  const head = approachOut ? [p0, p0.clone().addScaledVector(approachOut, 7)] : [p0];
+  const tail = approachIn ? [p1.clone().addScaledVector(approachIn, 7), p1] : [p1];
+  const flat = Math.hypot(p1.x - p0.x, p1.z - p0.z), d = p0.distanceTo(p1);
+  // 1. short or high hops: straight, then a gentle arc
+  if (flat < 90 || Math.min(p0.y, p1.y) > 70) {
+    const direct = build([...head, ...tail]);
+    if (ok(direct)) return { curve: direct, cruise: false };
+    const mid = p0.clone().lerp(p1, .5).add(V(0, THREE.MathUtils.clamp(d * .25, 3, 30), 0));
+    const arc = build([...head, mid, ...tail]);
+    if (ok(arc)) return { curve: arc, cruise: false };
+  }
+  // 2. pull back and climb, cruise above the rooftops, descend into the next street
+  let H = Math.max(36, corridorTop(p0, p1) + 14, p0.y, p1.y);
+  for (let attempt = 0; attempt < 5; attempt++, H += 12) {
+    const e0 = approachOut ? head[1] : escape(p0, v0, H), e1 = approachIn ? tail[0] : escape(p1, v1, H);
+    if (!e0 || !e1) continue;
+    const toward = V(e1.x - e0.x, 0, e1.z - e0.z);
+    const span = toward.length();
+    toward.normalize();
+    const lead = Math.min(50, span * .2);
+    const m0 = V(e0.x, e0.y + (H - e0.y) * .55, e0.z), m1 = V(e1.x, e1.y + (H - e1.y) * .55, e1.z);
+    let t0 = V(e0.x, H, e0.z).addScaledVector(toward, lead), t1 = V(e1.x, H, e1.z).addScaledVector(toward, -lead);
+    if (!segClear(m0, t0, 0, 3)) t0 = V(e0.x, H, e0.z);
+    if (!segClear(t1, m1, 0, 3)) t1 = V(e1.x, H, e1.z);
+    const way = [...head, ...(approachOut ? [] : [e0]), m0, t0, t1, m1, ...(approachIn ? [] : [e1]), ...tail];
+    for (const type of ['centripetal', 'chordal']) {
+      const c = build(way, type);
+      if (ok(c)) return { curve: c, cruise: true };
+    }
+  }
+  // 3. last resort: straight up, across and down
+  const H2 = Math.max(H, 90);
+  return { curve: build([...head, V(head.at(-1).x, H2, head.at(-1).z), V(tail[0].x, H2, tail[0].z), ...tail], 'chordal'), cruise: true, fallback: true };
+}
+
+// velocity profile: smooth acceleration, a steady cruise, a long gentle braking; integrated into a 0..1 ease
+const EASE = (() => {
+  const N = 400, v = [], acc = [0];
+  for (let i = 0; i <= N; i++) { const t = i / N; v.push(smooth(0, .24, t) * (1 - smooth(.62, 1, t)) + 1e-3); }
+  for (let i = 1; i <= N; i++) acc.push(acc[i - 1] + (v[i] + v[i - 1]) / 2);
+  return (t) => { const x = Math.min(N, Math.max(0, t * N)), i = Math.floor(x), f = x - i; return (acc[i] + (acc[Math.min(N, i + 1)] - acc[i]) * f) / acc[N]; };
+})();
+
+// Plans one hop and returns its duration and a pose function u → camera state (u = eased progress 0..1).
+function makeFlight(to, from) {
   const p0 = rig.pos.clone(), t0 = rig.target.clone(), s0 = rig.shift, f0 = rig.fov;
   const p1 = to.pos.clone(), t1 = to.target.clone(), s1 = to.shift, f1 = to.fov || 40;
-  const d = p0.distanceTo(p1);
-  // long hops between street-level shots arc up over the rooftops; high shots don't need the climb
-  const lift = d > 35 ? THREE.MathUtils.clamp(d * .32 - Math.min(p0.y, p1.y) * .5, 0, 150) : 0;
-  const c0 = p0.clone().lerp(p1, .18).add(V(0, lift, 0));
-  const c1 = to.approach ? p1.clone().addScaledVector(to.approach, Math.min(14, d * .4)) : p0.clone().lerp(p1, .82).add(V(0, lift, 0));
-  // look a little ahead of the travel while cruising so long jumps read as flying, not panning
-  const ahead = (k) => bez(p0, c0, c1, p1, Math.min(1, k + .12));
-  const st = { k: 0 };
-  return G.to(st, {
-    k: 1, duration: Math.min(4.6, 1.5 + d / 170), ease: 'power2.inOut',
-    onUpdate() {
-      const k = st.k;
-      rig.pos.copy(bez(p0, c0, c1, p1, k));
-      const look = t0.clone().lerp(t1, smooth(.1, .9, k));
-      if (d > 120) look.lerp(ahead(k), Math.sin(Math.PI * k) * .55);
-      rig.target.copy(look);
-      rig.shift = s0 + (s1 - s0) * smooth(.2, 1, k);
-      rig.fov = f0 + (f1 - f0) * k;
-      onUpdate?.(k);
+  const { curve, cruise } = planPath(p0, t0.clone().sub(p0), p1, t1.clone().sub(p1), to.approach, from?.approach);
+  const L = curve.getLength();
+  const q0 = rig.quat ? rig.quat.clone() : lookQuat(p0, t0), q1 = lookQuat(p1, t1);
+  const qT = new THREE.Quaternion(), look = new THREE.Vector3(), tan = new THREE.Vector3();
+  return {
+    duration: THREE.MathUtils.clamp(1.9 + L / 70, 2.3, 7),
+    apply(u) {
+      rig.pos.copy(curve.getPointAt(u));
+      const q = q0.clone().slerp(q1, smooth(.08, .92, u));
+      if (cruise) {
+        // while cruising, look ahead along the flight with the nose a little down, like a drone
+        curve.getTangentAt(Math.min(1, u + .05), tan);
+        tan.y = 0;
+        if (tan.lengthSq() > 1e-5) {
+          tan.normalize();
+          look.copy(rig.pos).add(tan).add(V(0, -.42, 0));
+          qT.copy(lookQuat(rig.pos, look));
+          q.slerp(qT, smooth(.04, .3, u) * (1 - smooth(.62, .9, u)) * .8);
+        }
+      }
+      rig.quat = q;
+      rig.target.copy(t0).lerp(t1, smooth(.1, .9, u));
+      rig.shift = s0 + (s1 - s0) * smooth(.25, 1, u);
+      rig.fov = f0 + (f1 - f0) * smooth(0, 1, u);
     },
-  });
+    end() { rig.quat = null; rig.pos.copy(p1); rig.target.copy(t1); },
+  };
+}
+function flight(to, from) {
+  const f = makeFlight(to, from), st = { k: 0 };
+  return G.to(st, { k: 1, duration: f.duration, ease: 'none', onUpdate: () => f.apply(EASE(st.k)), onComplete: () => f.end() });
 }
 
 /* ---------- panels ---------- */
@@ -385,7 +531,7 @@ function go(n) {
   if (SHOTS[n].id === 'title' || SHOTS[from].id === 'title') world.star.group.visible = true;
   const relFrom = world.getRelease(), relTo = n >= RELEASE_AT ? RELEASE_END : 0;
   if (reduce) {
-    Object.assign(rig, { pos: SHOTS[n].pos.clone(), target: SHOTS[n].target.clone(), shift: SHOTS[n].shift, fov: SHOTS[n].fov || 40 });
+    Object.assign(rig, { pos: SHOTS[n].pos.clone(), target: SHOTS[n].target.clone(), quat: null, shift: SHOTS[n].shift, fov: SHOTS[n].fov || 40 });
     world.setRelease(relTo);
     arrive(n);
     return;
@@ -393,7 +539,7 @@ function go(n) {
   busy = true;
   const rel = { v: relFrom };
   tl = G.timeline({ onComplete: () => { busy = false; arrive(n); } });
-  tl.add(flight(SHOTS[n]), 0);
+  tl.add(flight(SHOTS[n], SHOTS[from]), 0);
   if (relFrom !== relTo) {
     // on the "seconds" shot the W–E platoon starts with the flight and freezes as the camera lands
     tl.to(rel, { v: relTo, duration: tl.duration(), ease: relTo > relFrom ? 'power1.out' : 'power2.inOut', onUpdate: () => world.setRelease(rel.v) }, 0);
@@ -494,10 +640,37 @@ window.__sc = {
     panels.forEach((p, i) => { if (i !== n) { p.classList.remove('is-on'); p.style.opacity = 0; } });
     leaveShot(cur);
     const s = SHOTS[n];
-    Object.assign(rig, { pos: s.pos.clone(), target: s.target.clone(), shift: s.shift, fov: s.fov || 40 });
+    Object.assign(rig, { pos: s.pos.clone(), target: s.target.clone(), quat: null, shift: s.shift, fov: s.fov || 40 });
     world.setRelease(n >= RELEASE_AT ? RELEASE_END : 0);
     world.star.group.visible = s.id === 'title';
     cur = n; hud(); showPanel(n); enterShot(n);
+  },
+  // checks every planned hop (both directions) for samples inside obstacles
+  // poses the camera mid-flight between shots i and j at eased progress u (for screenshots)
+  pose(i, j, u) {
+    const s = SHOTS[i];
+    Object.assign(rig, { pos: s.pos.clone(), target: s.target.clone(), quat: null, shift: s.shift, fov: s.fov || 40 });
+    panels.forEach(p => { p.classList.remove('is-on'); p.style.opacity = 0; });
+    world.star.group.visible = true;
+    const f = makeFlight(SHOTS[j], s);
+    f.apply(u);
+    return rig.pos.toArray().map(v => +v.toFixed(1));
+  },
+  planTest() {
+    const out = [];
+    const t0 = performance.now();
+    for (let i = 0; i < SHOTS.length - 1; i++) for (const [a, b] of [[SHOTS[i], SHOTS[i + 1]], [SHOTS[i + 1], SHOTS[i]]]) {
+      const r = planPath(a.pos, a.target.clone().sub(a.pos), b.pos, b.target.clone().sub(b.pos), b.approach, a.approach);
+      let bad = 0, top = 0;
+      for (let k = 1; k < 600; k++) {
+        const p = r.curve.getPointAt(k / 600);
+        top = Math.max(top, p.y);
+        if (p.distanceTo(a.pos) > (a.approach ? 8 : 3) && p.distanceTo(b.pos) > (b.approach ? 8 : 3) && blocked(p)) bad++;
+      }
+      out.push(`${a.id}→${b.id}: L=${r.curve.getLength().toFixed(0)} top=${top.toFixed(0)} cruise=${r.cruise}${r.fallback ? ' FALLBACK' : ''} pts=${r.curve.points.length} bad=${bad}`);
+    }
+    out.push('ms=' + (performance.now() - t0).toFixed(0));
+    return out;
   },
   go, state: () => ({ cur, busy, frames, t: clock.elapsedTime, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }), shots: SHOTS.map(s => s.id),
 };
