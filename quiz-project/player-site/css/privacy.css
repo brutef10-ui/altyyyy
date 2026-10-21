@@ -1,0 +1,82 @@
+/* AL Studio — политика конфиденциальности. Основа — theatre.css: программка с текстом на бумаге. */
+
+.page-privacy {
+  background:
+    radial-gradient(60% 40% at 50% -6%, rgba(255, 233, 176, 0.18), transparent 70%),
+    radial-gradient(42% 62% at -8% 46%, rgba(140, 21, 41, 0.4), transparent 70%),
+    radial-gradient(42% 62% at 108% 46%, rgba(140, 21, 41, 0.4), transparent 70%),
+    var(--night);
+  background-attachment: fixed;
+}
+
+.privacy-layout {
+  padding: 44px 0 72px;
+}
+
+.privacy-card {
+  display: grid;
+  gap: 12px;
+  max-width: 820px;
+  margin-inline: auto;
+  padding: 34px 38px 40px;
+  animation: programme-in 800ms var(--ease-out) 560ms backwards;
+}
+
+.privacy-card .kicker {
+  color: var(--gold-deep);
+  font-size: 20px;
+}
+
+.privacy-card h1 {
+  font-size: clamp(32px, 5vw, 48px);
+  color: var(--ink);
+}
+
+.privacy-card h2 {
+  margin-top: 18px;
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.privacy-card h3 {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-style: italic;
+  color: var(--velvet);
+}
+
+.privacy-card p,
+.privacy-card li {
+  overflow-wrap: anywhere;
+}
+
+.privacy-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.privacy-card a {
+  color: var(--velvet);
+  font-weight: 700;
+}
+
+.privacy-card code {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(143, 106, 34, 0.14);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+@media (max-width: 600px) {
+  .privacy-layout {
+    padding: 28px 0 56px;
+  }
+
+  .privacy-card {
+    padding: 24px 18px 30px;
+  }
+}

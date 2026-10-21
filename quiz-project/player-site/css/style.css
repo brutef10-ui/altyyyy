@@ -2838,3 +2838,8 @@ body > .toast {
   text-align: center;
   opacity: 0.8;
 }
+
+.privacy-note a {
+  color: var(--gold-light);
+  font-weight: 700;
+}

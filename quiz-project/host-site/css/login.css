@@ -56,6 +56,11 @@
 
 /* ---------- Программка ---------- */
 
+.privacy-note a {
+  color: var(--gold-light);
+  font-weight: 700;
+}
+
 .login-card {
   grid-area: card;
   padding: 18px 30px 32px;

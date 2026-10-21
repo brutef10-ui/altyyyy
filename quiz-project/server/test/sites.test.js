@@ -49,6 +49,19 @@ test('сайт игрока отдаётся с корня, сайт ведущ�
   assert.equal((await fetch(`${server.url}/host`, { redirect: 'manual' })).status, 302, 'без входа — на страницу входа');
 });
 
+test('политика конфиденциальности открыта без входа и описывает данные', async () => {
+  const response = await fetch(`${server.url}/privacy.html`);
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Политика конфиденциальности/);
+  assert.match(html, /support\.alluminous@gmail\.com/);
+  assert.match(html, /drive\.file/);
+  assert.match(html, /180 дней/);
+  // Ссылки на неё — с главной игрока и со страницы входа ведущего.
+  assert.match(await (await fetch(`${server.url}/`)).text(), /href="privacy\.html"/);
+  assert.match(await (await fetch(`${server.url}/host/login.html`)).text(), /href="\.\.\/privacy\.html"/);
+});
+
 test('config.js сайтов указывает на тот же адрес', async () => {
   for (const file of ['/js/config.js', '/host/js/config.js']) {
     const response = await fetch(server.url + file);
