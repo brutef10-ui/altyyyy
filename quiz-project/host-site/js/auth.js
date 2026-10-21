@@ -4,6 +4,7 @@
 // Здесь только: узнать, кто вошёл, получить CSRF-токен для изменяющих запросов и отправить на вход.
 import { SERVER_URL } from './config.js';
 import { curtain } from './theatre.js';
+import { hostSession } from './session.js';
 
 let current = null; // { account, csrfToken, adminContact }
 let loading = null;
@@ -78,6 +79,7 @@ export async function logout() {
     });
   } finally {
     current = null;
+    hostSession.clear();
     curtain.go('login.html', { replace: true });
   }
 }

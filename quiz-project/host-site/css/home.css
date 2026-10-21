@@ -297,6 +297,12 @@
   color: var(--gold-light);
   white-space: nowrap;
   text-overflow: ellipsis;
+  text-decoration: none;
+}
+
+.account-chip:hover b {
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .account-chip-label {
@@ -324,10 +330,19 @@
 
 @media (max-width: 520px) {
   .topbar-actions {
-    gap: 8px;
+    gap: 10px;
+  }
+
+  /* На телефоне «Выйти» — на странице аккаунта, в шапке остаётся ссылка на аккаунт. */
+  .topbar-actions #logout {
+    display: none;
   }
 
   .account-chip {
-    display: none;
+    max-width: 96px;
+  }
+
+  .account-chip b {
+    font-size: 15px;
   }
 }

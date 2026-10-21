@@ -22,7 +22,9 @@ quiz-project/
 │   │   ├── db/              # пул PostgreSQL (index.js) и миграции под блокировкой (migrate.js)
 │   │   ├── identity/        # посетитель (cookie vid), сессии (cookie sid), аккаунты, CSRF, IP за прокси
 │   │   ├── security/        # лимиты попыток входа и регистрации (в БД)
-│   │   ├── routes/auth.js   # /api/auth/*: вход, регистрация, выход, смена пароля, резервный код
+│   │   ├── routes/auth.js   # /api/auth/*: вход, регистрация, выход, смена пароля, резервный код, восстановление
+│   │   ├── admin/routes.js  # /api/admin/*: только администратор (коды восстановления, диагностика IP)
+│   │   ├── logs/audit.js    # журнал действий администратора
 │   │   ├── stores/          # игры и картинки в PostgreSQL, перенос старых игр из quizzes.json
 │   │   ├── auth.js          # владелец игр = аккаунт из сессии
 │   │   ├── rooms.js         # комнаты, уникальный 6-значный код
@@ -42,10 +44,10 @@ quiz-project/
 │   ├── test/                # node:test — unit и интеграционные тесты (нужна база: TEST_DATABASE_URL)
 │   └── .env.example
 ├── host-site/
-│   ├── login.html  index.html  editor.html  lobby.html  game.html  results.html
+│   ├── login.html  account.html  index.html  editor.html  lobby.html  game.html  results.html
 │   ├── css/theatre.css      # общая основа «Большой театр»: токены, кнопки, занавес
-│   ├── css/login.css  home.css  editor.css  lobby.css  game.css  ceremony.css   # стили экранов
-│   └── js/ config.js auth.js api.js session.js socket.js ui.js theatre.js login.js home.js editor.js lobby.js game.js results.js
+│   ├── css/login.css  account.css  home.css  editor.css  lobby.css  game.css  ceremony.css   # стили экранов
+│   └── js/ config.js auth.js api.js codes.js session.js socket.js ui.js theatre.js login.js account.js home.js editor.js lobby.js game.js results.js
 ├── player-site/
 │   ├── index.html  photo.html  name.html  play.html
 │   ├── css/theatre.css  css/style.css   # общая основа + экраны игрока
@@ -162,6 +164,7 @@ PLAYER_SITE_URL=http://192.168.1.5:3000 npm run single
 | `COOKIE_SECURE` | cookie только по HTTPS | `true` на Render и при `NODE_ENV=production` |
 | `SESSION_IDLE_DAYS`, `SESSION_ABSOLUTE_DAYS` | сессия истекает без активности / не живёт дольше | `14`, `60` |
 | `REGISTRATIONS_PER_IP_PER_HOUR`, `REGISTRATIONS_PER_HOUR` | защита от массовых регистраций | `5`, `300` |
+| `RECOVERY_CODE_TTL_MINUTES` | сколько действует одноразовый код восстановления от администратора | `60` |
 | `ADMIN_LOGIN`, `ADMIN_PASSWORD_HASH` | администратор (логин может быть кириллицей; хэш — `npm run hash-password`) | вход админа выключен |
 | `ADMIN_CONTACT` | контакт для заблокированных пользователей | — |
 | `HOST_SITE_URL` | куда ведёт кнопка «Создать свою игру» на сайте игрока | `/host/` или первый из `HOST_SITE_ORIGIN` |
@@ -277,6 +280,10 @@ node scripts/loadtest.js https://ваш-сервер 150   # то же прот�
 | POST | `/api/auth/logout` | ведущий | выход |
 | POST | `/api/auth/password` | ведущий | смена пароля `{ currentPassword, newPassword }`, остальные сессии отзываются |
 | POST | `/api/auth/backup-code` | ведущий | новый резервный код `{ currentPassword }` |
+| POST | `/api/auth/logout-all` | ведущий | выйти на всех устройствах |
+| POST | `/api/auth/recover` | все | восстановление `{ login, code, newPassword }`: резервный код или код от администратора; все сессии отзываются, выдаётся новый резервный код |
+| POST | `/api/admin/accounts/:id/recovery-code` | администратор | одноразовый код восстановления (показывается один раз, запись в аудит) |
+| GET | `/api/admin/diagnostics/ip` | администратор | как сервер видит IP клиента за прокси |
 | GET / POST | `/api/legacy`, `/api/legacy/claim` | ведущий + старый токен браузера | сколько игр осталось с версии без аккаунтов / перенести их в аккаунт |
 | GET | `/api/quizzes` | ведущий (cookie сессии) | список игр |
 | GET | `/api/quizzes/:id` | ведущий | игра целиком |
@@ -294,6 +301,7 @@ node scripts/loadtest.js https://ваш-сервер 150   # то же прот�
 
 * Ведущий — вошедший аккаунт. Сессия хранится в БД, в браузере — только HttpOnly-cookie (`SameSite=Lax`, `Secure` и префикс `__Host-` на HTTPS); при входе выдаётся новая сессия, выход и смена пароля отзывают сессии. Пароли — argon2id, резервные коды — только хэшем. Изменяющие запросы проверяются по `Origin` и CSRF-токену. Лимиты попыток входа и регистрации хранятся в БД и переживают перезапуск.
 * Роль и владелец берутся только из сессии на сервере. Администратор задаётся только переменными окружения.
+* Восстановление доступа без почты: логин + резервный код (выдаётся при регистрации, показывается один раз) или одноразовый код от администратора (срок `RECOVERY_CODE_TTL_MINUTES`, 5 попыток, новый код отзывает прежние). Ответ не выдаёт, существует ли логин; попытки ограничены. После сброса все сессии отозваны, старые коды не действуют, выдаётся новый резервный код. Пароли и коды нигде не показываются повторно и не пишутся в логи; в БД — только хэши.
 * Команды `host:*` принимаются только от сокета, который сейчас управляет комнатой: создавшего её или вернувшегося с `hostKey` **и** тем же аккаунтом; сессия перепроверяется перед `host:create` и `host:resume`.
 * Сервер проверяет всё: код (6 цифр), ник (длина, символы, уникальность), фото (только `data:image/jpeg|png;base64`, до 100 КБ, проверка сигнатуры файла), номер вопроса и ответа, структуру игры.
 * Один ответ на вопрос; ответы после окончания таймера отклоняются (`TOO_LATE`).

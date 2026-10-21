@@ -122,6 +122,13 @@ export const api = {
   updateQuiz: async (id, quiz) => (await request(`/api/quizzes/${encodeURIComponent(id)}`, { method: 'PUT', body: quiz })).quiz,
   deleteQuiz: (id) => request(`/api/quizzes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+  /** Смена пароля по текущему паролю (остальные сессии сервер отзывает). */
+  changePassword: (currentPassword, newPassword) => request('/api/auth/password', { method: 'POST', body: { currentPassword, newPassword } }),
+  /** Новый резервный код — показывается один раз. */
+  newBackupCode: async (currentPassword) => (await request('/api/auth/backup-code', { method: 'POST', body: { currentPassword } })).backupCode,
+  /** Выйти на всех устройствах, включая это. */
+  logoutAll: () => request('/api/auth/logout-all', { method: 'POST' }),
+
   /** Сколько старых игр (созданных до аккаунтов) осталось в этом браузере. */
   async legacyCount() {
     const token = existingDeviceToken();

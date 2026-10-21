@@ -13,6 +13,9 @@
   Ошибка `403 { code: 'CSRF' }` — взять токен заново и повторить.
 * `401 { code: 'UNAUTHORIZED' }` (REST) или `{ ok: false, code: 'UNAUTHORIZED' }` (`host:create`, `host:resume`) —
   входа нет или сессия отозвана: открыть `login.html?next=<текущая страница>`.
+* Восстановление доступа: `POST /api/auth/recover { login, code, newPassword }` → `{ account, backupCode }`
+  (новый резервный код показать один раз). Ошибка `401 { code: 'BAD_RECOVERY' }` одна и та же для
+  неизвестного логина и неверного кода; `429 { code: 'RATE_LIMIT' }` — слишком много попыток.
 * Игрокам вход не нужен: `player:*` и `/api/rooms/*` работают как раньше.
 * Поле `socket.handshake.auth.token` (токен браузера из прежней версии) сервер больше не использует для прав.
 

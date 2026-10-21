@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#1a0910">
+  <title>AL Studio — аккаунт</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 58'%3E%3Cpath d='M5 56V19Q5 5 19 5h26q14 0 14 14v37z' fill='%23d8ac4c' stroke='%238f6a22' stroke-width='1.6'/%3E%3Cpath d='M11 56V21q0-9 9-9h24q9 0 9 9v35z' fill='%231a0910'/%3E%3Cpath d='M11 21q0-9 9-9h24q9 0 9 9v2q-4 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0Q15 28 11 23z' fill='%238c1529'/%3E%3Cpath d='M11 23.2q4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0' fill='none' stroke='%23f3d98b' stroke-width='1.2'/%3E%3Cpath d='M11 24c9 3 9 18 4.6 32H11z' fill='%23b3243d'/%3E%3Cpath d='M53 24c-9 3-9 18-4.6 32H53z' fill='%23b3243d'/%3E%3Cpath d='M13.4 27c3 5 2.6 14 .6 26M50.6 27c-3 5-2.6 14-.6 26' fill='none' stroke='%235c0c1b' stroke-width='1.1' stroke-linecap='round'/%3E%3Ccircle cx='16.8' cy='40' r='1.9' fill='%23f3d98b' stroke='%238f6a22' stroke-width='.8'/%3E%3Ccircle cx='47.2' cy='40' r='1.9' fill='%23f3d98b' stroke='%238f6a22' stroke-width='.8'/%3E%3Crect x='11' y='51.5' width='42' height='4.5' fill='%236b3f22'/%3E%3Ctext x='32' y='47' text-anchor='middle' font-family='Georgia, serif' font-weight='900' font-size='15.5' fill='%23f3d98b'%3EAL%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,500&amp;family=Playfair+Display:ital,wght@0,700;0,900;1,700&amp;display=swap">
+  <link rel="stylesheet" href="css/theatre.css">
+  <link rel="stylesheet" href="css/login.css">
+  <link rel="stylesheet" href="css/account.css">
+  <script type="module" src="js/theatre.js"></script>
+  <script type="module" src="js/account.js"></script>
+</head>
+<body class="page-login page-account">
+  <div class="curtain" aria-hidden="true"><div class="curtain-drape curtain-left"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="curtain-drape curtain-right"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="curtain-valance"></div></div>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="AL Studio — на главную">
+      <svg class="brand-mark" viewBox="0 0 64 58" aria-hidden="true"><path d="M5 56V19Q5 5 19 5h26q14 0 14 14v37z" fill="#d8ac4c" stroke="#8f6a22" stroke-width="1.6"/><path d="M11 56V21q0-9 9-9h24q9 0 9 9v35z" fill="#1a0910"/><path d="M11 21q0-9 9-9h24q9 0 9 9v2q-4 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0Q15 28 11 23z" fill="#8c1529"/><path d="M11 23.2q4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0" fill="none" stroke="#f3d98b" stroke-width="1.2"/><path d="M11 24c9 3 9 18 4.6 32H11z" fill="#b3243d"/><path d="M53 24c-9 3-9 18-4.6 32H53z" fill="#b3243d"/><path d="M13.4 27c3 5 2.6 14 .6 26M50.6 27c-3 5-2.6 14-.6 26" fill="none" stroke="#5c0c1b" stroke-width="1.1" stroke-linecap="round"/><circle cx="16.8" cy="40" r="1.9" fill="#f3d98b" stroke="#8f6a22" stroke-width=".8"/><circle cx="47.2" cy="40" r="1.9" fill="#f3d98b" stroke="#8f6a22" stroke-width=".8"/><rect x="11" y="51.5" width="42" height="4.5" fill="#6b3f22"/><text x="32" y="47" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-weight="900" font-size="15.5" fill="#f3d98b">AL</text></svg>
+      <span class="brand-word"><span class="brand-al">AL</span><span class="brand-studio">Studio</span></span>
+    </a>
+    <a class="btn btn-ghost btn-small" href="index.html">← Мои игры</a>
+  </header>
+
+  <main class="container account-layout">
+    <section class="page-intro account-intro">
+      <p class="kicker">Гримёрка</p>
+      <h1 id="account-login">Аккаунт</h1>
+      <p class="muted" id="account-note">Пароль, резервный код и выход на всех устройствах.</p>
+    </section>
+
+    <div class="account-grid">
+      <form class="programme account-card login-form" id="password-form" novalidate>
+        <div class="form-head">
+          <p class="kicker">Пароль</p>
+          <h2>Сменить пароль</h2>
+          <p class="field-hint">На остальных устройствах после смены пароля нужно будет войти заново.</p>
+        </div>
+        <label class="field">
+          <span class="field-label">Текущий пароль</span>
+          <input class="input" id="current-password" type="password" autocomplete="current-password" maxlength="128" required>
+        </label>
+        <label class="field">
+          <span class="field-label">Новый пароль</span>
+          <input class="input" id="new-password" type="password" autocomplete="new-password" lang="en" maxlength="128" required aria-describedby="new-password-hint">
+          <span class="field-hint" id="new-password-hint">От 8 символов, только латиница, цифры и знаки.</span>
+        </label>
+        <label class="field">
+          <span class="field-label">Новый пароль ещё раз</span>
+          <input class="input" id="new-password2" type="password" autocomplete="new-password" lang="en" maxlength="128" required>
+        </label>
+        <p class="form-error" id="password-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="password-submit">Сменить пароль</button>
+      </form>
+
+      <div class="programme account-card" id="backup-card">
+        <form class="login-form" id="backup-form" novalidate>
+          <div class="form-head">
+            <p class="kicker">Резервный код</p>
+            <h2>Новый резервный код</h2>
+            <p class="field-hint">Код нужен, если забудете пароль. Если прежний код потерян или мог попасть к кому-то ещё — выпустите новый: старый сразу перестанет действовать.</p>
+          </div>
+          <label class="field">
+            <span class="field-label">Текущий пароль</span>
+            <input class="input" id="backup-password" type="password" autocomplete="current-password" maxlength="128" required>
+          </label>
+          <p class="form-error" id="backup-error" role="alert" hidden></p>
+          <button class="btn btn-primary btn-block" type="submit" id="backup-submit">Выпустить новый код</button>
+        </form>
+        <section class="backup-step" id="backup-result" hidden aria-labelledby="backup-result-title">
+          <p class="kicker">Показан один раз</p>
+          <h2 id="backup-result-title">Ваш новый резервный код</h2>
+          <p class="backup-code num" id="backup-code" aria-live="polite"></p>
+          <div class="backup-actions">
+            <button class="btn btn-ghost btn-small" type="button" id="copy-code">Скопировать</button>
+            <button class="btn btn-ghost btn-small" type="button" id="download-code">Сохранить файлом</button>
+          </div>
+          <p class="field-hint">Старый код больше не действует. Закройте эту карточку, когда сохраните новый.</p>
+          <button class="btn btn-secondary btn-block" type="button" id="backup-done">Я сохранил код</button>
+        </section>
+      </div>
+
+      <div class="programme account-card" id="sessions-card">
+        <div class="form-head">
+          <p class="kicker">Устройства</p>
+          <h2>Выход</h2>
+          <p class="field-hint">«Выйти везде» закрывает вход на всех устройствах, включая это. Пригодится, если вы входили на чужом компьютере.</p>
+        </div>
+        <button class="btn btn-secondary btn-block" type="button" id="logout">Выйти на этом устройстве</button>
+        <button class="btn btn-danger btn-block" type="button" id="logout-all">Выйти на всех устройствах</button>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

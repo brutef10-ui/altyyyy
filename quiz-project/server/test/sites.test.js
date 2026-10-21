@@ -34,7 +34,7 @@ test('сайт игрока отдаётся с корня, сайт ведущ�
   const anonymous = await fetch(`${server.url}/host/`, { redirect: 'manual' });
   assert.equal(anonymous.status, 302);
   assert.equal(anonymous.headers.get('location'), '/host/login.html?next=%2Fhost%2F');
-  for (const page of ['editor.html', 'lobby.html', 'game.html', 'results.html']) {
+  for (const page of ['editor.html', 'lobby.html', 'game.html', 'results.html', 'account.html']) {
     assert.equal((await fetch(`${server.url}/host/${page}`, { redirect: 'manual' })).status, 302, page);
   }
   assert.equal((await fetch(`${server.url}/host/login.html`)).status, 200);

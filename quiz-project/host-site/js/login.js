@@ -2,7 +2,7 @@
 import { SERVER_URL } from './config.js';
 import { csrfToken, loadSession, safeNext, setAccount } from './auth.js';
 import { api } from './api.js';
-import { toast } from './ui.js';
+import { contactNode, copyCode, downloadCode, renderCode } from './codes.js';
 import { curtain, sceneChange } from './theatre.js';
 
 const LOGIN_PATTERN = /^[A-Za-z][A-Za-z0-9_.-]{2,31}$/;
@@ -108,12 +108,16 @@ $('form-login').addEventListener('submit', async (event) => {
 
 // ---------- Регистрация ----------
 
-function registerProblem(login, password, repeat) {
-  if (!LOGIN_PATTERN.test(login)) return 'Логин: 3–32 символа, латинские буквы, цифры, «_», «.» или «-», начинается с буквы.';
+function passwordProblem(password, repeat) {
   if (password.length < 8) return 'Пароль: не короче 8 символов.';
   if (!PRINTABLE_ASCII.test(password)) return 'Пароль: только латинские буквы, цифры и знаки (без кириллицы).';
   if (password !== repeat) return 'Пароли не совпадают.';
   return '';
+}
+
+function registerProblem(login, password, repeat) {
+  if (!LOGIN_PATTERN.test(login)) return 'Логин: 3–32 символа, латинские буквы, цифры, «_», «.» или «-», начинается с буквы.';
+  return passwordProblem(password, repeat);
 }
 
 $('form-register').addEventListener('submit', async (event) => {
@@ -140,41 +144,66 @@ $('form-register').addEventListener('submit', async (event) => {
   }
 });
 
+// ---------- Восстановление доступа ----------
+
+const loginForms = [$('form-login'), $('form-register'), $('form-recover')];
+
+function showRecover(show) {
+  const target = show ? $('form-recover') : $('form-login');
+  sceneChange(target, () => {
+    for (const form of loginForms) form.hidden = form !== target;
+    $('login-tabs').hidden = show;
+    if (!show) selectTab($('tab-login'));
+  }, 'turntable').then(() => target.querySelector('input')?.focus());
+}
+
+$('forgot-link').addEventListener('click', () => {
+  $('recover-login').value = $('login-login').value.trim();
+  showRecover(true);
+});
+$('back-to-login').addEventListener('click', () => showRecover(false));
+
+$('form-recover').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const error = $('recover-error');
+  const login = $('recover-login').value.trim();
+  const code = $('recover-code').value.trim();
+  const password = $('recover-password').value;
+  const problem = !login || !code ? 'Введите логин и код' : passwordProblem(password, $('recover-password2').value);
+  if (problem) {
+    showError(error, problem);
+    return;
+  }
+  showError(error, '');
+  const done = busy($('recover-submit'), 'Проверяем код…');
+  try {
+    const { account, backupCode } = await post('/api/auth/recover', { login, code, newPassword: password });
+    setAccount(account);
+    for (const id of ['recover-code', 'recover-password', 'recover-password2']) $(id).value = '';
+    showBackupCode(account, backupCode, { recovered: true });
+  } catch (err) {
+    done();
+    showError(error, err.message);
+  }
+});
+
 // ---------- Резервный код (показывается один раз) ----------
 
-function showBackupCode(account, code) {
+function showBackupCode(account, code, { recovered = false } = {}) {
   const step = $('backup-step');
-  const groups = code.split('-');
-  $('backup-code').replaceChildren(...groups.map((group, index) => {
-    const span = document.createElement('span');
-    span.textContent = index < groups.length - 1 ? `${group}-` : group;
-    return span;
-  }));
+  if (recovered) {
+    $('backup-kicker').textContent = 'Пароль изменён';
+    $('backup-title').textContent = 'Сохраните новый резервный код';
+  }
+  renderCode($('backup-code'), code);
   sceneChange(card, () => {
     $('login-tabs').hidden = true;
-    $('form-register').hidden = true;
+    for (const form of loginForms) form.hidden = true;
     step.hidden = false;
   }, 'turntable').then(() => $('saved-check').focus());
 
-  $('copy-code').onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      toast('Код скопирован');
-    } catch {
-      toast('Не получилось скопировать — выделите код и скопируйте вручную', 'error');
-    }
-  };
-  $('download-code').onclick = () => {
-    const text = `AL Studio — резервный код\nЛогин: ${account.login}\nКод: ${code}\n\nКод нужен, чтобы восстановить доступ, если вы забудете пароль. Храните его в надёжном месте.\n`;
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-    link.download = `al-studio-${account.login}-backup-code.txt`;
-    link.dataset.curtain = 'off';
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1_000);
-  };
+  $('copy-code').onclick = () => copyCode(code);
+  $('download-code').onclick = () => downloadCode(account.login, code);
   $('saved-check').onchange = (event) => {
     $('backup-continue').disabled = !event.target.checked;
   };
@@ -207,10 +236,15 @@ async function init() {
       curtain.go(next, { replace: true });
       return;
     }
+    if (session.adminContact) {
+      $('admin-contact').replaceChildren(contactNode(session.adminContact));
+      $('recover-contact').hidden = false;
+    }
   } catch {
     showError($('login-error'), `Сервер недоступен (${SERVER_URL}). Обновите страницу чуть позже.`);
   }
   if (location.hash === '#register') selectTab($('tab-register'));
+  if (location.hash === '#recover') showRecover(true);
   try {
     const config = await api.getConfig();
     if (config.playerSiteUrl) $('player-link').href = config.playerSiteUrl;

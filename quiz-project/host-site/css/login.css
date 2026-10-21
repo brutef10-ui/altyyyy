@@ -138,6 +138,70 @@
   overflow: hidden;
 }
 
+/* Текстовая кнопка-ссылка под формой */
+.link-btn {
+  justify-self: center;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--velvet);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgba(140, 21, 41, 0.35);
+  text-underline-offset: 4px;
+  cursor: pointer;
+  transition: color 200ms ease, text-decoration-color 200ms ease;
+}
+
+.link-btn:hover {
+  color: var(--velvet-deep);
+  text-decoration-color: currentColor;
+}
+
+.link-btn:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.form-head {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.form-head .kicker {
+  color: var(--gold-deep);
+}
+
+.form-head h2 {
+  font-size: 28px;
+  color: var(--ink);
+}
+
+.input-code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.input-code::placeholder {
+  text-transform: none;
+}
+
+.recover-contact {
+  text-align: center;
+}
+
+.recover-contact a {
+  color: var(--velvet);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Резервный код ---------- */
 
 .backup-step {

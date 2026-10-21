@@ -49,6 +49,36 @@
         </label>
         <p class="form-error" id="login-error" role="alert" hidden></p>
         <button class="btn btn-primary btn-block" type="submit" id="login-submit">Войти</button>
+        <button class="link-btn" type="button" id="forgot-link">Забыли пароль?</button>
+      </form>
+
+      <form class="login-form" id="form-recover" novalidate hidden aria-labelledby="recover-title">
+        <div class="form-head">
+          <p class="kicker">Восстановление доступа</p>
+          <h2 id="recover-title">Новый пароль по коду</h2>
+          <p class="field-hint">Введите резервный код, сохранённый при регистрации, или одноразовый код от администратора.</p>
+        </div>
+        <label class="field">
+          <span class="field-label">Логин</span>
+          <input class="input" id="recover-login" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="64" required>
+        </label>
+        <label class="field">
+          <span class="field-label">Код</span>
+          <input class="input input-code" id="recover-code" name="one-time-code" autocomplete="one-time-code" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="40" placeholder="XXXXX-XXXXX-…" required>
+        </label>
+        <label class="field">
+          <span class="field-label">Новый пароль</span>
+          <input class="input" id="recover-password" name="new-password" type="password" autocomplete="new-password" lang="en" maxlength="128" required aria-describedby="recover-password-hint">
+          <span class="field-hint" id="recover-password-hint">От 8 символов, только латиница, цифры и знаки.</span>
+        </label>
+        <label class="field">
+          <span class="field-label">Новый пароль ещё раз</span>
+          <input class="input" id="recover-password2" type="password" autocomplete="new-password" lang="en" maxlength="128" required>
+        </label>
+        <p class="form-error" id="recover-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" type="submit" id="recover-submit">Сменить пароль и войти</button>
+        <p class="field-hint recover-contact" id="recover-contact" hidden>Нет кода? Напишите администратору — он выдаст одноразовый код: <span id="admin-contact"></span></p>
+        <button class="link-btn" type="button" id="back-to-login">← Вернуться ко входу</button>
       </form>
 
       <form class="login-form" id="form-register" role="tabpanel" aria-labelledby="tab-register" novalidate hidden>
@@ -75,7 +105,7 @@
       </form>
 
       <section class="backup-step" id="backup-step" hidden aria-labelledby="backup-title">
-        <p class="kicker">Последний шаг</p>
+        <p class="kicker" id="backup-kicker">Последний шаг</p>
         <h2 id="backup-title">Сохраните резервный код</h2>
         <p>Почта и телефон не нужны, поэтому вернуть доступ к аккаунту, если забудете пароль, можно только этим кодом. Он показан <b>один раз</b> — запишите его или сохраните файлом.</p>
         <p class="backup-code num" id="backup-code" aria-live="polite"></p>

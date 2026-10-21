@@ -1,0 +1,41 @@
+/* AL Studio — аккаунт ведущего: «Гримёрка». Карточки-программки, общие поля — из login.css. */
+
+.account-layout {
+  padding-bottom: 72px;
+}
+
+.account-intro h1 {
+  overflow-wrap: anywhere;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  align-items: start;
+  gap: 28px;
+}
+
+.account-card {
+  display: grid;
+  gap: 18px;
+  padding: 26px 28px 30px;
+  animation: programme-in 800ms var(--ease-out) 600ms backwards;
+}
+
+.account-card:nth-child(2) { animation-delay: 680ms; }
+.account-card:nth-child(3) { animation-delay: 760ms; }
+
+.account-card .login-form,
+.account-card .backup-step {
+  gap: 16px;
+}
+
+.account-card.is-disabled {
+  opacity: 0.6;
+}
+
+@media (max-width: 520px) {
+  .account-card {
+    padding: 22px 18px 24px;
+  }
+}
