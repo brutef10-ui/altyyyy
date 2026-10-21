@@ -43,11 +43,15 @@ export class AdminQueries {
     );
   }
 
-  /** Вкладка «Зарегистрированные». sort: last_login (по умолчанию) | created. */
-  async accounts(query) {
+  /**
+   * Вкладка «Зарегистрированные». sort: last_login (по умолчанию) | created.
+   * ids — только эти аккаунты и в этом порядке (фильтр «Подозрительные»: по убыванию оценки).
+   */
+  async accounts(query, { ids = null } = {}) {
     const { limit, offset } = page(query);
     const { text, ip: ipPattern } = searchTerms(query.q);
-    const order = query.sort === 'created' ? 'a.created_at DESC' : 'a.last_login_at DESC NULLS LAST, a.created_at DESC';
+    let order = query.sort === 'created' ? 'a.created_at DESC' : 'a.last_login_at DESC NULLS LAST, a.created_at DESC';
+    if (ids) order = 'array_position($5::uuid[], a.id)';
     const rows = await this.db.many(
       `SELECT a.id, a.login, a.role, a.created_at, a.last_login_at,
               host(last_ev.ip) AS last_ip, last_ev.device_type, last_ev.os, last_ev.browser,
@@ -73,9 +77,10 @@ export class AdminQueries {
         WHERE ($1 = '' OR a.login_normalized LIKE $1
                OR EXISTS (SELECT 1 FROM events e WHERE e.account_id = a.id AND lower(e.nickname) LIKE $1)
                OR ($2 <> '' AND EXISTS (SELECT 1 FROM events e WHERE e.account_id = a.id AND host(e.ip) LIKE $2)))
+          ${ids ? 'AND a.id = ANY($5::uuid[])' : ''}
         ORDER BY ${order}
         LIMIT $3 OFFSET $4`,
-      [text, ipPattern, limit + 1, offset],
+      ids ? [text, ipPattern, limit + 1, offset, ids] : [text, ipPattern, limit + 1, offset],
     );
     return {
       items: rows.slice(0, limit).map((row) => ({

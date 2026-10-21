@@ -107,6 +107,8 @@ export function loadConfig(overrides = {}) {
     // Журнал действий администратора и история блокировок (после снятия или окончания).
     auditRetentionDays: integer(env.AUDIT_RETENTION_DAYS, 1095, { min: 30, max: 3650 }),
     banHistoryRetentionDays: integer(env.BAN_HISTORY_RETENTION_DAYS, 1095, { min: 30, max: 3650 }),
+    // Часовой пояс для подсказок о шаринге («чередование устройств по времени суток»).
+    sharingTimeZone: String(env.SHARING_TIMEZONE || 'Europe/Moscow'),
     // ---------- IP клиента за прокси (docs/ACCOUNTS_PLAN.md, раздел 4) ----------
     // hops: N-й адрес справа в X-Forwarded-For; header: заголовок, который выставляет доверенный прокси.
     clientIpMode: env.CLIENT_IP_MODE === 'header' ? 'header' : 'hops',

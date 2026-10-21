@@ -70,7 +70,7 @@ function banView(row) {
   };
 }
 
-export function adminRouter({ db, identity, audit, config }) {
+export function adminRouter({ db, identity, audit, config, sharing }) {
   const router = express.Router();
   router.use(express.json({ limit: '16kb' }), identity.requireAdmin, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -98,8 +98,36 @@ export function adminRouter({ db, identity, audit, config }) {
   router.get('/overview', async (req, res) => {
     res.json(await queries.overview());
   });
+  // Подсказки о шаринге добавляются к строкам, только если администратор их включил.
+  async function withSharing(items) {
+    const analysis = await sharing.analysis();
+    if (!analysis) return { items, sharing: null };
+    const hidden = await sharing.hiddenIds();
+    return {
+      items: items.map((item) => {
+        const result = analysis.results.get(item.id);
+        return { ...item, sharing: result ? { ...result, hidden: hidden.has(item.id) } : null };
+      }),
+      sharing: { computedAt: analysis.computedAt, analyzed: analysis.analyzed, limited: analysis.limited, durationMs: analysis.durationMs },
+    };
+  }
+
   router.get('/accounts', async (req, res) => {
-    res.json(await queries.accounts(req.query));
+    // Фильтр «Подозрительные»: жёлтые и красные, кроме скрытых, по убыванию оценки.
+    if (req.query.suspicious === '1') {
+      const analysis = await sharing.analysis();
+      if (!analysis) throw new AppError('Подсказки о шаринге выключены', { status: 409, code: 'SHARING_DISABLED' });
+      const hidden = await sharing.hiddenIds();
+      const ids = [...analysis.results.entries()]
+        .filter(([id, result]) => result.level !== 'green' && !hidden.has(id))
+        .sort((a, b) => b[1].score - a[1].score)
+        .map(([id]) => id);
+      const page = await queries.accounts(req.query, { ids });
+      res.json({ ...page, ...(await withSharing(page.items)) });
+      return;
+    }
+    const page = await queries.accounts(req.query);
+    res.json({ ...page, ...(await withSharing(page.items)) });
   });
   router.get('/visitors', async (req, res) => {
     res.json(await queries.visitors(req.query));
@@ -108,7 +136,43 @@ export function adminRouter({ db, identity, audit, config }) {
   router.get('/accounts/:id', async (req, res) => {
     const card = await queries.account(req.params.id);
     await audit.record({ ...auditMeta(req), action: 'account.view', targetType: 'account', targetId: card.account.id, details: { login: card.account.login } });
-    res.json(card);
+    const [withHints] = (await withSharing([card.account])).items;
+    res.json({ ...card, sharing: withHints.sharing ?? null, sharingEnabled: await sharing.enabled() });
+  });
+
+  // ---------- Подсказки о шаринге (только показ; сервер по ним ничего не делает) ----------
+
+  router.get('/settings', async (req, res) => {
+    res.json({ sharingHints: await sharing.enabled() });
+  });
+
+  router.post('/settings/sharing', ...mutating, async (req, res) => {
+    const enabled = req.body?.enabled === true;
+    await db.tx(async (tx) => {
+      await sharing.setEnabled(enabled, req.identity.account, tx);
+      await audit.record({ ...auditMeta(req), action: 'settings.update', targetType: 'setting', targetId: 'sharing_hints', details: { key: 'sharing_hints', value: enabled } }, tx);
+    });
+    res.json({ sharingHints: enabled });
+  });
+
+  // Пересчитать сейчас (иначе результат живёт несколько минут).
+  router.post('/sharing/recompute', ...mutating, async (req, res) => {
+    const analysis = await sharing.analysis({ force: true });
+    if (!analysis) throw new AppError('Подсказки о шаринге выключены', { status: 409, code: 'SHARING_DISABLED' });
+    const flagged = [...analysis.results.values()].filter((result) => result.level !== 'green').length;
+    res.json({ computedAt: analysis.computedAt, analyzed: analysis.analyzed, flagged, limited: analysis.limited, durationMs: analysis.durationMs });
+  });
+
+  router.post('/accounts/:id/sharing-hidden', ...mutating, async (req, res) => {
+    if (!isUuid(req.params.id)) throw notFound('Аккаунт не найден');
+    const account = await db.one('SELECT id, login FROM accounts WHERE id = $1', [req.params.id]);
+    if (!account) throw notFound('Аккаунт не найден');
+    const hidden = req.body?.hidden === true;
+    await db.tx(async (tx) => {
+      await sharing.setHidden(account.id, hidden, req.identity.account, tx);
+      await audit.record({ ...auditMeta(req), action: hidden ? 'sharing.hide' : 'sharing.unhide', targetType: 'account', targetId: account.id, details: { login: account.login } }, tx);
+    });
+    res.json({ hidden });
   });
   router.get('/visitors/:id', async (req, res) => {
     const card = await queries.visitor(req.params.id);

@@ -19,6 +19,8 @@ import { migrate } from './src/db/migrate.js';
 import { createIdentity } from './src/identity/index.js';
 import { authRouter } from './src/routes/auth.js';
 import { adminRouter } from './src/admin/routes.js';
+import { SharingService } from './src/admin/sharing.js';
+import { sharingConfig } from './src/admin/sharingConfig.js';
 import { AuditLog } from './src/logs/audit.js';
 import { EVENT_TYPES, EventLog } from './src/logs/events.js';
 import { Retention } from './src/logs/retention.js';
@@ -112,7 +114,7 @@ function withTimeout(promise, ms) {
   })]).finally(() => clearTimeout(timer));
 }
 
-function createApp({ config, db, identity, audit, events, legacy, quizService, images, rooms, roomLimiter }) {
+function createApp({ config, db, identity, audit, events, sharing, legacy, quizService, images, rooms, roomLimiter }) {
   const app = express();
   app.disable('x-powered-by');
   // Express узнаёт HTTPS (для Secure-cookie) из X-Forwarded-Proto только от доверенных прокси.
@@ -185,7 +187,7 @@ function createApp({ config, db, identity, audit, events, legacy, quizService, i
   app.use('/api/auth', anyCors, authRouter({ identity, config, events }));
 
   // ---------- Администратор ----------
-  app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config }));
+  app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config, sharing }));
 
   // ---------- Перенос игр, созданных до появления аккаунтов ----------
   // Нужны и сессия (куда переносить), и старый токен браузера в Authorization (откуда).
@@ -323,6 +325,7 @@ export async function startServer(overrides = {}) {
   const legacy = new LegacyService(db);
   const audit = new AuditLog(db);
   const events = new EventLog(db);
+  const sharing = new SharingService(db, { config: config.sharing ?? sharingConfig(), timeZone: config.sharingTimeZone });
   await identity.bans.load();
   identity.bans.start();
 
@@ -366,7 +369,7 @@ export async function startServer(overrides = {}) {
   const retentionTimer = setInterval(runRetention, 24 * 60 * 60_000);
   retentionTimer.unref();
 
-  const app = createApp({ config, db, identity, audit, events, legacy, quizService, images, rooms, roomLimiter });
+  const app = createApp({ config, db, identity, audit, events, sharing, legacy, quizService, images, rooms, roomLimiter });
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: config.allOrigins, methods: ['GET', 'POST'], credentials: true },
@@ -423,6 +426,7 @@ export async function startServer(overrides = {}) {
     config,
     db,
     identity,
+    sharing,
     port,
     url: `http://localhost:${port}`,
     close() {
