@@ -53,6 +53,7 @@ export const AUDIT_LABELS = {
   'visitor.view': 'Открыта карточка устройства',
   'settings.update': 'Изменены настройки',
   'sharing.hide': 'Скрыт из подозрительных',
+  'backup.run': 'Резервная копия вручную',
   'sharing.unhide': 'Возвращён в подозрительные',
 };
 

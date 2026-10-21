@@ -70,7 +70,7 @@ function banView(row) {
   };
 }
 
-export function adminRouter({ db, identity, audit, config, sharing }) {
+export function adminRouter({ db, identity, audit, config, sharing, backups = null }) {
   const router = express.Router();
   router.use(express.json({ limit: '16kb' }), identity.requireAdmin, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -96,7 +96,15 @@ export function adminRouter({ db, identity, audit, config, sharing }) {
   // ---------- Чтение: списки, карточки, журналы ----------
 
   router.get('/overview', async (req, res) => {
-    res.json(await queries.overview());
+    const backup = backups ? { configured: true, ...(await backups.status()) } : { configured: false };
+    res.json({ ...(await queries.overview()), backup });
+  });
+
+  // Сделать резервную копию сейчас (не дожидаясь расписания).
+  router.post('/backup/run', ...mutating, async (req, res) => {
+    if (!backups) throw new AppError('Резервные копии не настроены (BACKUP_ENCRYPTION_KEY и хранилище).', { status: 409, code: 'BACKUP_DISABLED' });
+    await audit.record({ ...auditMeta(req), action: 'backup.run', targetType: 'backup' });
+    res.json({ backup: { configured: true, ...(await backups.run()) } });
   });
   // Подсказки о шаринге добавляются к строкам, только если администратор их включил.
   async function withSharing(items) {

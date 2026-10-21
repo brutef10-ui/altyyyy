@@ -26,6 +26,8 @@ quiz-project/
 │   │   ├── routes/auth.js   # /api/auth/*: вход, регистрация, выход, смена пароля, резервный код, восстановление
 │   │   ├── admin/routes.js  # /api/admin/*: только администратор (коды восстановления, диагностика IP)
 │   │   ├── logs/            # журнал заходов (events.js), аудит (audit.js), сроки хранения (retention.js), разбор user-agent
+│   │   ├── backup/          # бэкап: дамп, шифрование, Google Drive, расписание, восстановление и его проверка
+│   │   ├── admin/           # /api/admin: маршруты, запросы консоли, подсказки о шаринге
 │   │   ├── security/bans.js # блокировки: проверка по списку в памяти, IP и подсети
 │   │   ├── stores/          # игры и картинки в PostgreSQL, перенос старых игр из quizzes.json
 │   │   ├── auth.js          # владелец игр = аккаунт из сессии
@@ -43,6 +45,7 @@ quiz-project/
 │   ├── data/quizzes.json    # игры из версии без аккаунтов (переносятся в БД при старте)
 │   ├── scripts/loadtest.js  # нагрузочный тест: наплыв игроков из одной сети
 │   ├── scripts/hash-password.js  scripts/migrate.js   # хэш пароля админа, миграции без запуска сервера
+│   ├── scripts/backup.js  restore-check.js  restore.js  google-drive-auth.js   # бэкапы (docs/DEPLOY.md)
 │   ├── test/                # node:test — unit и интеграционные тесты (нужна база: TEST_DATABASE_URL)
 │   └── .env.example
 ├── host-site/
@@ -70,7 +73,7 @@ render.yaml                  # (в корне репозитория) депло
 
 ## Установка и запуск
 
-Нужен **Node.js 18.18+** (рекомендуется 20 или 22) и **PostgreSQL 13+**.
+Нужен **Node.js 22+** (на Render — 24) и **PostgreSQL 13+**.
 
 ### База данных
 
@@ -178,6 +181,9 @@ PLAYER_SITE_URL=http://192.168.1.5:3000 npm run single
 | `ADMIN_CONTACT` | контакт для заблокированных пользователей | — |
 | `HOST_SITE_URL` | куда ведёт кнопка «Создать свою игру» на сайте игрока | `/host/` или первый из `HOST_SITE_ORIGIN` |
 | `DATA_FILE` | JSON-файл с играми из версии без аккаунтов: переносятся в БД при старте | `./data/quizzes.json` |
+| `BACKUP_ENCRYPTION_KEY` | ключ шифрования бэкапов (32 байта) — без него бэкапы выключены | — |
+| `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_DRIVE_REFRESH_TOKEN` | доступ к Google Drive для бэкапов (`npm run google-drive-auth`) | — |
+| `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP`, `BACKUP_DIR` | частота, сколько копий хранить, папка вместо Google Drive | `24`, `14`, — |
 | `TRUST_PROXY` | `true`, если сервер за прокси (Render, Railway, nginx) | `false` |
 | `TRUST_PROXY_HOPS` | сколько прокси перед сервером: IP берётся N-м справа в `X-Forwarded-For` | как `TRUST_PROXY` |
 | `CLIENT_IP_MODE`, `CLIENT_IP_HEADER` | `header` — IP из заголовка доверенного прокси (например, `cf-connecting-ip`) | `hops` |
@@ -350,53 +356,19 @@ node scripts/loadtest.js https://ваш-сервер 150   # то же прот�
 
 ## Деплой
 
-Есть два варианта: **один сервис** (сервер сам отдаёт оба сайта — проще всего, можно сделать с телефона) или **три сервиса** (сервер и два статических сайта отдельно).
+Рекомендуемый вариант — **Render одним сервисом с базой PostgreSQL** по Blueprint (`render.yaml` в корне
+репозитория): веб-сервис Starter + Postgres Basic-256mb, миграции перед каждым деплоем, health check,
+ежедневные зашифрованные бэкапы в Google Drive с проверкой восстановления.
+Пошагово — [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-### Render одним сервисом (Blueprint)
+После деплоя: игроки — `https://<адрес>/`, ведущий — `https://<адрес>/host/`, администратор — `https://<адрес>/admin/`.
 
-В корне репозитория лежит `render.yaml`.
-
-1. Зарегистрируйтесь на https://render.com через GitHub.
-2. **New → Blueprint**, выберите репозиторий и ветку с игрой, нажмите **Apply** / **Deploy Blueprint**.
-3. Через несколько минут сервис `al-studio` получит адрес вида `https://al-studio-xxxx.onrender.com`:
-   * ведущий: `https://al-studio-xxxx.onrender.com/host/`
-   * игроки: `https://al-studio-xxxx.onrender.com/` (адрес и QR-код видны в лобби).
-
-Если Blueprint недоступен, создайте **New → Web Service** вручную: репозиторий и ветка с игрой, Root Directory `quiz-project`, Build Command `npm install`, Start Command `npm start`, переменные `SERVE_SITES=true` и `TRUST_PROXY=true`.
-
-Ограничения бесплатного тарифа: сервис засыпает после 15 минут без запросов (первое открытие — до минуты), а файловая система временная — сохранённые игры пропадут после перезапуска или нового деплоя. Чтобы игры сохранялись, подключите Disk (платно) и задайте `DATA_FILE` на него.
-
-### Render тремя сервисами
-
-**Сервер** — New → Web Service:
-
-* Root Directory: `quiz-project/server`
-* Build Command: `npm install`
-* Start Command: `npm start`
-* Environment:
-  * `HOST_SITE_ORIGIN=https://al-studio-host.onrender.com`
-  * `PLAYER_SITE_ORIGIN=https://al-studio-play.onrender.com`
-  * `TRUST_PROXY=true`
-  * `DATA_FILE=/var/data/quizzes.json` и подключите **Disk** с путём `/var/data` (диски доступны на платных тарифах). Без диска сохранённые игры пропадут при перезапуске или новом деплое: файловая система Render временная.
-
-**Сайты** — New → Static Site (дважды):
-
-* Root Directory: `quiz-project/host-site` (и `quiz-project/player-site`)
-* Publish Directory: `.`
-* Build Command (подставит адрес сервера в `config.js`):
-  ```bash
-  sed -i "s#const PRODUCTION_SERVER_URL = '';#const PRODUCTION_SERVER_URL = '$SERVER_URL';#" js/config.js
-  ```
-* Environment: `SERVER_URL=https://al-studio-server.onrender.com`
-
-### Railway
-
-1. **Сервер**: New Service → GitHub repo, Root Directory `quiz-project/server`, Start Command `npm start`. Переменные — как для Render (`HOST_SITE_ORIGIN`, `PLAYER_SITE_ORIGIN`, `TRUST_PROXY=true`). Для сохранённых игр добавьте **Volume** (например, `/data`) и `DATA_FILE=/data/quizzes.json`. Включите публичный домен (Settings → Networking → Generate Domain).
-2. **Сайт ведущего**: ещё один сервис из того же репозитория, Root Directory `quiz-project`, Start Command `node tools/serve.js host-site`, переменная `SERVER_URL=https://<домен-сервера>`. `tools/serve.js` сам возьмёт `PORT` от Railway и подставит `SERVER_URL` в `config.js`.
-3. **Сайт игрока**: то же самое с `node tools/serve.js player-site`.
-4. Впишите домены сайтов в `HOST_SITE_ORIGIN` / `PLAYER_SITE_ORIGIN` сервера и перезапустите его.
-
-На бесплатных тарифах сервер «засыпает» без запросов — первое подключение может занять до минуты.
+**Раздельный деплой сайтов** (сервер и два статических сайта отдельными сервисами) возможен только на
+одном домене — например, `play.example.com`, `host.example.com` и `api.example.com`: cookie сессии
+(`SameSite=Lax`) между разными сайтами не передаются, а поддомены `*.onrender.com` браузеры считают
+разными сайтами. В этом случае задайте `HOST_SITE_ORIGIN`, `PLAYER_SITE_ORIGIN`, `HOST_SITE_URL`
+и подставьте адрес сервера в `js/config.js` сайтов (`tools/serve.js` делает это из `SERVER_URL`).
+Сервису нужен `DATABASE_URL`; диск для файлов больше не нужен — всё хранится в базе.
 
 ## Как развивать проект
 

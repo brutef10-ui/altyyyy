@@ -356,9 +356,26 @@ function bindTabs() {
   });
 }
 
+function showBackup(backup) {
+  const line = $('backup-line');
+  const status = $('backup-status');
+  line.hidden = false;
+  line.classList.toggle('is-bad', Boolean(backup.configured && backup.ok === false) || !backup.configured);
+  if (!backup.configured) {
+    status.textContent = 'Резервные копии не настроены: задайте BACKUP_ENCRYPTION_KEY и доступ к Google Drive в настройках сервера.';
+    $('backup-run').hidden = true;
+    return;
+  }
+  $('backup-run').hidden = false;
+  if (!backup.attemptAt) status.textContent = 'Резервные копии настроены, первая копия будет сделана в ближайшие минуты.';
+  else if (backup.ok) status.textContent = `Последняя резервная копия: ${fmtDate(backup.successAt)} — ${backup.rows} строк, ${Math.round((backup.size ?? 0) / 1024)} КБ, проверена после загрузки.`;
+  else status.textContent = `Резервная копия НЕ удалась ${fmtDate(backup.attemptAt)}: ${backup.error ?? 'ошибка'}.${backup.successAt ? ` Последняя удачная — ${fmtDate(backup.successAt)}.` : ''}`;
+}
+
 async function loadOverview() {
   try {
     const stats = await adminApi.overview();
+    showBackup(stats.backup);
     $('stat-accounts').textContent = stats.accounts;
     $('stat-guests').textContent = stats.guests;
     $('stat-bans').textContent = stats.active_bans;
@@ -388,6 +405,21 @@ async function init() {
   });
   bindTabs();
   loadOverview();
+  $('backup-run').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Копируем…';
+    try {
+      const { backup } = await adminApi.runBackup();
+      showBackup(backup);
+      toast(backup.ok ? 'Резервная копия сделана и проверена' : `Копия не удалась: ${backup.error}`, backup.ok ? 'success' : 'error');
+    } catch (error) {
+      toast(error.message, 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Сделать копию сейчас';
+    }
+  });
   selectTab(location.hash.slice(1));
 }
 

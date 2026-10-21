@@ -88,6 +88,31 @@
   color: var(--gold-light);
 }
 
+/* ---------- Резервные копии ---------- */
+
+.backup-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: -12px 0 24px;
+  padding: 10px 16px;
+  border-left: 4px solid var(--success);
+  border-radius: var(--radius-sm);
+  background: rgba(47, 158, 94, 0.1);
+  font-size: 15px;
+}
+
+.backup-line.is-bad {
+  border-left-color: var(--amber);
+  background: rgba(217, 154, 30, 0.12);
+}
+
+.backup-line p {
+  color: var(--ivory);
+}
+
 /* ---------- Вкладки ---------- */
 
 .admin-tabs {

@@ -1,19 +1,64 @@
-# Blueprint для Render: квиз-игра «AL Studio» одним сервисом (сервер + оба сайта).
-# Render → New → Blueprint → выберите этот репозиторий и ветку с игрой.
-# После деплоя: сайт игрока — https://<адрес>/, сайт ведущего — https://<адрес>/host/
+# Blueprint для Render: квиз-игра «AL Studio» — один веб-сервис (сервер + оба сайта + админ-консоль)
+# и база PostgreSQL. Пошаговая инструкция — quiz-project/docs/DEPLOY.md.
+# Render → New → Blueprint → этот репозиторий и ветка с игрой.
+# После деплоя: игрок — https://<адрес>/, ведущий — https://<адрес>/host/, админ — https://<адрес>/admin/
+#
+# Секреты здесь НЕ хранятся: поля с sync: false заполняются в панели Render при создании Blueprint
+# (репозиторий публичный). SESSION_SECRET Render генерирует сам.
 services:
   - type: web
     name: al-studio
     runtime: node
-    plan: free
+    plan: starter
+    region: frankfurt
     rootDir: quiz-project
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm ci --prefix server --omit=dev
+    # Миграции схемы — до переключения трафика на новую версию (под блокировкой, в одной транзакции,
+    # только добавляющие изменения). Сервер при старте тоже проверяет схему — это ничего не повторяет.
+    preDeployCommand: npm run migrate --prefix server
+    startCommand: npm start --prefix server
     healthCheckPath: /health
     envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
       - key: SERVE_SITES
         value: "true"
-      - key: TRUST_PROXY
-        value: "true"
-      - key: NODE_VERSION
-        value: "22"
+      # IP клиента: Render дописывает настоящий адрес последним в X-Forwarded-For.
+      # Проверка после деплоя — /api/admin/diagnostics/ip (docs/DEPLOY.md, шаг 5).
+      - key: CLIENT_IP_MODE
+        value: hops
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: al-studio-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_LOGIN
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: ADMIN_CONTACT
+        value: support.alluminous@gmail.com
+      - key: BACKUP_ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_DRIVE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_DRIVE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_DRIVE_REFRESH_TOKEN
+        sync: false
+
+databases:
+  - name: al-studio-db
+    plan: basic-256mb
+    region: frankfurt
+    databaseName: alstudio
+    user: alstudio
+    postgresMajorVersion: "16"
+    diskSizeGB: 1
+    # Пусто — доступ только из внутренней сети Render (из сервиса al-studio), снаружи — нет.
+    ipAllowList: []

@@ -25,6 +25,8 @@ import { AuditLog } from './src/logs/audit.js';
 import { EVENT_TYPES, EventLog } from './src/logs/events.js';
 import { Retention } from './src/logs/retention.js';
 import { publicBan } from './src/security/bans.js';
+import { BackupScheduler } from './src/backup/scheduler.js';
+import { storageFromConfig } from './src/backup/storage.js';
 import { ipFromSocket } from './src/identity/clientIp.js';
 import { PgQuizStore } from './src/stores/pgQuizStore.js';
 import { PgImageStore } from './src/stores/pgImageStore.js';
@@ -114,7 +116,7 @@ function withTimeout(promise, ms) {
   })]).finally(() => clearTimeout(timer));
 }
 
-function createApp({ config, db, identity, audit, events, sharing, legacy, quizService, images, rooms, roomLimiter }) {
+function createApp({ config, db, identity, audit, events, sharing, backups, legacy, quizService, images, rooms, roomLimiter }) {
   const app = express();
   app.disable('x-powered-by');
   // Express узнаёт HTTPS (для Secure-cookie) из X-Forwarded-Proto только от доверенных прокси.
@@ -187,7 +189,7 @@ function createApp({ config, db, identity, audit, events, sharing, legacy, quizS
   app.use('/api/auth', anyCors, authRouter({ identity, config, events }));
 
   // ---------- Администратор ----------
-  app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config, sharing }));
+  app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config, sharing, backups }));
 
   // ---------- Перенос игр, созданных до появления аккаунтов ----------
   // Нужны и сессия (куда переносить), и старый токен браузера в Authorization (откуда).
@@ -308,6 +310,10 @@ async function connectDb(db, attempts) {
 export async function startServer(overrides = {}) {
   const { db: providedDb, ...configOverrides } = overrides;
   const config = loadConfig(configOverrides);
+  // Обязательные настройки проверяем до подключения к БД.
+  if (config.production && (!config.sessionSecret || config.sessionSecret.length < 32)) {
+    throw new Error('SESSION_SECRET не задан или короче 32 символов (см. .env.example).');
+  }
 
   const db = providedDb ?? createDb({ url: config.databaseUrl, ssl: config.databaseSsl, schema: config.databaseSchema || undefined });
   const ownsDb = !providedDb;
@@ -369,7 +375,21 @@ export async function startServer(overrides = {}) {
   const retentionTimer = setInterval(runRetention, 24 * 60 * 60_000);
   retentionTimer.unref();
 
-  const app = createApp({ config, db, identity, audit, events, sharing, legacy, quizService, images, rooms, roomLimiter });
+  // Резервные копии: раз в BACKUP_INTERVAL_HOURS, если заданы ключ шифрования и хранилище.
+  let backups = null;
+  const backupStorage = storageFromConfig(config);
+  if (config.backup.encryptionKey && backupStorage) {
+    try {
+      backups = new BackupScheduler({ db, storage: backupStorage, encryptionKey: config.backup.encryptionKey, intervalHours: config.backup.intervalHours, keep: config.backup.keep });
+      if (config.backupSchedule !== false) backups.start();
+    } catch (error) {
+      console.error(`[backup] выключены: ${error.message}`);
+    }
+  } else if (config.production) {
+    console.warn('[backup] выключены: задайте BACKUP_ENCRYPTION_KEY и GOOGLE_DRIVE_* (см. .env.example и docs/DEPLOY.md).');
+  }
+
+  const app = createApp({ config, db, identity, audit, events, sharing, backups, legacy, quizService, images, rooms, roomLimiter });
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: config.allOrigins, methods: ['GET', 'POST'], credentials: true },
@@ -438,6 +458,7 @@ export async function startServer(overrides = {}) {
         clearInterval(imageGc);
         clearInterval(maintenance);
         clearInterval(retentionTimer);
+        backups?.stop();
         clearTimeout(retentionFirst);
         await new Promise((resolve) => io.close(() => resolve()));
         if (ownsDb) await db.close();

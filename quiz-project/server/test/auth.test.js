@@ -7,7 +7,7 @@ import { clientIp } from '../src/identity/clientIp.js';
 
 // Аккаунты, сессии, CSRF, лимиты попыток, администратор из окружения, владельцы игр.
 let server;
-const ADMIN_LOGIN = 'Владимир_Жириновский';
+const ADMIN_LOGIN = 'Главный_Тестовый_Админ';
 const ADMIN_PASSWORD = 'Admin-Secret-42';
 const quiz = { title: 'Своя игра', questions: [{ text: 'Q?', answers: ['A', 'B'], correct: 0, timeLimit: 10, readTime: 0 }] };
 

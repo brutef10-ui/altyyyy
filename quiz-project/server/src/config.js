@@ -109,6 +109,20 @@ export function loadConfig(overrides = {}) {
     banHistoryRetentionDays: integer(env.BAN_HISTORY_RETENTION_DAYS, 1095, { min: 30, max: 3650 }),
     // Часовой пояс для подсказок о шаринге («чередование устройств по времени суток»).
     sharingTimeZone: String(env.SHARING_TIMEZONE || 'Europe/Moscow'),
+    // ---------- Резервные копии ----------
+    backup: {
+      encryptionKey: String(env.BACKUP_ENCRYPTION_KEY || '').trim(),
+      intervalHours: integer(env.BACKUP_INTERVAL_HOURS, 24, { min: 1, max: 24 * 7 }),
+      keep: integer(env.BACKUP_KEEP, 14, { min: 1, max: 365 }),
+      // Папка для копий без Google Drive (локально; на Render диск временный — только для проверки).
+      dir: env.BACKUP_DIR ? path.resolve(SERVER_ROOT, env.BACKUP_DIR) : '',
+      googleDrive: {
+        clientId: String(env.GOOGLE_DRIVE_CLIENT_ID || '').trim(),
+        clientSecret: String(env.GOOGLE_DRIVE_CLIENT_SECRET || '').trim(),
+        refreshToken: String(env.GOOGLE_DRIVE_REFRESH_TOKEN || '').trim(),
+        folderId: String(env.GOOGLE_DRIVE_FOLDER_ID || '').trim(),
+      },
+    },
     // ---------- IP клиента за прокси (docs/ACCOUNTS_PLAN.md, раздел 4) ----------
     // hops: N-й адрес справа в X-Forwarded-For; header: заголовок, который выставляет доверенный прокси.
     clientIpMode: env.CLIENT_IP_MODE === 'header' ? 'header' : 'hops',

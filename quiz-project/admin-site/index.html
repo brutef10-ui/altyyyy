@@ -42,6 +42,10 @@
       <div class="stat"><dt>Действующих блокировок</dt><dd id="stat-bans" class="num">—</dd></div>
       <div class="stat"><dt>Входов в комнаты за сутки</dt><dd id="stat-joins" class="num">—</dd></div>
     </dl>
+    <div class="backup-line" id="backup-line" hidden>
+      <p id="backup-status" class="muted"></p>
+      <button class="btn btn-ghost btn-small" type="button" id="backup-run" hidden>Сделать копию сейчас</button>
+    </div>
 
     <div class="admin-tabs" role="tablist" aria-label="Разделы">
       <button class="admin-tab" role="tab" type="button" data-tab="accounts" id="tab-accounts" aria-controls="panel-accounts" aria-selected="true">Зарегистрированные <span class="count-badge" id="count-accounts"></span></button>

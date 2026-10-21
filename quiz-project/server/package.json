@@ -6,7 +6,7 @@
   "type": "module",
   "main": "server.js",
   "engines": {
-    "node": ">=18.18"
+    "node": ">=22"
   },
   "scripts": {
     "start": "node server.js",
@@ -14,7 +14,11 @@
     "test": "node --test",
     "loadtest": "node scripts/loadtest.js",
     "migrate": "node scripts/migrate.js",
-    "hash-password": "node scripts/hash-password.js"
+    "hash-password": "node scripts/hash-password.js",
+    "backup": "node scripts/backup.js",
+    "restore-check": "node scripts/restore-check.js",
+    "restore": "node scripts/restore.js",
+    "google-drive-auth": "node scripts/google-drive-auth.js"
   },
   "dependencies": {
     "argon2": "^0.45.1",
