@@ -2,7 +2,7 @@
 import { api } from './api.js';
 import { flash, hostSession } from './session.js';
 import { launchGame } from './socket.js';
-import { confirmDialog, formatDate, h, plural, toast } from './ui.js';
+import { confirmDialog, formatDate, h, plural, stageIcon, toast } from './ui.js';
 
 const list = document.getElementById('quiz-list');
 const status = document.getElementById('status');
@@ -16,7 +16,8 @@ function showStatus(message, { retry = false } = {}) {
 function renderEmpty() {
   list.replaceChildren(
     h('div', { class: 'empty card' },
-      h('div', { class: 'empty-art', 'aria-hidden': 'true' }, document.querySelector('.brand-mark')?.cloneNode(true) ?? '✦'),
+      h('div', { class: 'empty-art', 'aria-hidden': 'true' }, document.querySelector('.brand-mark')?.cloneNode(true) ?? ''),
+      h('p', { class: 'kicker', text: 'Сцена свободна' }),
       h('h2', { text: 'Пока нет сохранённых игр' }),
       h('p', { class: 'muted', text: 'Создайте свой квиз или начните с демо-викторины, чтобы посмотреть, как всё работает.' }),
       h('div', { class: 'empty-actions' },
@@ -30,20 +31,20 @@ function renderEmpty() {
 function quizCard(quiz) {
   const card = h('article', { class: 'quiz-card card' },
     h('div', { class: 'quiz-card-body' },
+      h('p', { class: 'quiz-card-kicker', 'aria-hidden': 'true', text: 'Спектакль-квиз' }),
       h('h2', { class: 'quiz-card-title', text: quiz.title }),
       h('p', { class: 'muted' }, `${quiz.questionCount} ${plural(quiz.questionCount, ['вопрос', 'вопроса', 'вопросов'])} · изменена ${formatDate(quiz.updatedAt)}`),
     ),
     h('div', { class: 'quiz-card-actions' },
-      h('button', { class: 'btn btn-primary', type: 'button', text: '▶ Запустить', onclick: () => launchGame({ quizId: quiz.id }) }),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => launchGame({ quizId: quiz.id }) }, stageIcon('play'), 'Запустить'),
       h('a', { class: 'btn btn-ghost', href: `editor.html?id=${encodeURIComponent(quiz.id)}`, text: 'Изменить' }),
       h('button', {
         class: 'btn btn-ghost btn-icon',
         type: 'button',
         title: 'Удалить',
         'aria-label': `Удалить игру «${quiz.title}»`,
-        text: '🗑',
         onclick: () => remove(quiz, card),
-      }),
+      }, stageIcon('trash')),
     ),
   );
   return card;

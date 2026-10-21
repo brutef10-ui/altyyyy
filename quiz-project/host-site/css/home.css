@@ -1,0 +1,279 @@
+/* AL Studio — главная ведущего: «Репертуар». Игры висят афишами на стене фойе.
+   Основа — theatre.css. */
+
+/* Стена фойе: шёлковые обои с золотой решёткой */
+.page-home {
+  background:
+    radial-gradient(70% 55% at 50% -8%, rgba(255, 233, 176, 0.16), transparent 70%),
+    repeating-linear-gradient(45deg, rgba(216, 172, 76, 0.045) 0 1.5px, transparent 1.5px 34px),
+    repeating-linear-gradient(-45deg, rgba(216, 172, 76, 0.045) 0 1.5px, transparent 1.5px 34px),
+    radial-gradient(40% 60% at -6% 40%, rgba(140, 21, 41, 0.38), transparent 70%),
+    radial-gradient(40% 60% at 106% 40%, rgba(140, 21, 41, 0.38), transparent 70%),
+    var(--night);
+  background-attachment: fixed;
+}
+
+.page-intro .kicker {
+  font-size: 22px;
+  animation: drop-in 600ms var(--ease-out) 500ms backwards;
+}
+
+.page-intro h1 {
+  animation: rise-in 700ms var(--ease-out) 580ms backwards;
+}
+
+.page-intro p:not(.kicker) {
+  animation: fade-in 700ms ease 700ms backwards;
+}
+
+/* ---------- Афиши ---------- */
+
+.quiz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 44px 28px;
+  padding: 26px 0 72px;
+  perspective: 1400px;
+}
+
+.quiz-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 262px;
+  padding: 30px 28px 26px;
+  text-align: center;
+  transform-origin: 50% -22px;
+  animation: poster-hang 900ms var(--ease-out) 640ms backwards;
+  transition: transform 420ms var(--ease-out), box-shadow 420ms var(--ease-out);
+}
+
+.quiz-card:nth-child(2) { animation-delay: 720ms; }
+.quiz-card:nth-child(3) { animation-delay: 800ms; }
+.quiz-card:nth-child(4) { animation-delay: 880ms; }
+.quiz-card:nth-child(n + 5) { animation-delay: 960ms; }
+
+/* Гвоздик и шнур, на которых висит афиша */
+.quiz-card::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 92px;
+  height: 22px;
+  background:
+    radial-gradient(circle at 50% 4px, var(--gold-light) 0 3px, var(--gold-deep) 3.5px 4.5px, transparent 5px),
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--gold-deep) calc(50% - 1px) calc(50% + 0.5px), transparent calc(50% + 0.5px)) 0 0 / 50% 100% no-repeat,
+    linear-gradient(to top left, transparent calc(50% - 1px), var(--gold-deep) calc(50% - 1px) calc(50% + 0.5px), transparent calc(50% + 0.5px)) 100% 0 / 50% 100% no-repeat;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Свет прожектора, который ложится на афишу при наведении */
+.quiz-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(70% 60% at 50% 0%, rgba(255, 233, 176, 0.42), transparent 70%);
+  opacity: 0;
+  transition: opacity 420ms ease;
+  pointer-events: none;
+}
+
+.quiz-card:hover {
+  transform: perspective(1000px) translateY(-8px) rotateX(4deg) rotateY(-3deg);
+  box-shadow: var(--programme-frame), 0 2px 0 rgba(0, 0, 0, 0.3), 0 34px 60px rgba(5, 1, 3, 0.65), 0 0 0 8px rgba(255, 233, 176, 0.06);
+}
+
+.quiz-card:hover::after {
+  opacity: 1;
+}
+
+.quiz-card-body {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.quiz-card-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--velvet);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.quiz-card-kicker::before,
+.quiz-card-kicker::after {
+  content: '';
+  width: 26px;
+  height: 1.5px;
+  background: var(--gold);
+}
+
+.quiz-card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.quiz-card-body .muted {
+  font-size: 15px;
+}
+
+/* Главная табличка «Запустить» во всю ширину, под ней — «Изменить» и корзина */
+.quiz-card-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.quiz-card-actions .btn-primary {
+  grid-column: 1 / -1;
+  min-height: 54px;
+  font-size: 18px;
+}
+
+.quiz-card-actions .btn-primary svg,
+.quiz-card-actions .btn-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.quiz-card-actions .btn-icon:hover:not(:disabled) {
+  color: #a12424;
+  border-color: rgba(176, 42, 42, 0.6);
+  background: rgba(210, 58, 58, 0.1);
+}
+
+/* Удалённая афиша срывается и падает в люк */
+.quiz-card.is-removing {
+  pointer-events: none;
+  animation: poster-fall 520ms cubic-bezier(.55, 0, .75, .2) forwards;
+}
+
+/* Загрузка — пустые рамки под афиши */
+.quiz-card.skeleton {
+  min-height: 262px;
+  border: 1.5px dashed rgba(216, 172, 76, 0.32);
+  border-radius: var(--radius);
+  background: linear-gradient(100deg, rgba(247, 236, 212, 0.04) 40%, rgba(247, 236, 212, 0.11) 50%, rgba(247, 236, 212, 0.04) 60%) 0 0 / 300% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.quiz-card.skeleton::before,
+.quiz-card.skeleton::after {
+  display: none;
+}
+
+/* ---------- Пустая сцена ---------- */
+
+.empty {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 56px 28px 48px;
+  overflow: hidden;
+  text-align: center;
+  animation: programme-in 800ms var(--ease-out) 600ms backwards;
+}
+
+.empty-art {
+  position: relative;
+  margin-bottom: 4px;
+}
+
+/* Луч прожектора на портал */
+.empty-art::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  z-index: -1;
+  width: 280px;
+  height: 260px;
+  background: linear-gradient(180deg, rgba(216, 172, 76, 0), rgba(216, 172, 76, 0.28));
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+  transform: translateX(-50%);
+}
+
+.empty-art .brand-mark {
+  width: 128px;
+  height: 116px;
+  filter: drop-shadow(0 12px 18px rgba(43, 18, 24, 0.35));
+  animation: sway 5s ease-in-out infinite;
+}
+
+.empty .kicker {
+  color: var(--velvet);
+  font-size: 20px;
+}
+
+.empty h2 {
+  font-size: 34px;
+}
+
+.empty p.muted {
+  max-width: 460px;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* ---------- Анимации ---------- */
+
+@keyframes poster-hang {
+  0% { opacity: 0; transform: perspective(1000px) translateY(-50px) rotateX(48deg); }
+  55% { opacity: 1; transform: perspective(1000px) translateY(4px) rotateX(-8deg); }
+  78% { transform: perspective(1000px) rotateX(3deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes poster-fall {
+  0% { opacity: 1; transform: none; }
+  25% { transform: perspective(1000px) rotateZ(-4deg); }
+  100% { opacity: 0; transform: perspective(1000px) translateY(140px) rotateX(-60deg) rotateZ(-8deg); }
+}
+
+@keyframes shimmer {
+  to { background-position: -150% 0; }
+}
+
+@media (max-width: 600px) {
+  .quiz-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quiz-card {
+    min-height: 220px;
+    padding: 26px 20px 22px;
+  }
+
+  .quiz-card-title {
+    font-size: 24px;
+  }
+
+  .topbar .btn-primary {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 15px;
+  }
+}

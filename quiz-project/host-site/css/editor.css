@@ -1,13 +1,39 @@
-/* AL Studio — редактор игры: типы вопросов, картинки, время на чтение и на ответ.
-   Подключается после css/style.css и использует его переменные и компоненты. */
+/* AL Studio — редактор игры: «Сценарий спектакля». Обложка с названием, вопросы — страницы
+   сценария, варианты — камни, правильный — золотая печать. Основа — theatre.css. */
+
+/* Стена фойе, как на главной */
+.page-editor {
+  background:
+    radial-gradient(70% 55% at 50% -8%, rgba(255, 233, 176, 0.14), transparent 70%),
+    repeating-linear-gradient(45deg, rgba(216, 172, 76, 0.04) 0 1.5px, transparent 1.5px 34px),
+    repeating-linear-gradient(-45deg, rgba(216, 172, 76, 0.04) 0 1.5px, transparent 1.5px 34px),
+    radial-gradient(40% 60% at -6% 40%, rgba(140, 21, 41, 0.35), transparent 70%),
+    radial-gradient(40% 60% at 106% 40%, rgba(140, 21, 41, 0.35), transparent 70%),
+    var(--night);
+  background-attachment: fixed;
+}
+
+.editor {
+  padding-bottom: 24px;
+}
+
+.page-intro .kicker {
+  font-size: 22px;
+  animation: drop-in 600ms var(--ease-out) 500ms backwards;
+}
+
+.page-intro h1 {
+  animation: rise-in 700ms var(--ease-out) 580ms backwards;
+}
 
 .editor-intro {
   display: grid;
-  gap: 2px;
+  gap: 3px;
+  animation: fade-in 700ms ease 700ms backwards;
 }
 
 .editor-intro b {
-  color: var(--text);
+  color: var(--ivory);
   font-weight: 700;
 }
 
@@ -22,43 +48,117 @@
   stroke-linejoin: round;
 }
 
-/* ---------- Карточка вопроса ---------- */
+.card .input {
+  background: #fffdf8;
+}
+
+/* ---------- Обложка: название игры ---------- */
+
+.editor-title {
+  margin-bottom: 30px;
+  padding: 26px 30px 28px;
+  transform-origin: 50% 0;
+  animation: programme-in 800ms var(--ease-out) 620ms backwards;
+}
+
+.editor-title .field-label {
+  color: var(--velvet);
+}
+
+#quiz-title {
+  min-height: 64px;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.select {
+  min-height: 36px;
+  padding: 4px 10px;
+  border: 1.5px solid rgba(143, 106, 34, 0.5);
+  border-radius: var(--radius-sm);
+  background: #fffdf8;
+  color: var(--ink);
+  font: inherit;
+}
+
+/* ---------- Страницы сценария ---------- */
+
+.question-list {
+  display: grid;
+  gap: 28px;
+  margin: 0 0 26px;
+  padding: 0;
+  list-style: none;
+  counter-reset: page;
+}
 
 .question-card {
-  gap: 16px;
+  display: grid;
+  gap: 18px;
+  padding: 24px 28px 22px;
+  transform-origin: 50% 0;
+  animation: page-drop 760ms var(--ease-out) backwards;
 }
+
+.question-card:nth-child(1) { animation-delay: 450ms; }
+.question-card:nth-child(2) { animation-delay: 530ms; }
+.question-card:nth-child(3) { animation-delay: 610ms; }
+.question-card:nth-child(n + 4) { animation-delay: 690ms; }
 
 /* Карточки появляются с анимацией только при открытии редактора и при добавлении вопроса. */
 .question-list.is-ready .question-card:not(.is-new) {
   animation: none;
 }
 
+.question-list.is-ready .question-card.is-new {
+  animation-delay: 0ms;
+}
+
+.question-card.skeleton {
+  min-height: 320px;
+  background: linear-gradient(100deg, var(--ivory) 40%, #fffaf0 50%, var(--ivory) 60%) 0 0 / 300% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
 .question-head {
-  flex-wrap: nowrap;
+  display: flex;
+  align-items: center;
   gap: 12px 18px;
 }
 
+/* Номер — бархатная закладка с золотом */
 .question-number {
   flex: none;
+  padding: 7px 16px 8px;
+  border-radius: 7px;
+  color: var(--gold-light);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 50%),
+    var(--velvet);
+  box-shadow: 0 0 0 1.5px var(--gold), 0 0 0 3px var(--velvet-deep), 0 4px 10px rgba(43, 18, 24, 0.3);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 700;
   white-space: nowrap;
 }
 
-.question-head .question-tools {
+.question-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
 }
 
-/* ---------- Тип вопроса: сегментированный переключатель ---------- */
+/* ---------- Тип вопроса: пара билетов ---------- */
 
 .segmented {
   display: inline-grid;
   min-width: 0;
   grid-auto-columns: minmax(0, 1fr);
   grid-auto-flow: column;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.22);
+  gap: 8px;
+  perspective: 500px;
 }
 
 .segment {
@@ -83,14 +183,16 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 6px 14px;
-  border-radius: 10px;
-  color: var(--muted);
+  min-height: 40px;
+  padding: 7px 15px;
+  border: 1.5px dashed rgba(143, 106, 34, 0.55);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: var(--paper-2);
   font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 320ms var(--ease-spring), background-color 240ms ease, color 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
 }
 
 .segment-face .ui-icon {
@@ -104,21 +206,24 @@
 }
 
 .segment:hover .segment-face {
-  color: var(--text);
+  color: var(--ink);
+  transform: rotateX(10deg) translateY(-1px);
 }
 
 .segment input:checked + .segment-face {
-  background: var(--surface-strong);
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 6px 16px rgba(4, 2, 18, 0.35);
+  border: 1.5px solid var(--gold-deep);
+  background: var(--gold-leaf);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px rgba(255, 244, 210, 0.45), 0 3px 0 var(--gold-deep), 0 8px 16px rgba(43, 18, 24, 0.22);
+  transform: translateY(-2px);
 }
 
 .segment input:checked + .segment-face .ui-icon {
-  color: var(--accent);
+  color: var(--velvet);
 }
 
 .segment input:focus-visible + .segment-face {
-  outline: 3px solid #ffd166;
+  outline: 3px solid var(--gold);
   outline-offset: 2px;
 }
 
@@ -127,22 +232,32 @@
 .question-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 14px;
+  gap: 16px;
+}
+
+textarea.input {
+  resize: vertical;
+  min-height: 76px;
 }
 
 .question-body .question-text {
   height: 100%;
-  min-height: 148px;
+  min-height: 152px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .image-slot {
   position: relative;
-  min-height: 148px;
+  min-height: 152px;
   margin: 0;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: 4px;
 }
 
+/* Пустая золочёная рама */
 .image-add {
   display: flex;
   flex-direction: column;
@@ -151,33 +266,35 @@
   gap: 10px;
   width: 100%;
   padding: 16px;
-  border: 2px dashed var(--border);
-  background: rgba(0, 0, 0, 0.14);
-  color: var(--muted);
+  border: 4px solid var(--gold);
+  background:
+    repeating-linear-gradient(135deg, rgba(143, 106, 34, 0.07) 0 8px, transparent 8px 16px),
+    var(--paper-2);
+  box-shadow: inset 0 0 0 1.5px var(--gold-deep), 0 0 0 1.5px var(--gold-deep);
+  color: var(--ink-soft);
   font: inherit;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  transition: background-color 240ms ease, color 240ms ease, box-shadow 240ms ease;
 }
 
 .image-add:hover,
 .image-slot.is-dragover {
-  border-color: var(--accent);
-  background: rgba(255, 106, 61, 0.08);
-  color: var(--text);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--gold-deep), 0 0 0 1.5px var(--gold-deep), inset 0 0 30px rgba(255, 233, 176, 0.9);
 }
 
 .image-add-icon {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
+  color: var(--gold-deep);
   stroke-width: 1.7;
-  transition: transform 0.2s ease, color 0.2s ease;
+  transition: transform 320ms var(--ease-spring);
 }
 
 .image-add:hover .image-add-icon,
 .image-slot.is-dragover .image-add-icon {
-  color: var(--accent);
-  transform: translateY(-2px) scale(1.06);
+  transform: translateY(-3px) scale(1.1);
 }
 
 .image-add-text {
@@ -193,27 +310,23 @@
 .image-add-hint {
   font-size: 13px;
   font-weight: 600;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
 .image-preview {
   display: grid;
   place-items: center;
-  border: 1px solid var(--border);
-  background: var(--bg-deep);
+  border: 4px solid var(--gold);
+  background: var(--night-2);
+  box-shadow: inset 0 0 0 1.5px var(--gold-deep), 0 0 0 1.5px var(--gold-deep), 0 8px 18px rgba(43, 18, 24, 0.3);
 }
 
 .image-preview.is-uploading {
-  animation: fade-in 0.2s ease both;
+  animation: fade-in 200ms ease both;
 }
 
 .image-preview.is-fresh {
-  animation: image-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1.2) both;
-}
-
-@keyframes image-in {
-  from { opacity: 0; transform: scale(0.94); }
-  to { opacity: 1; transform: none; }
+  animation: frame-hang 700ms var(--ease-out) both;
 }
 
 .image-backdrop {
@@ -222,7 +335,7 @@
   width: calc(100% + 48px);
   height: calc(100% + 48px);
   object-fit: cover;
-  filter: blur(18px) brightness(0.5) saturate(1.2);
+  filter: blur(18px) brightness(0.45) saturate(1.1);
 }
 
 .image-main {
@@ -240,21 +353,20 @@
   justify-content: center;
   gap: 6px;
   padding: 26px 8px 8px;
-  background: linear-gradient(to bottom, transparent, rgba(8, 6, 24, 0.88));
+  background: linear-gradient(to bottom, transparent, rgba(26, 9, 16, 0.9));
 }
 
 .image-action {
   gap: 6px;
   min-height: 32px;
   padding: 4px 12px;
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(18, 13, 43, 0.72);
-  backdrop-filter: blur(8px);
+  border-color: rgba(216, 172, 76, 0.6);
+  background: rgba(26, 9, 16, 0.75);
   font-size: 14px;
 }
 
 .image-action:hover:not(:disabled) {
-  background: rgba(40, 32, 84, 0.9);
+  background: rgba(140, 21, 41, 0.85);
 }
 
 .image-action .ui-icon {
@@ -263,7 +375,7 @@
 }
 
 .image-action[data-action='remove-image']:hover:not(:disabled) {
-  border-color: rgba(239, 68, 68, 0.7);
+  border-color: rgba(255, 140, 120, 0.8);
 }
 
 .image-broken {
@@ -279,19 +391,14 @@
   position: relative;
   display: block;
   padding: 0 16px 44px;
-  color: #ffb4b4;
+  color: #ffb4a8;
   font-size: 14px;
   font-weight: 700;
   text-align: center;
 }
 
-.image-slot.is-broken {
-  border-color: rgba(239, 68, 68, 0.5);
-}
-
-/* Загрузка: превью приглушено, поверх — индикатор. */
 .image-slot.is-uploading .image-main {
-  filter: brightness(0.45) saturate(0.6);
+  opacity: 0.4;
 }
 
 .image-progress {
@@ -299,6 +406,7 @@
   display: grid;
   justify-items: center;
   gap: 10px;
+  color: var(--ivory);
   font-size: 14px;
   font-weight: 700;
 }
@@ -306,17 +414,134 @@
 .image-progress .spinner {
   width: 34px;
   height: 34px;
-  border-width: 4px;
 }
 
-/* ---------- Варианты ответа и «Ввод ответа» ---------- */
+/* ---------- Варианты ответа — камни ---------- */
 
 .question-answers.is-switched {
-  animation: rise-in 0.3s ease both;
+  transform-origin: 50% 0;
+  animation: turn-page 560ms var(--ease-out) both;
 }
+
+.answers-edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.answer-edit {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px;
+  border: 2px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tone) 9%, #fffdf8);
+  transition: border-color 260ms ease, background-color 260ms ease, box-shadow 260ms ease;
+}
+
+.answer-edit.is-new {
+  transform-origin: 50% 0;
+  animation: row-drop 520ms var(--ease-out) both;
+}
+
+.answer-edit.is-correct {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 16%, #fffdf8);
+  box-shadow: 0 0 0 3px rgba(216, 172, 76, 0.25);
+}
+
+.answer-edit .input {
+  min-height: 44px;
+  border-color: transparent;
+  border-bottom-color: rgba(143, 106, 34, 0.35);
+  background: rgba(255, 255, 255, 0.75);
+  font-weight: 600;
+}
+
+.answer-edit .input:focus {
+  border-color: var(--gold);
+}
+
+/* Камень с фигурой в золотой оправе */
+.answer-badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  color: #fff;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.32), transparent 45%),
+    linear-gradient(330deg, rgba(0, 0, 0, 0.28), transparent 55%),
+    var(--tone);
+  box-shadow: 0 0 0 2px var(--gold), 0 0 0 3px var(--gold-deep);
+}
+
+.answer-badge .shape {
+  width: 22px;
+  height: 22px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+}
+
+/* Правильный ответ — золотая печать */
+.correct-toggle {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+}
+
+.correct-toggle input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.correct-toggle span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px dashed rgba(107, 74, 60, 0.45);
+  border-radius: 50%;
+  color: transparent;
+  font-weight: 900;
+  transition: transform 360ms var(--ease-spring), background-color 240ms ease, border-color 240ms ease, color 240ms ease, box-shadow 240ms ease;
+}
+
+.correct-toggle:hover span {
+  border-color: var(--gold-deep);
+  color: rgba(143, 106, 34, 0.5);
+}
+
+.correct-toggle input:checked + span {
+  border: 2px solid var(--gold-deep);
+  color: var(--velvet-deep);
+  background: radial-gradient(circle at 35% 30%, #fff4d2, var(--gold) 55%, #b98a33);
+  box-shadow: 0 0 0 3px rgba(216, 172, 76, 0.3), 0 3px 8px rgba(43, 18, 24, 0.3);
+  transform: scale(1.1) rotate(-8deg);
+}
+
+.correct-toggle input:focus-visible + span {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ---------- «Ввод ответа»: засчитываемые ответы ---------- */
 
 .answer-edit.is-accepted {
   --tone: var(--success);
+}
+
+.answer-edit.is-accepted .answer-badge {
+  background: var(--success);
 }
 
 .accepted-icon {
@@ -334,31 +559,27 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 14px;
-  border: 1px solid rgba(34, 197, 94, 0.28);
+  padding: 11px 15px;
+  border-left: 4px solid var(--gold);
   border-radius: var(--radius-sm);
-  background: rgba(34, 197, 94, 0.08);
-  color: var(--muted);
+  background: var(--paper-2);
+  color: var(--ink-soft);
   font-size: 15px;
   line-height: 1.45;
 }
 
 .accepted-hint .ui-icon {
   margin-top: 1px;
-  color: var(--success);
+  color: var(--velvet);
 }
 
-/* ---------- Низ карточки: добавить вариант + время ---------- */
+/* ---------- Низ страницы: ещё вариант + время ---------- */
 
 .question-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 16px;
-}
-
-.question-foot .add-answer {
-  justify-self: auto;
 }
 
 .question-timing {
@@ -368,43 +589,46 @@
   margin-left: auto;
 }
 
+/* Время — латунные таблички */
 .timing {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
+  min-height: 42px;
   padding: 0 4px 0 12px;
-  border: 1px solid var(--border);
+  border: 1.5px solid rgba(143, 106, 34, 0.55);
   border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--muted);
+  color: var(--ink-soft);
+  background: linear-gradient(180deg, #fff6dc, var(--paper-2));
+  box-shadow: 0 2px 0 rgba(143, 106, 34, 0.35);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: border-color 200ms ease, box-shadow 240ms ease;
 }
 
 .timing:hover {
-  background: var(--surface-strong);
+  border-color: var(--gold-deep);
 }
 
 .timing:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(255, 106, 61, 0.2);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(216, 172, 76, 0.35);
 }
 
 .timing .ui-icon {
   width: 17px;
   height: 17px;
+  color: var(--velvet);
 }
 
 .timing-select.select {
   min-height: 32px;
   padding: 2px 6px;
   border: 0;
-  background-color: transparent;
-  color: var(--text);
-  font-weight: 700;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -413,8 +637,49 @@
 }
 
 .timing-select option {
-  background: var(--surface-solid);
-  color: var(--text);
+  background: var(--ivory);
+  color: var(--ink);
+}
+
+/* «+ Добавить вопрос» — пустое место для новой страницы */
+#add-question {
+  min-height: 66px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-style: italic;
+  animation: fade-in 700ms ease 1100ms backwards;
+}
+
+#summary {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Анимации ---------- */
+
+@keyframes page-drop {
+  0% { opacity: 0; transform: perspective(1200px) translateY(-46px) rotateX(36deg); }
+  60% { opacity: 1; transform: perspective(1200px) translateY(4px) rotateX(-4deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes turn-page {
+  0% { opacity: 0; transform: perspective(1000px) rotateX(-70deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes row-drop {
+  0% { opacity: 0; transform: perspective(600px) translateY(-14px) rotateX(50deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes frame-hang {
+  0% { opacity: 0; transform: perspective(700px) translateY(-24px) rotateX(30deg); }
+  65% { opacity: 1; transform: perspective(700px) rotateX(-6deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes shimmer {
+  to { background-position: -150% 0; }
 }
 
 /* ---------- Ноутбук, планшет ---------- */
@@ -441,13 +706,26 @@
 /* ---------- Телефон ---------- */
 
 @media (max-width: 600px) {
+  .editor-title {
+    padding: 20px 18px 22px;
+  }
+
+  #quiz-title {
+    font-size: 24px;
+  }
+
   .question-card {
     gap: 14px;
-    padding: 16px;
+    padding: 18px 16px;
   }
 
   .question-tools {
     gap: 4px;
+  }
+
+  .question-tools .icon-btn {
+    width: 36px;
+    height: 36px;
   }
 
   .segment-face {
@@ -462,7 +740,8 @@
   }
 
   .question-body .question-text {
-    min-height: 96px;
+    min-height: 100px;
+    font-size: 19px;
   }
 
   .image-slot {
@@ -472,7 +751,7 @@
   .image-add {
     flex-direction: row;
     gap: 12px;
-    min-height: 56px;
+    min-height: 58px;
     padding: 10px 14px;
   }
 
@@ -487,6 +766,10 @@
 
   .image-preview {
     aspect-ratio: 16 / 10;
+  }
+
+  .answers-edit {
+    grid-template-columns: 1fr;
   }
 
   .accepted-hint {
@@ -512,7 +795,7 @@
     align-items: center;
     gap: 0 10px;
     min-width: 0;
-    min-height: 54px;
+    min-height: 56px;
     padding: 6px 6px 6px 12px;
   }
 
@@ -535,6 +818,16 @@
     min-height: 26px;
     padding: 0;
     font-size: 16px;
+  }
+
+  .action-bar-buttons {
+    flex-wrap: nowrap;
+  }
+
+  #launch {
+    min-height: 50px;
+    padding: 10px 18px;
+    font-size: 17px;
   }
 }
 

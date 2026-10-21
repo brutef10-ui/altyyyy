@@ -50,6 +50,36 @@ export function shapeIcon(index, className = 'shape') {
   return svg;
 }
 
+// ---------- Значки сцены (вместо эмодзи): линия текущего цвета ----------
+
+const STAGE_ICONS = {
+  play: ['M8 5.5v13l10.5-6.5z'],
+  trash: ['M4 7h16', 'M10 11v6', 'M14 11v6', 'M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12', 'M9 7V4h6v3'],
+  check: ['M5 12.6l4.6 4.6L19.2 7.4'],
+  quill: ['M20 4c-6 1-11 6-13 13l-1.5 3.5', 'M20 4c-1 5-4.5 9-9.5 10.5', 'M7.5 14.5l3 3'],
+  sound: ['M4 9.5h3.5L12 5.5v13l-4.5-4H4z', 'M15.5 9a4.2 4.2 0 0 1 0 6', 'M18 6.5a7.6 7.6 0 0 1 0 11'],
+  mute: ['M4 9.5h3.5L12 5.5v13l-4.5-4H4z', 'M16 9.5l5 5', 'M21 9.5l-5 5'],
+  hourglass: ['M6.5 3h11', 'M6.5 21h11', 'M8 3c0 5 8 5.6 8 9s-8 4-8 9', 'M16 3c0 5-8 5.6-8 9s8 4 8 9'],
+};
+
+export function stageIcon(name, className = 'stage-icon') {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', className);
+  for (const d of STAGE_ICONS[name] || []) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', name === 'play' ? 'currentColor' : 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2.2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.append(path);
+  }
+  return svg;
+}
+
 // ---------- Аватар ----------
 
 export function avatar(src, nickname, className = 'avatar') {

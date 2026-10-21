@@ -4,6 +4,7 @@ import { api, imageUrl } from './api.js';
 import { editorDraft } from './session.js';
 import { launchGame } from './socket.js';
 import { ANSWER_SHAPES, confirmDialog, h, plural, shapeIcon, toast } from './ui.js';
+import { EASE_OUT, prefersReducedMotion } from './theatre.js';
 
 // Те же ограничения проверяет сервер (server/src/validate.js).
 const LIMITS = {
@@ -479,10 +480,28 @@ function markDirty() {
   if (showErrors) highlightErrors();
 }
 
+// Карточки, которые остались на сцене, переезжают на новые места плавно (FLIP),
+// новая карточка опускается сверху (класс is-new), удалённая перед этим уходит в люк.
 function changeStructure(mutator, focusSelector) {
+  const before = new Map(); // вопрос → где стояла его карточка
+  [...questionsList.children].forEach((card, i) => {
+    if (quiz.questions[i]) before.set(quiz.questions[i], card.getBoundingClientRect().top);
+  });
   mutator();
   markDirty();
   render();
+  if (!prefersReducedMotion()) {
+    [...questionsList.children].forEach((card, i) => {
+      const top = before.get(quiz.questions[i]);
+      if (top === undefined) return;
+      const shift = top - card.getBoundingClientRect().top;
+      if (Math.abs(shift) < 2) return;
+      card.animate(
+        [{ transform: `translateY(${shift}px)` }, { transform: 'none' }],
+        { duration: 560, easing: EASE_OUT },
+      );
+    });
+  }
   if (focusSelector) {
     const node = document.querySelector(focusSelector);
     node?.focus();
@@ -547,6 +566,11 @@ questionsList.addEventListener('change', (event) => {
   }
 });
 
+/** Новая строка варианта выезжает с анимацией. */
+function markNewRow(qi, selector) {
+  questionsList.children[qi]?.querySelector(`.answers-edit ${selector}`)?.classList.add('is-new');
+}
+
 questionsList.addEventListener('click', (event) => {
   const button = event.target.closest('[data-action]');
   if (!button) return;
@@ -576,6 +600,7 @@ questionsList.addEventListener('click', (event) => {
         question.answers.push('');
         markDirty();
         renderCard(qi, `[data-a="${question.answers.length - 1}"]`);
+        markNewRow(qi, '.answer-edit:last-child');
       }
       break;
     case 'remove-answer': {
@@ -593,6 +618,7 @@ questionsList.addEventListener('click', (event) => {
         question.accepted.push('');
         markDirty();
         renderCard(qi, `[data-acc="${question.accepted.length - 1}"]`);
+        markNewRow(qi, '.answer-edit:last-child');
       }
       break;
     case 'remove-accepted': {
@@ -615,7 +641,22 @@ questionsList.addEventListener('click', (event) => {
   }
 });
 
+/** Элемент уходит со сцены в люк; промис выполняется, когда он скрылся. */
+function sinkAway(node) {
+  if (!node?.animate || prefersReducedMotion()) return Promise.resolve();
+  return node.animate(
+    [
+      { opacity: 1, transform: 'none' },
+      { opacity: 0, transform: 'perspective(900px) translateY(36px) rotateX(-55deg) scale(0.92)' },
+    ],
+    { duration: 380, easing: 'cubic-bezier(.55, 0, .75, .2)', fill: 'forwards' },
+  ).finished.catch(() => {});
+}
+
+let removing = false; // карточка уходит — повторное нажатие не удаляет следующий вопрос
+
 async function removeQuestion(qi) {
+  if (removing) return;
   const question = quiz.questions[qi];
   const isEmpty = !question.text.trim() && !question.image
     && question.answers.every((a) => !a.trim()) && question.accepted.every((a) => !a.trim());
@@ -623,7 +664,11 @@ async function removeQuestion(qi) {
     const confirmed = await confirmDialog({ title: `Удалить вопрос ${qi + 1}?`, message: question.text.trim(), confirmText: 'Удалить', danger: true });
     if (!confirmed) return;
   }
-  changeStructure(() => quiz.questions.splice(qi, 1));
+  removing = true;
+  await sinkAway(questionsList.children[quiz.questions.indexOf(question)]);
+  removing = false;
+  const index = quiz.questions.indexOf(question);
+  if (index >= 0 && quiz.questions.length > 1) changeStructure(() => quiz.questions.splice(index, 1));
 }
 
 addQuestionButton.addEventListener('click', () => {
@@ -988,7 +1033,8 @@ async function init() {
   }
   render();
   // Первая отрисовка — с анимацией появления карточек, дальше карточки не «прыгают» при каждом изменении.
-  requestAnimationFrame(() => setTimeout(() => questionsList.classList.add('is-ready'), 600));
+  // Начальное появление страниц сценария идёт вместе с открытием занавеса (до ~1,4 с).
+  requestAnimationFrame(() => setTimeout(() => questionsList.classList.add('is-ready'), 1500));
   if (!quiz.title) titleInput.focus();
 }
 
