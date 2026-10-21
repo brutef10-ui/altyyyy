@@ -28,6 +28,7 @@
     </header>
 
     <section class="panel photo-panel" id="photo-panel" data-mode="empty">
+      <p class="panel-stub" aria-hidden="true"><span>Портрет для афиши</span><span>Акт II</span></p>
       <h1>Ваше фото</h1>
       <p class="muted">Фото появится на экране ведущего рядом с вашим ником. После игры оно не сохраняется.</p>
 
@@ -46,7 +47,7 @@
       <!-- Камера включена: затвор по центру, слева — галерея, справа — отмена -->
       <div class="camera-live" id="camera-live" hidden>
         <label class="round-action file-button" title="Выбрать из галереи">
-          <span class="round-action-icon" aria-hidden="true">🖼</span>
+          <span class="round-action-icon" aria-hidden="true"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.6"/><path d="M6.5 16.4l4-4.4 3 3 2-2 2.5 3.4"/><circle cx="9" cy="9" r="1.4"/></svg></span>
           <span class="round-action-label">Галерея</span>
           <input type="file" accept="image/*" data-source="gallery" aria-label="Выбрать из галереи">
         </label>
@@ -54,7 +55,7 @@
           <span class="shutter-ring"></span>
         </button>
         <button class="round-action" id="cancel-camera" type="button">
-          <span class="round-action-icon" aria-hidden="true">✕</span>
+          <span class="round-action-icon" aria-hidden="true"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 6.6l10.8 10.8M17.4 6.6 6.6 17.4"/></svg></span>
           <span class="round-action-label">Отмена</span>
         </button>
       </div>
@@ -62,11 +63,11 @@
       <!-- Два равных способа добавить фото -->
       <div class="photo-choices" id="choices">
         <button class="photo-choice" id="take-selfie" type="button">
-          <span class="photo-choice-icon" aria-hidden="true">📷</span>
+          <span class="photo-choice-icon" aria-hidden="true"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.2h3.3l1.8-2.6h6.8l1.8 2.6h3.3v11.2H3.5z"/><circle cx="12" cy="13.4" r="3.6"/></svg></span>
           <span class="photo-choice-label" id="selfie-label">Сделать селфи</span>
         </button>
         <label class="photo-choice file-button" id="gallery-choice">
-          <span class="photo-choice-icon" aria-hidden="true">🖼</span>
+          <span class="photo-choice-icon" aria-hidden="true"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.6"/><path d="M6.5 16.4l4-4.4 3 3 2-2 2.5 3.4"/><circle cx="9" cy="9" r="1.4"/></svg></span>
           <span class="photo-choice-label" id="gallery-label">Выбрать из галереи</span>
           <input type="file" id="gallery-input" accept="image/*" data-source="gallery" aria-label="Выбрать из галереи">
         </label>

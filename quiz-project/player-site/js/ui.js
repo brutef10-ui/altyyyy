@@ -58,6 +58,36 @@ export function pencilIcon(className = 'shape') {
   return svg;
 }
 
+// Значки сцены (вместо эмодзи): рисуются линией текущего цвета.
+const STAGE_ICONS = {
+  check: ['M5 12.6l4.6 4.6L19.2 7.4'],
+  cross: ['M6.6 6.6l10.8 10.8', 'M17.4 6.6 6.6 17.4'],
+  hourglass: ['M6.5 3h11', 'M6.5 21h11', 'M8 3c0 5 8 5.6 8 9s-8 4-8 9', 'M16 3c0 5-8 5.6-8 9s8 4 8 9', 'M10 18.6h4'],
+  alert: ['M12 6.5v7', 'M12 17.4v.2'],
+  curtain: ['M3.5 21V8a5 5 0 0 1 5-5h7a5 5 0 0 1 5 5v13', 'M3.5 8c3.2 1.4 4.3 6.3 3.2 13', 'M20.5 8c-3.2 1.4-4.3 6.3-3.2 13', 'M2.5 21h19'],
+  'curtain-closed': ['M3.5 21V8a5 5 0 0 1 5-5h7a5 5 0 0 1 5 5v13', 'M12 4v17', 'M7.5 6v15', 'M16.5 6v15', 'M2.5 21h19'],
+  phone: ['M8.5 2.8h7a1.6 1.6 0 0 1 1.6 1.6v15.2a1.6 1.6 0 0 1-1.6 1.6h-7a1.6 1.6 0 0 1-1.6-1.6V4.4a1.6 1.6 0 0 1 1.6-1.6z', 'M11 18h2'],
+  door: ['M4 21h16', 'M6.5 21V4.2c0-.7.6-1.2 1.2-1.2h8.6c.7 0 1.2.5 1.2 1.2V21', 'M14 12.2v.2'],
+};
+
+export function stageIcon(name, className = 'stage-icon') {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', className);
+  for (const d of STAGE_ICONS[name] || STAGE_ICONS.alert) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2.4');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.append(path);
+  }
+  return svg;
+}
+
 export function showError(element, message) {
   element.textContent = message || '';
   element.hidden = !message;

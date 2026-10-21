@@ -4,7 +4,8 @@
 import { SERVER_URL } from './config.js';
 import { goTo, playerState } from './session.js';
 import { connectPlayer, request } from './socket.js';
-import { ANSWER_SHAPES, formatScore, h, pencilIcon, plural, shapeIcon, vibrate } from './ui.js';
+import { ANSWER_SHAPES, formatScore, h, pencilIcon, plural, shapeIcon, stageIcon, vibrate } from './ui.js';
+import { curtain, EASE_OUT, prefersReducedMotion, replay } from './theatre.js';
 
 const state = playerState.get();
 const $ = (id) => document.getElementById(id);
@@ -19,6 +20,7 @@ const questionView = $('view-question');
 const kindTag = $('q-kind');
 const secondsValue = $('q-seconds');
 const timebar = $('timebar');
+const timebarTrack = timebar.parentElement; // фитиль: CSS-переменная --left двигает заливку и огонёк
 const media = $('q-media');
 const mediaImage = $('q-image');
 const readingBox = $('q-reading');
@@ -56,6 +58,7 @@ let timerFrame = 0;
 let wakeLock = null;
 let mediaRetryTimer = 0;
 let shownFinal = null; // { rank, complete } — что уже показано на экране финала
+let lastScore = null; // для «перелистывания» таблички очков при начислении
 
 // ---------- Проверка шагов входа ----------
 
@@ -70,26 +73,153 @@ function guard() {
   return false;
 }
 
-// ---------- Экраны ----------
+// ---------- Экраны: смена декораций ----------
+
+// Как меняется сцена при переходе на экран: вопрос опускается с колосников, «ответ принят» —
+// поворотный круг, результат и сообщения — свет (затемнение и прожектор), церемония — занавес.
+function sceneFor(id) {
+  if (id === 'view-question') return 'fly';
+  if (id === 'view-answered') return 'turntable';
+  if (id === 'view-ceremony') return 'curtain';
+  return 'lights';
+}
+
+const SCENES = {
+  fly: {
+    out: [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(10%) scale(.94)' }],
+    in: [
+      { opacity: 0, transform: 'translateY(-36%) rotateX(18deg)' },
+      { opacity: 1, transform: 'translateY(2%) rotateX(-2deg)', offset: 0.72 },
+      { opacity: 1, transform: 'none' },
+    ],
+    outMs: 300,
+    inMs: 660,
+    inDelay: 90,
+  },
+  turntable: {
+    out: [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'rotateY(-84deg)' }],
+    in: [{ opacity: 0, transform: 'rotateY(84deg)' }, { opacity: 1, transform: 'none' }],
+    outMs: 380,
+    inMs: 580,
+    inDelay: 140,
+  },
+  lights: {
+    out: [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.96)' }],
+    in: [{ opacity: 0, transform: 'scale(1.05)' }, { opacity: 1, transform: 'none' }],
+    outMs: 220,
+    inMs: 540,
+    inDelay: 170,
+  },
+};
+
+const viewAnimations = new Map(); // экран → его анимации смены сцены
+let curtainScene = false; // занавес закрывается: экраны переключатся, когда он сойдётся
+
+function stopViewAnimations(view) {
+  (viewAnimations.get(view) || []).forEach((animation) => animation.cancel());
+  viewAnimations.delete(view);
+}
+
+function animateView(view, keyframes, options) {
+  if (!view.animate) return null;
+  const animation = view.animate(keyframes, options);
+  viewAnimations.set(view, [...(viewAnimations.get(view) || []), animation]);
+  return animation;
+}
+
+function showOnly(id) {
+  for (const view of views) {
+    stopViewAnimations(view);
+    view.hidden = view.id !== id;
+    view.inert = false;
+  }
+}
+
+function changeScene(previous, next, kind) {
+  const scene = SCENES[kind];
+  for (const view of views) {
+    if (view === next || view === previous) continue;
+    stopViewAnimations(view);
+    view.hidden = true;
+    view.inert = false;
+  }
+  stopViewAnimations(next);
+  next.hidden = false;
+  next.inert = false;
+  next.scrollTop = 0;
+  if (!scene || prefersReducedMotion()) {
+    stopViewAnimations(previous);
+    previous.hidden = true;
+    animateView(next, [{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
+    return;
+  }
+  // Старая сцена уходит (и уже не принимает нажатий), новая выезжает с небольшой задержкой.
+  previous.inert = true;
+  const leaving = animateView(previous, scene.out, { duration: scene.outMs, easing: 'cubic-bezier(.55, 0, .75, .2)', fill: 'forwards' });
+  leaving?.finished.then(() => {
+    if (currentView !== previous.id) previous.hidden = true;
+    previous.inert = false;
+    stopViewAnimations(previous);
+  }, () => {});
+  animateView(next, scene.in, { duration: scene.inMs, delay: scene.inDelay, easing: EASE_OUT, fill: 'backwards' });
+}
+
+// Большая смена — через занавес: экраны переключаются, когда кулисы сошлись.
+async function curtainChange() {
+  curtainScene = true;
+  await curtain.close();
+  curtainScene = false;
+  showOnly(currentView);
+  $(currentView).scrollTop = 0;
+  curtain.open();
+}
 
 function show(id, mood = '') {
-  const changed = currentView !== id;
-  for (const view of views) view.hidden = view.id !== id;
-  if (changed) {
-    const current = $(id);
-    current.classList.remove('enter');
-    void current.offsetWidth;
-    current.classList.add('enter');
-    current.scrollTop = 0;
-    if (document.activeElement === textInput) textInput.blur(); // спрятать клавиатуру
-  }
+  const previousId = currentView;
   currentView = id;
   document.body.dataset.mood = mood;
   if (id !== 'view-question') stopTimer();
+  if (curtainScene) return; // переключится под закрытым занавесом
+  if (previousId === id) {
+    if ($(id).hidden) showOnly(id);
+    return;
+  }
+  if (document.activeElement === textInput) textInput.blur(); // спрятать клавиатуру
+  const kind = sceneFor(id);
+  if (kind === 'curtain' && !prefersReducedMotion()) {
+    curtainChange();
+    return;
+  }
+  changeScene($(previousId), $(id), kind);
+}
+
+/**
+ * Плавно переносит элементы на новые места после перестройки экрана (техника FLIP):
+ * запоминаем положение, меняем раскладку и анимируем из старого места в новое.
+ */
+function flip(elements, mutate) {
+  const tracked = prefersReducedMotion() ? [] : elements.filter((node) => node && node.getClientRects().length);
+  const before = tracked.map((node) => node.getBoundingClientRect());
+  mutate();
+  tracked.forEach((node, index) => {
+    const after = node.getBoundingClientRect();
+    if (!after.width || !after.height) return;
+    const was = before[index];
+    const dx = was.left + was.width / 2 - (after.left + after.width / 2);
+    const dy = was.top + was.height / 2 - (after.top + after.height / 2);
+    const scale = node === media ? Math.min(2, Math.max(0.5, was.height / after.height)) : 1;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(scale - 1) < 0.01) return;
+    node.animate(
+      [{ transform: `translate(${dx}px, ${dy}px) scale(${scale})` }, { transform: 'none' }],
+      { duration: 560, easing: EASE_OUT },
+    );
+  });
 }
 
 function setScore(score) {
   const hidden = score === null || score === undefined;
+  if (!hidden && lastScore !== null && score > lastScore) replay(scorePill, 'is-bumped');
+  if (!hidden) lastScore = score;
   scoreValue.textContent = hidden ? '?' : formatScore(score);
   scorePill.classList.toggle('is-hidden', hidden);
   scorePill.setAttribute('aria-label', hidden ? 'Очки скрыты до церемонии награждения' : 'Ваши очки');
@@ -113,8 +243,8 @@ function showWaiting(count) {
   show('view-waiting');
 }
 
-function showMessage({ title, text, icon = '!', actions = [] }) {
-  $('message-icon').textContent = icon;
+function showMessage({ title, text, icon = 'alert', actions = [] }) {
+  $('message-icon').replaceChildren(stageIcon(icon));
   $('message-title').textContent = title;
   $('message-text').textContent = text;
   $('message-actions').replaceChildren(...actions);
@@ -238,30 +368,38 @@ function renderReading(data) {
 
 function renderAnswering(data) {
   const wasReading = questionView.dataset.phase === 'reading' && currentView === 'view-question';
-  questionView.dataset.phase = 'answering';
-  readingBox.hidden = true;
+  const apply = () => {
+    questionView.dataset.phase = 'answering';
+    readingBox.hidden = true;
 
-  if (data.type === 'text') {
-    answerButtons.hidden = true;
-    textForm.hidden = false;
-    const maxLength = Number.isInteger(data.maxLength) && data.maxLength > 0 ? data.maxLength : 80;
-    textInput.maxLength = maxLength;
-    setTextLocked(false);
-    updateTextCounter();
-    setTextHint(TEXT_HINT);
-    // На телефоне клавиатура может не открыться без касания — но курсор уже в поле.
-    requestAnimationFrame(() => textInput.focus({ preventScroll: true }));
+    if (data.type === 'text') {
+      answerButtons.hidden = true;
+      textForm.hidden = false;
+      const maxLength = Number.isInteger(data.maxLength) && data.maxLength > 0 ? data.maxLength : 80;
+      textInput.maxLength = maxLength;
+      setTextLocked(false);
+      updateTextCounter();
+      setTextHint(TEXT_HINT);
+      // На телефоне клавиатура может не открыться без касания — но курсор уже в поле.
+      requestAnimationFrame(() => textInput.focus({ preventScroll: true }));
+    } else {
+      textForm.hidden = true;
+      renderAnswerButtons(data.answers || []);
+      answerButtons.hidden = false;
+    }
+  };
+  // Чтение закончилось: вопрос и картинка плавно уступают место вариантам.
+  if (wasReading) {
+    flip([$('q-text'), media], apply);
+    vibrate(25);
   } else {
-    textForm.hidden = true;
-    renderAnswerButtons(data.answers || []);
-    answerButtons.hidden = false;
+    apply();
   }
-  if (wasReading) vibrate(25);
 
   const totalMs = data.timeLimit * 1000;
   runCountdown(Math.min(totalMs, data.remainingMs ?? totalMs), (left) => {
     secondsValue.textContent = Math.ceil(left / 1000);
-    timebar.style.transform = `scaleX(${left / totalMs})`;
+    timebarTrack.style.setProperty('--left', (left / totalMs).toFixed(4));
     timebar.classList.toggle('is-urgent', left < 5000);
   });
 }
@@ -391,7 +529,7 @@ async function submitAnswer(value) {
         break;
       case 'TOO_LATE':
         sending = false;
-        showMessage({ title: 'Время вышло', text: 'Ответ не успел дойти. Ждём результатов…', icon: '⏱' });
+        showMessage({ title: 'Время вышло', text: 'Ответ не успел дойти. Ждём результатов…', icon: 'hourglass' });
         break;
       case 'TOO_EARLY':
         unlockAnswer(isText, isText ? 'Подождите секунду — ответы ещё не открыты' : 'Варианты ещё не открылись — подождите секунду');
@@ -423,7 +561,7 @@ function showAnswered(value) {
 
 function rankText(rank, playerCount) {
   if (!rank) return '';
-  if (rank === 1) return playerCount > 1 ? 'Вы лидируете! 🔥' : '1-е место';
+  if (rank === 1) return playerCount > 1 ? 'Вы лидируете!' : '1-е место';
   return `${rank}-е место из ${playerCount}`;
 }
 
@@ -474,18 +612,18 @@ function renderResult(result) {
   let mood;
   if (!result.answered) {
     mood = 'timeout';
-    icon.textContent = '⏱';
+    icon.replaceChildren(stageIcon('hourglass'));
     title.textContent = 'Время вышло';
     points.textContent = '+0';
   } else if (result.correct) {
     mood = 'correct';
-    icon.textContent = '✓';
+    icon.replaceChildren(stageIcon('check'));
     title.textContent = 'Верно!';
     points.textContent = `+${formatScore(result.points)}`;
     vibrate([40, 60, 40]);
   } else {
     mood = 'wrong';
-    icon.textContent = '✕';
+    icon.replaceChildren(stageIcon('cross'));
     title.textContent = 'Неверно';
     points.textContent = '+0';
     vibrate(150);
@@ -539,7 +677,8 @@ function showPodium(final) {
 
 function launchConfetti() {
   const layer = $('confetti');
-  const colors = ['var(--a0)', 'var(--a1)', 'var(--a2)', 'var(--a3)', '#ffd166', '#ffffff'];
+  // Лепестки роз и позолота.
+  const colors = ['var(--velvet-light)', 'var(--gold)', 'var(--ruby)', 'var(--gold-light)', 'var(--velvet)', '#fff3d6'];
   layer.replaceChildren(...Array.from({ length: 36 }, (_, i) => h('span', {
     style: [
       `--x: ${Math.round(Math.random() * 100)}%`,
@@ -803,7 +942,7 @@ function bindEvents() {
   }));
 
   socket.on('game:started', queueOr(() => {
-    showMessage({ title: 'Поехали!', text: 'Первый вопрос уже на экране', icon: '🚀' });
+    showMessage({ title: 'Поехали!', text: 'Первый вопрос уже на экране', icon: 'curtain' });
   }));
   socket.on('question', queueOr((data) => renderQuestion(data)));
   socket.on('results', queueOr(renderResult));
@@ -820,7 +959,7 @@ function bindEvents() {
     showMessage({
       title: reason === 'replaced' ? 'Игра открыта в другом месте' : 'Игра завершена',
       text: message,
-      icon: reason === 'replaced' ? '📱' : '👋',
+      icon: reason === 'replaced' ? 'phone' : 'curtain-closed',
       actions: [homeButton()],
     });
   });
@@ -828,7 +967,7 @@ function bindEvents() {
   socket.on('player:kicked', ({ message }) => {
     stopForGood();
     playerState.leaveRoom();
-    showMessage({ title: 'Вы покинули игру', text: message, icon: '🚪', actions: [homeButton('Войти снова')] });
+    showMessage({ title: 'Вы покинули игру', text: message, icon: 'door', actions: [homeButton('Войти снова')] });
   });
 
   socket.on('error', ({ message }) => console.warn('[server]', message));

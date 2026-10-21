@@ -1,113 +1,58 @@
-/* AL Studio — сайт игрока. Mobile-first: телефон в руке, крупные кнопки. */
-
-:root {
-  /* Палитра «Console Chrome» — см. DESIGN.md */
-  --canvas: #7a8aba;
-  --periwinkle: #8ba1d4;
-  --sky: #9fbee7;
-  --lavender: #acace7;
-  --ice: #c0d5e6;
-  --platinum: #dedede;
-  --chrome: #3d4f97;
-  --chrome-muted: #60619c;
-  --carbon: #21242e;
-  --carbon-2: #2c3040;
-  --red: #e60012;
-  --signal: #f68d1f;
-  --signal-deep: #a24f00;
-  --amber: #ecab37;
-  --nav-gold: #e48600;
-  --halftone: radial-gradient(rgba(255, 255, 255, 0.075) 1px, transparent 1.3px) 0 0 / 5px 5px;
-
-  --bg: var(--canvas);
-  --bg-deep: #5d6c9c;
-  --surface: rgba(255, 255, 255, 0.26);
-  --surface-strong: rgba(255, 255, 255, 0.42);
-  --surface-solid: #b9c6ea;
-  --border: rgba(61, 79, 151, 0.55);
-  --text: #21242e;
-  --muted: #3d4f97;
-  --accent: #f68d1f;
-  --accent-2: #e8650b;
-  --accent-gradient: linear-gradient(180deg, #ffad55, #f68d1f 55%, #e8780f);
-  --success: #1f9d4a;
-  --danger: #e60012;
-  --warning: #ecab37;
-
-  /* Цвета клавиш ответа (совпадают на проекторе и телефонах) */
-  --a0: #e60012;
-  --a1: #2c5fd6;
-  --a2: #e8a317;
-  --a3: #1f9d4a;
-
-  --plate: linear-gradient(180deg, #b3c2ea 0%, #97abde 55%, #8ba1d4 100%);
-  --plate-edge: inset 0 2px 0 rgba(255, 255, 255, 0.65), inset 0 -2px 0 rgba(33, 36, 46, 0.18);
-  --font: 'Rubik', Arial, Helvetica, sans-serif;
-  --font-display: 'Russo One', 'Arial Black', Arial, sans-serif;
-  --font-pixel: 'Press Start 2P', 'Courier New', monospace;
-  --radius: 8px;
-  --radius-sm: 5px;
-  --shadow: 0 4px 0 var(--chrome), 0 12px 26px rgba(33, 36, 46, 0.28);
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
-}
+/* AL Studio — экраны игрока. Основа (токены, кнопки, поля, занавес) — theatre.css.
+   Вход — билетная касса: билет, портрет для афиши, имя в программке. Игра — зрительный зал:
+   вопрос опускается с колосников, варианты — камни в золотой оправе, итоги — под прожектором.
+   Mobile-first: телефон в руке, крупные зоны нажатия. */
 
 body {
-  margin: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
-  font-family: var(--font);
-  font-size: 17px;
   line-height: 1.45;
-  color: var(--text);
+  overflow-x: hidden;
+}
+
+/* Кулисы по краям экрана — рамка зала на каждой странице */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  width: clamp(9px, 2.6vw, 30px);
+  --fold: 13px;
   background:
-    radial-gradient(600px 420px at 0% -10%, rgba(255, 77, 109, 0.28), transparent 60%),
-    radial-gradient(600px 500px at 110% 10%, rgba(47, 140, 255, 0.24), transparent 60%),
-    var(--bg);
-  background-attachment: fixed;
-  transition: background-color 0.4s ease;
+    linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 30%, transparent 80%, rgba(0, 0, 0, 0.4)),
+    var(--velvet-folds);
+  pointer-events: none;
 }
 
-h1 {
-  margin: 0;
-  font-size: 28px;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+body::before {
+  left: 0;
+  border-right: 2px solid var(--gold-deep);
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.45);
 }
 
-p {
-  margin: 0;
+body::after {
+  right: 0;
+  border-left: 2px solid var(--gold-deep);
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.45);
 }
 
-a {
-  color: inherit;
+.btn {
+  min-height: 56px;
+  padding: 14px 22px;
+  font-size: 19px;
+  user-select: none;
+  touch-action: manipulation;
 }
 
-[hidden] {
-  display: none !important;
+.line-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.muted {
-  color: var(--muted);
-}
-
-:focus-visible {
-  outline: 3px solid #ffd166;
-  outline-offset: 3px;
-}
-
-/* ---------- Каркас шагов входа ---------- */
+/* ---------- Каркас шагов входа: билетная касса ---------- */
 
 .screen {
   display: flex;
@@ -117,26 +62,26 @@ a {
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0 auto;
-  padding: calc(20px + var(--safe-top)) 16px calc(24px + var(--safe-bottom));
+  padding: calc(20px + var(--safe-top)) clamp(20px, 6vw, 28px) calc(26px + var(--safe-bottom));
 }
 
 .logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 6vh;
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 4vh;
 }
 
-.logo-mark {
-  width: 38px;
-  height: 38px;
-  fill: var(--accent);
-  filter: drop-shadow(0 0 14px rgba(255, 106, 61, 0.7));
-  animation: twinkle 3s ease-in-out infinite;
+.logo .brand-mark {
+  width: 98px;
+  height: 89px;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 22px rgba(243, 217, 139, 0.25));
+  animation: logo-rise 900ms var(--ease-spring) 520ms backwards;
+}
+
+.logo .brand-word {
+  font-size: 40px;
+  animation: rise-in 700ms var(--ease-out) 700ms backwards;
 }
 
 .step-header {
@@ -149,24 +94,37 @@ a {
   display: grid;
   flex: none;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
+  border: 1.5px solid rgba(216, 172, 76, 0.6);
   border-radius: 50%;
-  background: var(--surface);
+  background: rgba(26, 9, 16, 0.6);
+  color: var(--gold-light);
   font-size: 22px;
   text-decoration: none;
+  transition: transform var(--t-micro) var(--ease-out), background-color 200ms ease;
 }
 
+.back-link:hover {
+  background: rgba(140, 21, 41, 0.55);
+}
+
+.back-link:active {
+  transform: scale(0.92);
+}
+
+/* Шаги — отрывные корешки билета: «акты» I, II, III */
 .steps {
   display: flex;
   flex: none;
   align-self: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   margin: 0;
   padding: 0;
   list-style: none;
   counter-reset: step;
+  perspective: 600px;
 }
 
 .step-header .steps {
@@ -174,90 +132,163 @@ a {
 }
 
 .steps li {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--surface);
+  gap: 7px;
+  padding: 6px 13px 6px 11px;
+  border: 1.5px dashed rgba(216, 172, 76, 0.5);
+  border-radius: 7px;
+  background: rgba(247, 236, 212, 0.05);
   color: var(--muted);
   font-size: 14px;
   font-weight: 700;
   counter-increment: step;
+  animation: drop-in 520ms var(--ease-out) backwards;
 }
 
+.steps li:nth-child(1) { animation-delay: 420ms; }
+.steps li:nth-child(2) { animation-delay: 490ms; }
+.steps li:nth-child(3) { animation-delay: 560ms; }
+
 .steps li::before {
-  content: counter(step);
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--surface-strong);
-  font-size: 12px;
+  content: counter(step, upper-roman);
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: var(--gold);
 }
 
 .steps li.is-active {
-  background: var(--accent-gradient);
-  color: #fff;
+  border: 1.5px solid var(--gold-deep);
+  background: var(--gold-leaf);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px rgba(255, 244, 210, 0.45), 0 2px 0 var(--gold-deep), 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.steps li.is-active::before {
+  color: var(--velvet-deep);
+}
+
+.steps li.is-done {
+  border-style: solid;
+  border-color: rgba(216, 172, 76, 0.55);
+  color: var(--paper-2);
 }
 
 .steps li.is-done::before {
   content: '✓';
-  background: var(--success);
-  color: #fff;
+  font-family: var(--font);
+  color: var(--gold-light);
 }
 
+/* Панель — билет: бумага, корешок с перфорацией и вырубками по краям */
 .panel {
+  --text: var(--ink);
+  --muted: var(--ink-soft);
+  --border: rgba(143, 106, 34, 0.5);
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 24px 20px;
+  padding: 0 22px 24px;
   border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  color: var(--text);
+  background:
+    radial-gradient(120% 70% at 50% 0%, #fffaf0 0%, transparent 70%),
+    var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow-lift);
   text-align: center;
-  animation: rise-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  transform-origin: 50% 0;
+  animation: ticket-out 760ms var(--ease-out) 360ms backwards;
 }
 
-/* ---------- Поля и кнопки ---------- */
+/* Вырубки на линии отрыва */
+.panel::before,
+.panel::after {
+  content: '';
+  position: absolute;
+  top: 37px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--night);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.panel::before {
+  left: -11px;
+}
+
+.panel::after {
+  right: -11px;
+}
+
+.panel-stub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 48px;
+  margin: 0 -22px 4px;
+  padding: 0 26px;
+  border-bottom: 2px dashed rgba(143, 106, 34, 0.45);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.panel-stub span:last-child {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--velvet);
+}
+
+.panel h1 {
+  font-size: 32px;
+  color: var(--ink);
+}
+
+.panel > .muted {
+  font-size: 16px;
+}
+
+/* ---------- Поля ---------- */
 
 .input {
-  width: 100%;
-  min-height: 56px;
-  padding: 12px 16px;
-  border: 2px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--text);
-  font: inherit;
+  min-height: 58px;
   font-size: 20px;
   font-weight: 700;
   text-align: center;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.input::placeholder {
-  color: rgba(170, 164, 207, 0.55);
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(255, 106, 61, 0.22);
+.panel .input {
+  background: #fffdf7;
 }
 
 .code-input {
-  min-height: 76px;
-  font-size: 40px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  min-height: 80px;
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
   font-variant-numeric: tabular-nums;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(143, 106, 34, 0.07) 22px 23px),
+    #fffdf7;
+}
+
+.code-input::placeholder {
+  color: rgba(107, 74, 60, 0.32);
 }
 
 .nickname-input {
-  font-size: 24px;
+  font-family: var(--font-display);
+  font-size: 26px;
 }
 
 .hint-row {
@@ -269,92 +300,54 @@ a {
   text-align: left;
 }
 
+.hint-row #counter {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
 .form-error {
   padding: 10px 14px;
+  border: 1px solid rgba(230, 110, 100, 0.55);
   border-radius: var(--radius-sm);
-  background: rgba(239, 68, 68, 0.16);
-  border: 1px solid rgba(239, 68, 68, 0.5);
-  color: #ffd0d0;
-  font-weight: 600;
+  background: rgba(210, 58, 58, 0.16);
+  color: #ffc9c0;
   font-size: 15px;
 }
 
-.shake {
-  animation: shake 0.4s ease;
+.panel .form-error {
+  border-color: rgba(176, 42, 42, 0.4);
+  background: rgba(210, 58, 58, 0.09);
+  color: #a12424;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 56px;
-  padding: 14px 22px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: 19px;
-  font-weight: 800;
-  color: var(--text);
-  text-decoration: none;
-  cursor: pointer;
-  user-select: none;
-  touch-action: manipulation;
-  transition: transform 0.12s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-}
-
-.btn:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--accent-gradient);
-  box-shadow: 0 10px 26px rgba(255, 77, 109, 0.38);
-}
-
-.btn-ghost {
-  background: var(--surface);
-  border-color: var(--border);
-}
-
-.btn-block {
-  width: 100%;
-}
-
-.pill {
-  display: inline-block;
-  align-self: center;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: var(--surface-strong);
-  font-weight: 700;
-  font-size: 15px;
-}
-
-/* ---------- Фото ---------- */
+/* ---------- Портрет для афиши ---------- */
 
 .camera {
   position: relative;
-  width: min(250px, 64vw);
+  width: min(236px, 62vw);
   aspect-ratio: 1;
-  margin: 4px auto;
+  margin: 18px auto 20px;
   border-radius: 50%;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.08), transparent 65%),
-    rgba(0, 0, 0, 0.35);
-  border: 5px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 8px rgba(255, 106, 61, 0.25), var(--shadow);
-  transition: box-shadow 0.3s ease;
+  isolation: isolate;
+  background: radial-gradient(circle at 50% 36%, #5a1a26, var(--night-2) 72%);
+  box-shadow:
+    0 0 0 3px var(--gold-deep),
+    0 0 0 9px var(--gold),
+    0 0 0 11px var(--gold-deep),
+    0 0 0 18px rgba(216, 172, 76, 0.16),
+    0 20px 40px rgba(43, 18, 24, 0.45);
+  transition: box-shadow 400ms var(--ease-out);
 }
 
 .photo-panel[data-mode='camera'] .camera {
-  box-shadow: 0 0 0 8px rgba(47, 140, 255, 0.3), var(--shadow);
+  box-shadow:
+    0 0 0 3px var(--gold-deep),
+    0 0 0 9px var(--gold-light),
+    0 0 0 11px var(--gold-deep),
+    0 0 0 18px rgba(255, 233, 176, 0.35),
+    0 0 46px rgba(255, 233, 176, 0.5),
+    0 20px 40px rgba(43, 18, 24, 0.45);
 }
 
 .camera video,
@@ -371,7 +364,7 @@ a {
 }
 
 .camera img.is-new {
-  animation: pop-in 0.4s ease both;
+  animation: portrait-in 640ms var(--ease-out) backwards;
 }
 
 .camera-placeholder {
@@ -382,9 +375,9 @@ a {
 }
 
 .camera-placeholder svg {
-  width: 78%;
-  height: 78%;
-  fill: rgba(255, 255, 255, 0.16);
+  width: 76%;
+  height: 76%;
+  fill: rgba(247, 236, 212, 0.18);
 }
 
 .camera-busy {
@@ -392,41 +385,44 @@ a {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(10, 6, 30, 0.45);
-  animation: fade-in 0.2s ease both;
+  background: rgba(26, 9, 16, 0.55);
+  animation: fade-in 200ms ease both;
 }
 
+/* Вспышка — тёплый свет прожектора */
 .camera-flash {
   position: absolute;
   inset: 0;
-  background: #fff;
+  background: radial-gradient(circle at 50% 40%, #fffdf2, var(--light) 70%);
   opacity: 0;
   pointer-events: none;
 }
 
 .camera-flash.is-active {
-  animation: camera-flash 0.45s ease-out;
+  animation: camera-flash 560ms ease-out;
 }
 
-/* Два равных способа: крупные плитки, после выбора фото — компактная строка */
+/* Два способа добавить фото — две таблички */
 .photo-choices {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
+  perspective: 700px;
 }
 
 .photo-choice {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 98px;
-  padding: 12px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-strong);
-  color: var(--text);
+  gap: 9px;
+  min-height: 108px;
+  padding: 14px 10px;
+  border: 1.5px solid rgba(143, 106, 34, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffaf0, var(--paper-2));
+  color: var(--ink);
   font: inherit;
   font-size: 16px;
   font-weight: 800;
@@ -435,57 +431,64 @@ a {
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
-  animation: tile-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
-  transition: transform 0.12s ease, border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  box-shadow: 0 3px 0 rgba(143, 106, 34, 0.5), 0 10px 18px rgba(43, 18, 24, 0.14);
+  animation: rise-in 560ms var(--ease-out) 640ms backwards;
+  transition: transform var(--t-micro) var(--ease-out), box-shadow 220ms ease, border-color 220ms ease;
 }
 
 .photo-choice + .photo-choice {
-  animation-delay: 60ms;
+  animation-delay: 720ms;
+}
+
+.photo-choice:hover {
+  transform: perspective(500px) translateY(-2px) rotateX(8deg);
 }
 
 .photo-choice:active {
-  transform: scale(0.97);
+  transform: perspective(500px) translateY(2px) scale(0.98);
+  box-shadow: 0 1px 0 rgba(143, 106, 34, 0.5), 0 4px 10px rgba(43, 18, 24, 0.12);
 }
 
 .photo-choice-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  font-size: 28px;
-  line-height: 1;
+  color: var(--gold-light);
+  background: radial-gradient(circle at 35% 30%, var(--velvet-light), var(--velvet) 58%, var(--velvet-deep));
+  box-shadow: var(--gold-frame), 0 4px 10px rgba(43, 18, 24, 0.35);
 }
 
-.photo-choice:first-child .photo-choice-icon {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
-}
-
-.photo-choice:last-child .photo-choice-icon {
-  background: color-mix(in srgb, var(--a1) 30%, transparent);
+.photo-choice-icon svg {
+  width: 27px;
+  height: 27px;
 }
 
 .photo-choice.is-suggested {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(255, 106, 61, 0.22);
-  animation: nudge 0.5s ease 2;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 4px rgba(216, 172, 76, 0.45), 0 3px 0 rgba(143, 106, 34, 0.5);
+  animation: nudge 520ms ease 2;
 }
 
+/* Фото выбрано: способы становятся компактной строкой */
 .photo-panel[data-mode='preview'] .photo-choice {
   flex-direction: row;
   gap: 8px;
   min-height: 52px;
   padding: 8px 10px;
-  background: var(--surface);
   font-size: 15px;
   animation: none;
 }
 
 .photo-panel[data-mode='preview'] .photo-choice-icon {
-  width: 30px;
-  height: 30px;
-  font-size: 17px;
+  width: 32px;
+  height: 32px;
+}
+
+.photo-panel[data-mode='preview'] .photo-choice-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* Камера включена: галерея — затвор — отмена */
@@ -495,20 +498,20 @@ a {
   align-items: center;
   justify-items: center;
   gap: 10px;
-  animation: fade-in 0.25s ease both;
+  animation: fade-in 260ms ease both;
 }
 
 .round-action {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   min-width: 72px;
   padding: 4px;
   border: 0;
   border-radius: var(--radius-sm);
   background: none;
-  color: var(--muted);
+  color: var(--ink-soft);
   font: inherit;
   font-size: 13px;
   font-weight: 700;
@@ -521,35 +524,48 @@ a {
   place-items: center;
   width: 52px;
   height: 52px;
+  border: 1.5px solid rgba(143, 106, 34, 0.55);
   border-radius: 50%;
-  background: var(--surface-strong);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 22px;
-  line-height: 1;
-  transition: transform 0.12s ease;
+  background: linear-gradient(180deg, #fffaf0, var(--paper-2));
+  color: var(--ink);
+  transition: transform var(--t-micro) var(--ease-out);
+}
+
+.round-action-icon svg {
+  width: 24px;
+  height: 24px;
 }
 
 .round-action:active .round-action-icon {
+  transform: scale(0.9);
+}
+
+/* Затвор — золотой медальон с бархатной серединой */
+.btn-shutter {
+  width: 84px;
+  height: 84px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--gold-leaf);
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 0 0 8px rgba(216, 172, 76, 0.25), 0 10px 22px rgba(43, 18, 24, 0.4);
+}
+
+.btn-shutter:hover:not(:disabled) {
+  transform: perspective(400px) scale(1.04);
+}
+
+.btn-shutter:active:not(:disabled) {
   transform: scale(0.92);
 }
 
-.btn-shutter {
-  width: 80px;
-  height: 80px;
-  min-height: 0;
-  padding: 0;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.25), var(--shadow);
-}
-
 .shutter-ring {
-  width: 64px;
-  height: 64px;
-  border: 4px solid var(--bg);
+  width: 62px;
+  height: 62px;
+  border: 3px solid var(--gold-deep);
   border-radius: 50%;
-  background: var(--accent-gradient);
+  background: radial-gradient(circle at 38% 32%, var(--velvet-light), var(--velvet) 55%, var(--velvet-deep));
 }
 
 .file-button {
@@ -568,7 +584,7 @@ a {
 }
 
 .file-button:focus-within {
-  outline: 3px solid #ffd166;
+  outline: 3px solid var(--gold);
   outline-offset: 3px;
 }
 
@@ -576,59 +592,46 @@ a {
   outline: none;
 }
 
-/* ---------- Ник ---------- */
+/* ---------- Имя в программке ---------- */
 
 .avatar-edit {
   position: relative;
   align-self: center;
+  margin: 12px 0 4px;
   text-decoration: none;
+  animation: portrait-in 700ms var(--ease-out) 560ms backwards;
+}
+
+.avatar-edit .avatar-xl {
+  width: 132px;
+  height: 132px;
 }
 
 .avatar-edit-badge {
   position: absolute;
-  right: 0;
+  right: -2px;
   bottom: 4px;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: var(--accent-gradient);
-  font-weight: 800;
-  box-shadow: var(--shadow);
+  color: var(--ink);
+  background: var(--gold-leaf);
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 4px 10px rgba(43, 18, 24, 0.4);
+  transition: transform var(--t-element) var(--ease-spring);
 }
 
-.avatar {
-  display: block;
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--surface-strong);
-  border: 3px solid rgba(255, 255, 255, 0.9);
+.avatar-edit-badge svg {
+  width: 20px;
+  height: 20px;
 }
 
-.avatar-sm {
-  width: 36px;
-  height: 36px;
-  border-width: 2px;
+.avatar-edit:hover .avatar-edit-badge {
+  transform: rotate(-120deg) scale(1.08);
 }
 
-.avatar-xl {
-  width: 120px;
-  height: 120px;
-  box-shadow: var(--shadow);
-}
-
-.avatar-hero {
-  width: 150px;
-  height: 150px;
-  border-width: 5px;
-  box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.08), var(--shadow);
-}
-
-/* ---------- Игра ---------- */
+/* ---------- Игра: зал ---------- */
 
 .play {
   display: flex;
@@ -638,65 +641,106 @@ a {
   overflow: hidden;
 }
 
+/* Полоса игрока — ламбрекен: портрет в раме, имя, очки на латунной табличке */
 .player-bar {
   position: relative;
-  z-index: 10;
+  z-index: 50;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: calc(10px + var(--safe-top)) 14px 10px;
-  background: rgba(0, 0, 0, 0.25);
-  border-bottom: 1px solid var(--border);
+  gap: 11px;
+  padding: calc(9px + var(--safe-top)) clamp(18px, 5vw, 40px) 9px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.32), transparent 45%, rgba(0, 0, 0, 0.22)),
+    var(--velvet-folds);
+  border-bottom: 3px solid var(--gold);
+  box-shadow: 0 1px 0 var(--gold-deep);
+  --fold: 34px;
+}
+
+.player-bar::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 11px;
+  margin-top: 3px;
+  background: radial-gradient(ellipse 50% 100% at 50% 0, var(--velvet) 0 62%, var(--gold) 62% 78%, var(--gold-deep) 78% 82%, transparent 84%) 0 0 / 34px 11px repeat-x;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.player-bar .avatar {
+  border-width: 2px;
 }
 
 .player-bar-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-style: italic;
+  font-weight: 700;
+  color: var(--ivory);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .player-bar-score {
   flex: none;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--surface-strong);
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: var(--gold-leaf);
+  color: var(--ink);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: inset 0 0 0 2px rgba(255, 244, 210, 0.45), 0 0 0 1px var(--gold-deep), 0 3px 8px rgba(0, 0, 0, 0.35);
 }
 
 .player-bar-score small {
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+/* Очки начислены — табличка перелистывается */
+.player-bar-score.is-bumped {
+  animation: plaque-flip 720ms var(--ease-out);
 }
 
 /* Очки скрыты до церемонии награждения */
 .player-bar-score.is-hidden {
-  background: rgba(255, 209, 102, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.45);
-  color: #ffd166;
+  color: var(--gold-light);
+  background: rgba(26, 9, 16, 0.65);
+  box-shadow: inset 0 0 0 1.5px rgba(216, 172, 76, 0.65);
 }
 
-/* Плашка «Переподключаемся…» висит поверх экрана и не сдвигает его */
+.player-bar-score.is-hidden small {
+  color: var(--muted);
+}
+
+/* «Переподключаемся…» — записка под ламбрекеном, поверх экрана */
 .reconnect-banner {
   position: absolute;
-  top: calc(100% + 10px);
-  left: 50%;
+  top: calc(100% + 24px);
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: calc(100% - 32px);
-  padding: 9px 16px;
-  border-radius: 999px;
-  background: #b45309;
-  box-shadow: 0 10px 28px rgba(4, 2, 18, 0.5);
-  font-weight: 700;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  margin-inline: auto;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border-left: 5px solid var(--amber);
+  color: var(--ink);
+  background: var(--ivory);
+  box-shadow: var(--shadow);
   font-size: 14px;
-  transform: translateX(-50%);
-  animation: banner-in 0.3s ease both;
+  font-weight: 700;
+  transform-origin: 50% 0;
+  animation: note-in 480ms var(--ease-spring) both;
 }
 
 .reconnect-banner > span:last-child {
@@ -705,25 +749,85 @@ a {
   white-space: nowrap;
 }
 
+/* Сцена: экраны стоят друг на друге, смена — анимацией в play.js */
 .views {
   position: relative;
   flex: 1;
   min-height: 0;
+  perspective: 1400px;
+  perspective-origin: 50% 35%;
+}
+
+/* Свет на сцене по настроению экрана (верно, неверно, церемония, победа) */
+.views::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+body[data-mood='correct'] .views::before {
+  opacity: 1;
+  background:
+    radial-gradient(60% 55% at 50% 0%, rgba(255, 233, 176, 0.42), transparent 75%),
+    radial-gradient(70% 40% at 50% 100%, rgba(31, 139, 92, 0.42), transparent 75%);
+  animation: lights-correct 900ms var(--ease-out) both;
+}
+
+body[data-mood='wrong'] .views::before {
+  opacity: 1;
+  background:
+    radial-gradient(80% 60% at 50% 40%, transparent 30%, rgba(5, 1, 3, 0.75) 100%),
+    radial-gradient(60% 45% at 50% 20%, rgba(196, 42, 67, 0.32), transparent 75%);
+  animation: lights-wrong 900ms var(--ease-out) both;
+}
+
+body[data-mood='timeout'] .views::before {
+  opacity: 1;
+  background:
+    radial-gradient(80% 60% at 50% 40%, transparent 30%, rgba(5, 1, 3, 0.7) 100%),
+    radial-gradient(60% 45% at 50% 20%, rgba(217, 154, 30, 0.3), transparent 75%);
+  animation: lights-timeout 900ms var(--ease-out) both;
+}
+
+body[data-mood='ceremony'] .views::before {
+  opacity: 1;
+  background: radial-gradient(70% 50% at 50% 30%, rgba(255, 233, 176, 0.16), transparent 75%);
+  animation: lights-ceremony 1200ms var(--ease-out) both;
+}
+
+body[data-mood~='winner'] .views::before,
+body[data-mood='final'] .views::before {
+  opacity: 1;
+  background:
+    radial-gradient(45% 60% at 50% 0%, rgba(255, 233, 176, 0.5), rgba(255, 233, 176, 0.1) 60%, transparent 80%),
+    radial-gradient(60% 30% at 50% 100%, rgba(140, 21, 41, 0.45), transparent 75%);
+  animation: lights-winner 1400ms var(--ease-out) both;
+}
+
+body[data-mood='final'] .views::before {
+  background: radial-gradient(45% 60% at 50% 0%, rgba(255, 233, 176, 0.26), transparent 80%);
 }
 
 .view {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 18px 14px calc(18px + var(--safe-bottom));
+  padding: 22px clamp(20px, 5.5vw, 32px) calc(20px + var(--safe-bottom));
   overflow-x: hidden;
   overflow-y: auto;
+  transform-origin: 50% 50% -260px;
+  backface-visibility: hidden;
 }
 
-.view.enter {
-  animation: view-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+.view h1 {
+  font-size: 34px;
+  color: var(--ivory);
 }
 
 .view-center {
@@ -752,57 +856,69 @@ a {
   font-size: 18px;
 }
 
-.spinner {
-  flex: none;
-  width: 54px;
-  height: 54px;
-  border: 5px solid rgba(255, 255, 255, 0.15);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.9s linear infinite;
+.view .pill {
+  align-self: center;
 }
 
-.spinner-sm {
-  width: 40px;
-  height: 40px;
-  border-width: 4px;
+#connecting-text {
+  animation: fade-in 600ms ease 300ms backwards;
 }
 
-.spinner-xs {
-  width: 16px;
-  height: 16px;
-  border-width: 2.5px;
-  border-color: rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
+/* Ожидание старта: ваш портрет под прожектором */
 .waiting-avatar {
   position: relative;
-  padding: 10px;
+  padding: 12px;
+  margin-bottom: 6px;
 }
 
 .waiting-avatar::before {
   content: '';
   position: absolute;
-  inset: 0;
+  left: 50%;
+  bottom: 30%;
+  z-index: -1;
+  width: 340px;
+  height: 75vh;
+  background: linear-gradient(180deg, rgba(255, 233, 176, 0) 0%, rgba(255, 233, 176, 0.2) 100%);
+  clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
+  transform: translateX(-50%);
+  transform-origin: 50% 0;
+  animation: beam-in 1100ms var(--ease-out) 300ms backwards, beam-breathe 4s ease-in-out 1.4s infinite;
+}
+
+/* Пятно света на полу */
+.waiting-avatar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  z-index: -1;
+  width: 240px;
+  height: 46px;
   border-radius: 50%;
-  border: 3px solid rgba(255, 106, 61, 0.7);
-  animation: ripple 2s ease-out infinite;
+  background: radial-gradient(closest-side, rgba(255, 233, 176, 0.4), transparent);
+  transform: translateX(-50%);
+}
+
+.avatar-hero {
+  width: 156px;
+  height: 156px;
+  border-width: 6px;
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 0 0 10px rgba(216, 172, 76, 0.16), 0 24px 50px rgba(0, 0, 0, 0.55);
+  animation: portrait-in 800ms var(--ease-out) 240ms backwards;
+}
+
+/* Число игроков — номерок гардероба */
+#wait-count {
+  margin-top: 6px;
+  border-style: dashed;
+  animation: rise-in 600ms var(--ease-out) 520ms backwards;
 }
 
 /* ---------- Вопрос ---------- */
 
 .view-question {
-  gap: 12px;
+  gap: 13px;
 }
 
 .question-top {
@@ -810,21 +926,28 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 52px;
+  min-height: 54px;
+}
+
+#q-number {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--gold-light);
 }
 
 .q-kind {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--muted);
+  padding: 7px 13px;
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--ivory);
+  box-shadow: inset 0 0 0 1px rgba(143, 106, 34, 0.5), 0 3px 8px rgba(0, 0, 0, 0.35);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
+  transform: rotate(-2deg);
 }
 
 .kind-shapes {
@@ -842,18 +965,23 @@ a {
 .kind-icon {
   width: 17px;
   height: 17px;
-  color: var(--accent);
+  color: var(--velvet);
 }
 
+/* Секунды — латунный медальон */
 .q-seconds {
   display: grid;
   place-items: center;
-  min-width: 52px;
-  height: 52px;
+  min-width: 54px;
+  height: 54px;
+  padding: 0 6px;
   border-radius: 50%;
-  background: var(--surface-strong);
-  font-size: 24px;
-  font-weight: 800;
+  color: var(--ink);
+  background: radial-gradient(circle at 35% 30%, #fff4d2, var(--gold) 55%, #b98a33);
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 0 0 5px rgba(216, 172, 76, 0.2), 0 6px 14px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
 
@@ -862,16 +990,20 @@ a {
   display: none;
 }
 
+/* Время — догорающий фитиль с огоньком. --left (0…1) задаёт play.js */
 .timebar {
+  --left: 1;
+  position: relative;
   flex: none;
   height: 10px;
+  margin-right: 8px;
   border-radius: 999px;
-  background: var(--surface);
-  overflow: hidden;
-  transition: opacity 0.3s ease;
+  background: linear-gradient(180deg, #120509, var(--night-3));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(216, 172, 76, 0.35);
+  transition: opacity 300ms ease;
 }
 
-/* Во время чтения полоса времени прячется, но место под ней остаётся — экран не прыгает */
+/* Во время чтения фитиль прячется, но место под ним остаётся — экран не прыгает */
 .view-question[data-phase='reading'] .timebar {
   opacity: 0;
 }
@@ -879,12 +1011,29 @@ a {
 .timebar-fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--accent-gradient);
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold) 60%, var(--gold-light));
+  transform: scaleX(var(--left));
   transform-origin: left;
 }
 
 .timebar-fill.is-urgent {
-  background: var(--danger);
+  background: linear-gradient(90deg, #7d1717, var(--danger) 70%, #ff8a6a);
+}
+
+/* Огонёк на конце фитиля: слой шириной с фитиль, сдвигается вместе с остатком времени */
+.timebar::after {
+  content: '';
+  position: absolute;
+  inset: -14px -10px -6px auto;
+  width: calc(100% + 10px);
+  background: radial-gradient(7px 11px at calc(100% - 9px) 52%, #fffbe6 0 30%, var(--light) 45%, rgba(255, 150, 40, 0.85) 70%, rgba(255, 120, 30, 0) 100%) no-repeat;
+  transform: translateX(calc((var(--left) - 1) * (100% - 10px)));
+  animation: flame 420ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.timebar:has(.is-urgent)::after {
+  animation-duration: 160ms;
 }
 
 /* На телефоне картинка и текст — прямые участники колонки: картинка ужимается первой,
@@ -905,7 +1054,7 @@ a {
   margin-bottom: auto;
 }
 
-/* Картинка: высота зарезервирована заранее, сама картинка проявляется после загрузки */
+/* Картинка в золочёной раме: место зарезервировано, сама картинка проявляется после загрузки */
 .q-media {
   position: relative;
   flex: 0 1 auto;
@@ -913,7 +1062,6 @@ a {
   height: min(34vh, 300px);
   min-height: 84px;
   margin: 0;
-  transition: height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .view-question[data-phase='answering'] .q-media {
@@ -929,13 +1077,15 @@ a {
   height: 100%;
   max-width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: var(--radius-sm);
+  border: 4px solid var(--gold);
+  border-radius: 4px;
   background:
-    linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%) 0 0 / 200% 100%,
-    var(--surface);
+    linear-gradient(100deg, transparent 30%, rgba(255, 233, 176, 0.12) 50%, transparent 70%) 0 0 / 200% 100%,
+    var(--night-2);
+  box-shadow: 0 0 0 1.5px var(--gold-deep), inset 0 0 0 1.5px var(--gold-deep);
   transform: translateX(-50%);
   animation: shimmer 1.4s linear infinite;
-  transition: opacity 0.3s ease;
+  transition: opacity 300ms ease;
 }
 
 .q-media img {
@@ -945,11 +1095,13 @@ a {
   max-width: 100%;
   max-height: 100%;
   margin: auto;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 12px 30px rgba(4, 2, 18, 0.45);
+  border: 4px solid var(--gold);
+  border-radius: 4px;
+  background: var(--night-2);
+  box-shadow: 0 0 0 1.5px var(--gold-deep), inset 0 0 0 1px rgba(0, 0, 0, 0.3), 0 14px 30px rgba(0, 0, 0, 0.5);
   opacity: 0;
-  transform: scale(0.97);
-  transition: opacity 0.35s ease, transform 0.35s ease;
+  transform: perspective(800px) rotateX(10deg) scale(0.96);
+  transition: opacity 450ms ease, transform 600ms var(--ease-out);
 }
 
 .q-media.is-loaded::before {
@@ -981,35 +1133,63 @@ a {
   font-weight: 700;
 }
 
+/* Текст вопроса — табличка, подвешенная на двух шнурах */
 .q-text {
+  position: relative;
   flex-shrink: 0;
   align-self: center;
+  width: 100%;
   max-width: 640px;
-  font-size: 19px;
+  margin-top: 12px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  color: var(--ink);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #fffaf0 0%, transparent 70%),
+    var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow);
+  font-family: var(--font-display);
+  font-size: 21px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
   text-align: center;
   white-space: pre-line;
   overflow-wrap: anywhere;
-  transition: font-size 0.3s ease;
+}
+
+.q-text::before {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 100%;
+  height: 13px;
+  border-inline: 2px solid var(--gold-deep);
+  pointer-events: none;
+}
+
+.q-text:empty {
+  display: none;
 }
 
 .view-question[data-phase='reading'] .q-text {
-  font-size: 23px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  padding: 26px 22px;
+  font-size: 25px;
+  font-weight: 900;
+  animation: sign-swing 1600ms var(--ease-out) 300ms backwards;
+  transform-origin: 50% -13px;
 }
 
 /* Длинный вопрос — шрифт чуть меньше, чтобы осталось место кнопкам */
 .view-question[data-long='true'] .q-text {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .view-question[data-long='true'][data-phase='reading'] .q-text {
-  font-size: 19px;
+  font-size: 20px;
 }
 
-/* Время на обдумывание: кольцо с обратным отсчётом */
+/* Время подумать: золотой циферблат с обратным отсчётом */
 .q-reading {
   display: flex;
   flex: none;
@@ -1017,23 +1197,33 @@ a {
   align-items: center;
   gap: 10px;
   padding-bottom: 4px;
-  animation: fade-in 0.4s ease both;
+  animation: rise-in 600ms var(--ease-out) 200ms backwards;
 }
 
 .read-caption {
   color: var(--muted);
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-style: italic;
   font-weight: 700;
 }
 
 .read-ring {
   position: relative;
-  width: 104px;
-  height: 104px;
-  animation: breathe 1s ease-in-out infinite;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--night-3) 0 52%, transparent 53%),
+    repeating-conic-gradient(from -1.5deg, rgba(243, 217, 139, 0.55) 0 3deg, transparent 3deg 30deg),
+    var(--night-2);
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 10px 26px rgba(0, 0, 0, 0.5);
+  animation: tick 1s ease-in-out infinite;
 }
 
 .read-ring svg {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -1042,11 +1232,11 @@ a {
 
 .read-ring circle {
   fill: none;
-  stroke-width: 9;
+  stroke-width: 8;
 }
 
 .read-ring-track {
-  stroke: var(--surface-strong);
+  stroke: rgba(0, 0, 0, 0.35);
 }
 
 .read-ring-fill {
@@ -1061,18 +1251,22 @@ a {
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 40px;
-  font-weight: 800;
+  color: var(--gold-light);
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
 
-/* Варианты ответа */
+/* Варианты — камни в золотой оправе на деревянном основании */
 .answer-buttons {
   display: grid;
   flex: 1 0 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: 1fr;
-  gap: 12px;
+  gap: 16px 14px;
+  padding: 4px 4px 10px;
+  perspective: 900px;
 }
 
 .answers-2 {
@@ -1084,56 +1278,104 @@ a {
 }
 
 .answer-button {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-  min-height: 96px;
-  padding: 12px;
+  min-height: 104px;
+  padding: 14px 12px;
   border: 0;
-  border-radius: var(--radius);
-  background: var(--tone);
+  border-radius: 14px;
   color: #fff;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.3), transparent 36%),
+    linear-gradient(330deg, rgba(0, 0, 0, 0.34), transparent 52%),
+    var(--tone);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 240, 200, 0.35),
+    0 0 0 3px var(--gold),
+    0 0 0 4.5px var(--gold-deep),
+    0 7px 0 4.5px var(--wood-dark),
+    0 14px 20px 4px rgba(0, 0, 0, 0.4);
   font: inherit;
   font-size: 17px;
   font-weight: 800;
   line-height: 1.2;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-  box-shadow: 0 7px 0 color-mix(in srgb, var(--tone) 60%, black);
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.4);
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
-  animation: tile-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
-  transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.3s ease, filter 0.3s ease;
+  transform-origin: 50% 100%;
+  animation: tile-rise 620ms var(--ease-out) backwards;
+  transition: transform 140ms var(--ease-out), box-shadow 200ms ease, opacity 360ms ease;
 }
 
-.answer-button:nth-child(2) { animation-delay: 50ms; }
-.answer-button:nth-child(3) { animation-delay: 100ms; }
-.answer-button:nth-child(4) { animation-delay: 150ms; }
+.answer-button:nth-child(2) { animation-delay: 80ms; }
+.answer-button:nth-child(3) { animation-delay: 160ms; }
+.answer-button:nth-child(4) { animation-delay: 240ms; }
+
+/* Блик прожектора по граням камня */
+.answer-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(60% 70% at 50% 0%, rgba(255, 245, 215, 0.55), transparent 70%);
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
 
 .answer-button:active:not(:disabled) {
-  transform: translateY(5px);
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--tone) 60%, black);
+  transform: translateY(5px) scale(0.98);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 240, 200, 0.35),
+    0 0 0 3px var(--gold),
+    0 0 0 4.5px var(--gold-deep),
+    0 2px 0 4.5px var(--wood-dark),
+    0 6px 12px 3px rgba(0, 0, 0, 0.35);
 }
 
+.answer-button:disabled {
+  cursor: default;
+}
+
+/* Выбранный ответ — под лучом прожектора, остальные уходят в тень */
 .answer-button.is-chosen {
-  outline: 5px solid #fff;
-  outline-offset: -5px;
-  transform: scale(1.02);
+  transform: scale(1.04);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 240, 200, 0.5),
+    0 0 0 3px var(--gold-light),
+    0 0 0 4.5px var(--gold-deep),
+    0 7px 0 4.5px var(--wood-dark),
+    0 0 0 12px rgba(255, 233, 176, 0.28),
+    0 0 44px 10px rgba(255, 233, 176, 0.45);
+  animation: chosen 520ms var(--ease-spring);
+}
+
+.answer-button.is-chosen::after {
+  opacity: 1;
 }
 
 .answer-button.is-faded {
-  opacity: 0.3;
-  filter: saturate(0.4);
+  opacity: 0.26;
+  transform: scale(0.95);
 }
 
+/* Фигура — в золотом медальоне */
 .answer-shape {
   flex: none;
-  width: 48px;
-  height: 48px;
-  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.25));
+  width: 52px;
+  height: 52px;
+  padding: 11px;
+  border-radius: 50%;
+  color: var(--tone);
+  background: radial-gradient(circle at 35% 30%, #fffaf0, var(--ivory) 45%, var(--paper-2));
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 0 0 4px var(--gold), 0 4px 8px rgba(0, 0, 0, 0.35);
+  overflow: visible;
 }
 
 .answer-text {
@@ -1145,31 +1387,27 @@ a {
   -webkit-line-clamp: 3;
 }
 
-/* Длинные варианты: фигура меньше, текст помещается в три строки */
+/* Длинные варианты: медальон меньше, текст помещается в три строки */
 .has-long-answers .answer-button {
-  gap: 6px;
+  gap: 7px;
   padding: 10px;
   font-size: 15px;
 }
 
 .has-long-answers .answer-shape {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
 }
 
-.answer-0 { --tone: var(--a0); }
-.answer-1 { --tone: var(--a1); }
-.answer-2 { --tone: var(--a2); }
-.answer-3 { --tone: var(--a3); }
-
-/* Ответ вручную */
+/* Ответ вручную — строка в программке */
 .text-answer {
   display: grid;
   flex: none;
   gap: 10px;
   width: min(480px, 100%);
   margin: 4px auto 0;
-  animation: rise-in 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: rise-in 560ms var(--ease-out) 120ms backwards;
 }
 
 .view-question[data-type='text'][data-phase='answering'] .text-answer {
@@ -1177,11 +1415,10 @@ a {
 }
 
 .text-answer-input {
-  min-height: 64px;
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(0, 0, 0, 0.32);
-  font-size: 24px;
-  font-weight: 800;
+  min-height: 66px;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 700;
 }
 
 .text-answer.is-sending .text-answer-input {
@@ -1190,8 +1427,7 @@ a {
 
 /* Пока поле пустое, кнопка приглушена, но нажимается — и подсказывает, что нужно написать ответ */
 .text-answer.is-empty .btn-primary {
-  opacity: 0.5;
-  box-shadow: none;
+  opacity: 0.72;
 }
 
 .text-answer-meta {
@@ -1211,119 +1447,161 @@ a {
 }
 
 .text-answer-hint.is-error {
-  color: #ffb4b4;
+  color: #ffb4a8;
   font-weight: 700;
 }
 
-/* ---------- Ответ принят ---------- */
+/* ---------- Ответ принят: сургучная печать в золотой розетке ---------- */
 
 .answered-badge {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 120px;
-  height: 120px;
-  border-radius: 28px;
-  background: var(--tone);
-  color: #fff;
-  box-shadow: 0 8px 0 color-mix(in srgb, var(--tone) 60%, black);
-  animation: pop-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.5) both;
+  width: 128px;
+  height: 128px;
+  margin: 26px 0 10px;
+  border-radius: 50%;
+  color: var(--gold-light);
+  background: radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--tone) 62%, white), var(--tone) 46%, color-mix(in srgb, var(--tone) 58%, black));
+  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--gold-deep), 0 16px 34px rgba(0, 0, 0, 0.55);
+  animation: seal-stamp 760ms var(--ease-out) 160ms backwards;
+}
+
+/* Розетка вокруг печати */
+.answered-badge::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  z-index: -1;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--gold) 0 6deg, var(--gold-deep) 6deg 12deg);
+  -webkit-mask: radial-gradient(circle, transparent 57%, #000 58%);
+  mask: radial-gradient(circle, transparent 57%, #000 58%);
+  animation: rosette-in 900ms var(--ease-out) 420ms backwards;
 }
 
 .answered-badge .shape {
-  width: 64px;
-  height: 64px;
+  width: 62px;
+  height: 62px;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
 }
 
 .answered-badge-text {
-  --tone: var(--accent-2);
-  background: var(--accent-gradient);
+  --tone: var(--velvet);
 }
 
 .answered-badge-text .shape {
-  width: 58px;
-  height: 58px;
+  width: 56px;
+  height: 56px;
 }
 
+/* Ваш ответ — строка на бумажке */
 .answered-quote {
   max-width: min(360px, 100%);
   padding: 12px 20px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-strong);
-  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--ivory);
+  box-shadow: inset 0 0 0 1px rgba(143, 106, 34, 0.45), var(--shadow);
+  font-family: var(--font-display);
   font-size: 22px;
-  font-weight: 800;
+  font-style: italic;
+  font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
-  animation: rise-in 0.45s 0.1s ease both;
+  transform: rotate(-1.5deg);
+  animation: note-in 600ms var(--ease-spring) 380ms backwards;
 }
 
-/* ---------- Результат вопроса ---------- */
-
-body[data-mood='correct'] {
-  background-color: #0f5132;
-  background-image: radial-gradient(500px 400px at 50% 30%, rgba(34, 197, 94, 0.55), transparent 70%);
+#view-answered h1 {
+  animation: rise-in 600ms var(--ease-out) 260ms backwards;
 }
 
-body[data-mood='wrong'] {
-  background-color: #5c1424;
-  background-image: radial-gradient(500px 400px at 50% 30%, rgba(239, 68, 68, 0.5), transparent 70%);
-}
-
-body[data-mood='timeout'] {
-  background-color: #3b2a10;
-  background-image: radial-gradient(500px 400px at 50% 30%, rgba(232, 154, 12, 0.4), transparent 70%);
-}
-
-body[data-mood='ceremony'] {
-  background-image:
-    radial-gradient(520px 420px at 50% 26%, rgba(255, 209, 102, 0.2), transparent 70%),
-    radial-gradient(600px 500px at 0% 110%, rgba(255, 77, 109, 0.22), transparent 60%),
-    radial-gradient(600px 500px at 110% 100%, rgba(47, 140, 255, 0.2), transparent 60%);
-}
-
-body[data-mood~='winner'] {
-  background-image:
-    radial-gradient(520px 440px at 50% 22%, rgba(255, 209, 102, 0.4), transparent 70%),
-    radial-gradient(600px 500px at 110% 100%, rgba(255, 77, 109, 0.3), transparent 60%);
-}
+/* ---------- Результат вопроса: под прожектором ---------- */
 
 .result-icon,
 .message-icon {
+  position: relative;
   display: grid;
   flex: none;
   place-items: center;
-  width: 110px;
-  height: 110px;
+  width: 118px;
+  height: 118px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--bg);
-  font-size: 58px;
-  font-weight: 800;
-  box-shadow: var(--shadow);
-  animation: pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.6) both;
+  color: var(--velvet);
+  background: radial-gradient(circle at 35% 30%, #fffaf0, var(--ivory) 45%, var(--paper-2));
+  box-shadow: 0 0 0 4px var(--gold), 0 0 0 6px var(--gold-deep), 0 0 0 14px rgba(216, 172, 76, 0.15), 0 18px 40px rgba(0, 0, 0, 0.5);
+  animation: medal-drop 760ms var(--ease-spring) 140ms backwards;
 }
 
-body[data-mood='correct'] .result-icon { color: #15803d; }
-body[data-mood='wrong'] .result-icon { color: #b91c1c; }
+.result-icon svg,
+.message-icon svg {
+  width: 56%;
+  height: 56%;
+}
 
-.message-icon {
-  font-size: 50px;
+body[data-mood='correct'] .result-icon { color: var(--success); }
+body[data-mood='wrong'] .result-icon { color: var(--danger); }
+body[data-mood='timeout'] .result-icon { color: #a8700f; }
+
+body[data-mood='wrong'] .result-icon {
+  animation: medal-drop 760ms var(--ease-spring) 140ms backwards, shake 460ms ease 860ms;
+}
+
+/* Верно: золотые лучи за медальоном */
+.result-icon::before {
+  content: '';
+  position: absolute;
+  inset: -64px;
+  z-index: -1;
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 233, 176, 0.38) 0 7deg, transparent 7deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 26%, transparent 70%);
+  mask: radial-gradient(circle, #000 26%, transparent 70%);
+  opacity: 0;
+}
+
+body[data-mood='correct'] .result-icon::before {
+  opacity: 1;
+  animation: fade-in 900ms ease 500ms backwards, spin 24s linear infinite;
+}
+
+#result-title {
+  font-size: 40px;
+  animation: rise-in 560ms var(--ease-out) 240ms backwards;
 }
 
 .result-points {
-  font-size: 46px;
-  font-weight: 800;
-  line-height: 1.1;
+  color: var(--gold-light);
+  font-family: var(--font-display);
+  font-size: 54px;
+  font-weight: 900;
+  line-height: 1.05;
   font-variant-numeric: tabular-nums;
-  animation: rise-in 0.5s 0.15s ease both;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 30px rgba(243, 217, 139, 0.35);
+  animation: points-pop 700ms var(--ease-spring) 380ms backwards;
 }
 
+body[data-mood='wrong'] .result-points,
+body[data-mood='timeout'] .result-points {
+  color: var(--muted);
+  text-shadow: none;
+}
+
+/* Подробности — бумажка из программки */
 .result-details {
+  --text: var(--ink);
+  --muted: var(--ink-soft);
   display: grid;
   justify-items: center;
   gap: 12px;
-  max-width: 360px;
-  animation: rise-in 0.5s 0.22s ease both;
+  width: min(360px, 100%);
+  padding: 18px 20px;
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow);
+  animation: drop-in 600ms var(--ease-out) 520ms backwards;
 }
 
 .result-details:empty {
@@ -1338,54 +1616,62 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 }
 
 .result-label {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
+  color: var(--ink-soft);
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .answer-quote {
+  font-family: var(--font-display);
   font-size: 21px;
-  font-weight: 800;
+  font-style: italic;
+  font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
 .answer-quote.is-wrong {
-  color: #ffd0d0;
-  text-decoration: line-through 2px rgba(255, 208, 208, 0.55);
+  color: #a12424;
+  text-decoration: line-through 2px rgba(161, 36, 36, 0.55);
 }
 
 .answer-quote.is-correct {
-  color: #d1fae5;
+  color: #1d7a4d;
 }
 
 .result-also {
   margin-top: -4px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--ink-soft);
   font-size: 15px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .result-total {
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 18px;
-  font-weight: 600;
+  color: var(--ink-soft);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
+/* Правильный вариант — камень в оправе */
 .correct-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   max-width: 100%;
-  padding: 6px 14px;
+  padding: 7px 15px;
   border-radius: 999px;
-  background: var(--tone);
   color: #fff;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.28), transparent 45%),
+    var(--tone);
+  box-shadow: 0 0 0 2px var(--gold), 0 0 0 3px var(--gold-deep);
   font-size: 17px;
   font-weight: 800;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   overflow-wrap: anywhere;
 }
 
@@ -1396,16 +1682,16 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 }
 
 .correct-chip-text {
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--bg);
+  color: var(--gold-light);
+  background: var(--night-2);
+  font-family: var(--font-display);
   font-size: 19px;
+  text-shadow: none;
 }
 
-.pill-gold {
-  background: rgba(255, 209, 102, 0.16);
-  border: 1px solid rgba(255, 209, 102, 0.5);
-  color: #ffe3a3;
-  animation: rise-in 0.5s 0.3s ease both;
+#result-rank,
+#result-hidden {
+  animation: rise-in 560ms var(--ease-out) 680ms backwards;
 }
 
 /* ---------- Церемония: место ещё не показано ---------- */
@@ -1417,16 +1703,38 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  width: 230px;
-  height: 214px;
+  width: 260px;
+  height: 236px;
+  margin-bottom: 8px;
 }
 
+/* Два прожектора ищут победителя */
 .drumroll-glow {
   position: absolute;
-  inset: -24px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 42%, rgba(255, 209, 102, 0.38), transparent 62%);
-  animation: glow-pulse 1.8s ease-in-out infinite;
+  inset: -40px -50px 0;
+  pointer-events: none;
+}
+
+.drumroll-glow::before,
+.drumroll-glow::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  width: 120px;
+  height: 330px;
+  background: linear-gradient(180deg, rgba(255, 233, 176, 0.05), rgba(255, 233, 176, 0.32));
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+  transform-origin: 50% 0;
+}
+
+.drumroll-glow::before {
+  left: 0;
+  animation: search-left 2.6s ease-in-out infinite alternate;
+}
+
+.drumroll-glow::after {
+  right: 0;
+  animation: search-right 2.6s ease-in-out infinite alternate;
 }
 
 .drumroll-trophy {
@@ -1434,10 +1742,10 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   width: 86px;
   height: 86px;
   margin-bottom: 8px;
-  color: #ffd166;
-  filter: drop-shadow(0 6px 18px rgba(255, 209, 102, 0.55));
+  color: var(--gold);
+  filter: drop-shadow(0 6px 16px rgba(243, 217, 139, 0.5));
   transform-origin: 50% 90%;
-  animation: trophy-wiggle 0.5s ease-in-out infinite;
+  animation: trophy-wiggle 520ms ease-in-out infinite;
 }
 
 .drumroll-trophy svg {
@@ -1459,49 +1767,79 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 
 .trophy-shine {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.75);
+  stroke: var(--gold-light);
   stroke-width: 3;
   stroke-linecap: round;
 }
 
+/* Пьедестал — ступени сцены с верхней гранью */
 .drumroll-podium {
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.drumroll-podium::after {
+  content: '';
+  position: absolute;
+  left: -40px;
+  right: -40px;
+  bottom: -10px;
+  height: 10px;
+  border-top: 2px solid var(--gold);
+  background: var(--boards);
+  border-radius: 2px;
 }
 
 .drum-step {
+  position: relative;
   display: grid;
   place-items: start center;
-  width: 64px;
-  padding-top: 8px;
-  border-radius: 12px 12px 4px 4px;
-  font-size: 22px;
-  font-weight: 800;
-  box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.15);
-  animation: drum 0.9s ease-in-out infinite;
+  width: 66px;
+  padding-top: 10px;
+  border-radius: 3px 3px 0 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 900;
+  box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  animation: drum 900ms ease-in-out infinite;
+}
+
+/* Верхняя грань ступени в перспективе */
+.drum-step::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 10px;
+  background: inherit;
+  filter: brightness(1.25);
+  transform: perspective(60px) rotateX(48deg);
+  transform-origin: 50% 100%;
 }
 
 .drum-step-1 {
-  height: 88px;
-  background: linear-gradient(180deg, #ffd166, #e89a0c);
-  color: #4a3000;
-  animation-delay: 0.3s;
+  height: 92px;
+  background: linear-gradient(180deg, var(--gold-light), var(--gold) 50%, #b98a33);
+  color: #5a3d0c;
+  animation-delay: 300ms;
 }
 
 .drum-step-2 {
-  height: 64px;
-  background: linear-gradient(180deg, #eef0f8, #9ea7c6);
-  color: #262c4c;
-  animation-delay: 0.15s;
+  height: 66px;
+  background: linear-gradient(180deg, #f4f2ec, #c9c8c3 50%, #8f8e8a);
+  color: #34322e;
+  animation-delay: 150ms;
 }
 
 .drum-step-3 {
   height: 48px;
-  background: linear-gradient(180deg, #f3ae7a, #b9652b);
-  color: #3f1d06;
-  animation-delay: 0.45s;
+  background: linear-gradient(180deg, #f0b98a, #c47a3e 55%, #8a4f22);
+  color: #3b1d08;
+  animation-delay: 450ms;
 }
 
 .ceremony-note {
@@ -1509,18 +1847,19 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   font-size: 15px;
 }
 
-/* ---------- Финал ---------- */
+/* ---------- Финал: ваше место под прожектором ---------- */
 
 .view-final {
   gap: 14px;
 }
 
 .final-caption {
-  color: var(--muted);
-  font-weight: 800;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  color: var(--gold-light);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-style: italic;
+  font-weight: 700;
+  animation: drop-in 600ms var(--ease-out) 200ms backwards;
 }
 
 .final-place {
@@ -1528,31 +1867,32 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   display: grid;
   flex: none;
   place-items: center;
-  width: 210px;
-  height: 200px;
-  margin-top: 6px;
+  width: 220px;
+  height: 214px;
+  margin-top: 26px;
 }
 
 .final-rays {
   position: absolute;
-  inset: -10px;
+  inset: -24px;
   border-radius: 50%;
   opacity: 0;
 }
 
 .final-place.is-podium .final-rays {
   opacity: 1;
-  background: repeating-conic-gradient(from 0deg, rgba(255, 209, 102, 0.34) 0deg 9deg, transparent 9deg 24deg);
-  -webkit-mask: radial-gradient(circle, #000 28%, transparent 68%);
-  mask: radial-gradient(circle, #000 28%, transparent 68%);
-  animation: fade-in 0.8s 0.3s ease both, spin 16s linear infinite;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 233, 176, 0.34) 0 7deg, transparent 7deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 24%, transparent 68%);
+  mask: radial-gradient(circle, #000 24%, transparent 68%);
+  animation: fade-in 900ms ease 400ms backwards, spin 22s linear infinite;
 }
 
+/* Медаль — золочёный медальон на бархатной ленте */
 .medal {
   position: relative;
   display: grid;
   justify-items: center;
-  animation: medal-in 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  animation: medal-in 1100ms var(--ease-spring) 260ms backwards;
 }
 
 .medal-disc {
@@ -1560,70 +1900,91 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 132px;
-  height: 132px;
+  width: 138px;
+  height: 138px;
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 28%, #fff7d6, #ffd166 34%, #e89a0c 74%, #b06a00);
+  background: radial-gradient(circle at 34% 28%, #fff7dc, var(--gold-light) 30%, var(--gold) 62%, #a87a2a);
   box-shadow:
-    inset 0 0 0 6px rgba(255, 255, 255, 0.35),
-    inset 0 -10px 18px rgba(0, 0, 0, 0.2),
-    0 0 44px rgba(255, 209, 102, 0.6),
-    var(--shadow);
+    inset 0 0 0 6px rgba(255, 244, 210, 0.45),
+    inset 0 0 0 8px rgba(143, 106, 34, 0.6),
+    inset 0 -12px 18px rgba(0, 0, 0, 0.18),
+    0 0 0 3px var(--gold-deep),
+    0 0 54px rgba(243, 217, 139, 0.55),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Гравированный поясок */
+.medal-disc::before {
+  content: '';
+  position: absolute;
+  inset: 16px;
+  border: 2px dotted rgba(90, 61, 12, 0.45);
+  border-radius: 50%;
 }
 
 .medal-number {
-  font-size: 64px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 68px;
+  font-weight: 900;
   line-height: 1;
-  color: #5a3600;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.45);
+  color: #5a3d0c;
+  text-shadow: 0 2px 0 rgba(255, 244, 210, 0.6);
 }
 
 .medal-silver .medal-disc {
-  background: radial-gradient(circle at 34% 28%, #ffffff, #e2e6f2 34%, #a9b1cb 74%, #78819f);
+  background: radial-gradient(circle at 34% 28%, #ffffff, #e9e8e3 32%, #b8b7b2 66%, #807f7a);
   box-shadow:
-    inset 0 0 0 6px rgba(255, 255, 255, 0.4),
-    inset 0 -10px 18px rgba(0, 0, 0, 0.18),
-    0 0 40px rgba(214, 222, 255, 0.45),
-    var(--shadow);
+    inset 0 0 0 6px rgba(255, 255, 255, 0.45),
+    inset 0 0 0 8px rgba(90, 89, 85, 0.5),
+    inset 0 -12px 18px rgba(0, 0, 0, 0.16),
+    0 0 0 3px #6e6d69,
+    0 0 46px rgba(240, 240, 235, 0.35),
+    0 18px 40px rgba(0, 0, 0, 0.5);
 }
 
-.medal-silver .medal-number { color: #2b3150; }
+.medal-silver .medal-number {
+  color: #34322e;
+}
 
 .medal-bronze .medal-disc {
-  background: radial-gradient(circle at 34% 28%, #ffe3c8, #f2a56c 34%, #c26b2d 74%, #874213);
+  background: radial-gradient(circle at 34% 28%, #ffe2c6, #eaa771 32%, #c47a3e 64%, #7f4519);
   box-shadow:
-    inset 0 0 0 6px rgba(255, 255, 255, 0.3),
-    inset 0 -10px 18px rgba(0, 0, 0, 0.2),
-    0 0 40px rgba(242, 165, 108, 0.45),
-    var(--shadow);
+    inset 0 0 0 6px rgba(255, 226, 198, 0.4),
+    inset 0 0 0 8px rgba(110, 58, 20, 0.5),
+    inset 0 -12px 18px rgba(0, 0, 0, 0.18),
+    0 0 0 3px #6e3a14,
+    0 0 46px rgba(234, 167, 113, 0.35),
+    0 18px 40px rgba(0, 0, 0, 0.5);
 }
 
-.medal-bronze .medal-number { color: #4a2306; }
+.medal-bronze .medal-number {
+  color: #3b1d08;
+}
 
 .medal-plain .medal-disc {
-  width: 124px;
-  height: 124px;
-  background:
-    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.22), transparent 60%),
-    var(--surface-solid);
-  border: 3px solid rgba(255, 255, 255, 0.28);
-  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.06), var(--shadow);
+  width: 126px;
+  height: 126px;
+  background: radial-gradient(circle at 35% 30%, var(--velvet-light), var(--velvet) 55%, var(--velvet-deep));
+  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--gold-deep), 0 0 0 12px rgba(216, 172, 76, 0.14), 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.medal-plain .medal-disc::before {
+  border-color: rgba(243, 217, 139, 0.4);
 }
 
 .medal-plain .medal-number {
-  color: var(--text);
-  font-size: 54px;
-  text-shadow: none;
+  color: var(--gold-light);
+  font-size: 56px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
 }
 
-/* Лента медали — буква V из двух полос за диском */
+/* Лента — две бархатные полосы с золотой кромкой */
 .medal-ribbon {
   position: absolute;
-  top: -42px;
+  top: -46px;
   left: 50%;
-  width: 84px;
-  height: 70px;
+  width: 88px;
+  height: 74px;
   transform: translateX(-50%);
 }
 
@@ -1632,48 +1993,57 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   content: '';
   position: absolute;
   top: 0;
-  width: 32px;
-  height: 70px;
-  border-radius: 3px;
+  width: 34px;
+  height: 74px;
+  border-inline: 3px solid var(--gold);
+  background: linear-gradient(180deg, var(--velvet-light), var(--velvet-deep));
 }
 
 .medal-ribbon::before {
   left: 6px;
-  background: linear-gradient(180deg, var(--a0), #b8213f);
   transform: skewX(20deg);
 }
 
 .medal-ribbon::after {
   right: 6px;
-  background: linear-gradient(180deg, var(--a1), #1c5bbd);
   transform: skewX(-20deg);
 }
 
 .final-rank {
-  font-size: 42px;
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  animation: rise-in 0.5s 0.45s ease both;
+  color: var(--ivory);
+  font-family: var(--font-display);
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1.05;
+  animation: rise-in 600ms var(--ease-out) 700ms backwards;
 }
 
 .view-final .view-text {
-  animation: rise-in 0.5s 0.55s ease both;
+  font-variant-numeric: tabular-nums;
+  animation: rise-in 600ms var(--ease-out) 820ms backwards;
 }
 
+/* Пьедестал — список в программке */
 .final-podium-wrap {
+  --text: var(--ink);
+  --muted: var(--ink-soft);
   display: grid;
-  gap: 8px;
+  gap: 10px;
   width: min(360px, 100%);
-  animation: rise-in 0.5s ease both;
+  padding: 18px 18px 16px;
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow);
+  animation: programme-in 700ms var(--ease-out) 300ms backwards;
 }
 
 .final-podium-title {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  color: var(--velvet);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-style: italic;
+  font-weight: 700;
 }
 
 .final-podium {
@@ -1688,16 +2058,16 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--paper-2);
   font-weight: 700;
-  animation: rise-in 0.4s ease both;
+  animation: rise-in 500ms var(--ease-out) backwards;
 }
 
 .final-podium li.is-me {
-  background: var(--surface-strong);
-  box-shadow: inset 0 0 0 2px rgba(255, 209, 102, 0.6);
+  background: #fff4d2;
+  box-shadow: inset 0 0 0 2px var(--gold);
 }
 
 .podium-rank {
@@ -1707,13 +2077,15 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--surface-strong);
-  font-weight: 800;
+  color: var(--ivory);
+  background: var(--velvet);
+  font-family: var(--font-display);
+  font-weight: 900;
 }
 
-.podium-rank-gold { background: linear-gradient(135deg, #ffd166, #f2a516); color: #2a1a00; }
-.podium-rank-silver { background: linear-gradient(135deg, #f1f3fa, #a7afc9); color: #23284a; }
-.podium-rank-bronze { background: linear-gradient(135deg, #f3ae7a, #b9652b); color: #2f1504; }
+.podium-rank-gold { background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #a87a2a); color: #4a3008; }
+.podium-rank-silver { background: radial-gradient(circle at 35% 30%, #fff, #c9c8c3 60%, #8f8e8a); color: #34322e; }
+.podium-rank-bronze { background: radial-gradient(circle at 35% 30%, #ffd9b8, #c47a3e 60%, #8a4f22); color: #fff3e6; }
 
 .podium-name {
   flex: 1;
@@ -1725,6 +2097,8 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 }
 
 .podium-score {
+  flex: none;
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1732,104 +2106,81 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   max-width: 320px;
 }
 
-/* Конфетти для призёров */
+/* Лепестки роз и позолота */
 .confetti {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  z-index: 30;
   overflow: hidden;
   pointer-events: none;
 }
 
 .confetti span {
   position: absolute;
-  top: -18px;
+  top: -24px;
   left: var(--x);
-  width: 9px;
+  width: 11px;
   height: 15px;
-  border-radius: 2px;
+  border-radius: 75% 0 75% 0;
   background: var(--color);
-  opacity: 0;
-  animation: confetti-fall var(--fall) var(--delay) cubic-bezier(0.25, 0.6, 0.45, 1) forwards;
+  box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.18);
+  animation: petal-fall var(--fall) linear var(--delay) both;
 }
 
 .confetti span:nth-child(3n) {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+}
+
+/* ---------- Сообщение ---------- */
+
+.message-icon {
+  color: var(--velvet);
 }
 
 .message-actions {
   display: grid;
   gap: 10px;
-  width: min(360px, 100%);
+  width: min(340px, 100%);
+  margin-top: 6px;
 }
 
-#play-again {
-  width: min(360px, 100%);
+.message-actions:empty {
+  display: none;
 }
 
-.toast {
+#message-title {
+  animation: rise-in 560ms var(--ease-out) 240ms backwards;
+}
+
+/* Записка-уведомление поверх экрана */
+body > .toast {
   position: fixed;
-  left: 50%;
-  bottom: calc(20px + var(--safe-bottom));
-  z-index: 50;
-  width: max-content;
-  max-width: calc(100% - 32px);
-  padding: 12px 18px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-solid);
-  border: 1px solid rgba(239, 68, 68, 0.6);
-  box-shadow: var(--shadow);
-  font-weight: 700;
-  text-align: center;
-  transform: translateX(-50%);
-  animation: toast-in 0.3s ease both;
+  left: 0;
+  right: 0;
+  bottom: calc(22px + var(--safe-bottom));
+  z-index: 200;
+  width: fit-content;
+  max-width: calc(100% - 48px);
+  margin-inline: auto;
 }
 
 /* ---------- Анимации ---------- */
 
-@keyframes rise-in {
-  from { opacity: 0; transform: translateY(16px); }
+@keyframes logo-rise {
+  0% { opacity: 0; transform: perspective(500px) translateY(30px) rotateY(-70deg) scale(0.8); }
+  100% { opacity: 1; transform: none; }
 }
 
-@keyframes view-in {
-  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+@keyframes ticket-out {
+  0% { opacity: 0; transform: perspective(1100px) translateY(46px) rotateX(-62deg); }
+  100% { opacity: 1; transform: none; }
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-}
-
-@keyframes pop-in {
-  0% { opacity: 0; transform: scale(0.4); }
-  70% { opacity: 1; transform: scale(1.1); }
-  100% { transform: none; }
-}
-
-@keyframes tile-in {
-  from { opacity: 0; transform: translateY(24px) scale(0.9); }
-}
-
-@keyframes toast-in {
-  from { opacity: 0; transform: translate(-50%, 12px); }
-}
-
-@keyframes banner-in {
-  from { opacity: 0; transform: translate(-50%, -8px); }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes ripple {
-  0% { transform: scale(0.9); opacity: 1; }
-  100% { transform: scale(1.35); opacity: 0; }
-}
-
-@keyframes twinkle {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: rotate(12deg) scale(1.15); opacity: 0.85; }
+@keyframes portrait-in {
+  0% { opacity: 0; transform: perspective(700px) rotateY(-90deg) scale(0.85); }
+  100% { opacity: 1; transform: none; }
 }
 
 @keyframes camera-flash {
@@ -1837,28 +2188,92 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   100% { opacity: 0; }
 }
 
-@keyframes shake {
-  20%, 60% { transform: translateX(-6px); }
-  40%, 80% { transform: translateX(6px); }
-}
-
 @keyframes nudge {
-  50% { transform: scale(1.04); }
+  50% { transform: perspective(500px) rotateX(10deg) scale(1.04); }
 }
 
 @keyframes shimmer {
   to { background-position: -200% 0, 0 0; }
 }
 
-@keyframes breathe {
+@keyframes plaque-flip {
+  0% { transform: perspective(300px) rotateX(0deg); }
+  45% { transform: perspective(300px) rotateX(-90deg) scale(1.1); }
+  46% { transform: perspective(300px) rotateX(90deg) scale(1.1); }
+  100% { transform: perspective(300px) rotateX(0deg); }
+}
+
+@keyframes beam-in {
+  from { opacity: 0; transform: translateX(-50%) scaleX(0.2); }
+}
+
+@keyframes beam-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+@keyframes flame {
+  from { opacity: 0.8; }
+  to { opacity: 1; }
+}
+
+/* Табличка опускается на шнурах и покачивается */
+@keyframes sign-swing {
+  0% { opacity: 0; transform: perspective(800px) translateY(-60px) rotateX(30deg); }
+  45% { opacity: 1; transform: perspective(800px) translateY(4px) rotateX(-8deg); }
+  70% { transform: perspective(800px) rotateX(4deg); }
+  100% { transform: none; }
+}
+
+@keyframes tick {
   0%, 100% { transform: scale(1); }
-  12% { transform: scale(1.06); }
+  12% { transform: scale(1.05); }
   30% { transform: scale(1); }
 }
 
-@keyframes drum {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-7px); }
+/* Камень поднимается из люка */
+@keyframes tile-rise {
+  0% { opacity: 0; transform: perspective(700px) translateY(34px) rotateX(-76deg); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes chosen {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.09); }
+  100% { transform: scale(1.04); }
+}
+
+@keyframes seal-stamp {
+  0% { opacity: 0; transform: scale(2.3) rotate(-28deg); }
+  55% { opacity: 1; transform: scale(0.9) rotate(5deg); }
+  78% { transform: scale(1.05) rotate(-2deg); }
+  100% { transform: none; }
+}
+
+@keyframes rosette-in {
+  from { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+}
+
+@keyframes medal-drop {
+  0% { opacity: 0; transform: perspective(600px) translateY(-70px) rotateY(180deg) scale(0.7); }
+  60% { opacity: 1; transform: perspective(600px) translateY(6px) rotateY(-12deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes points-pop {
+  0% { opacity: 0; transform: translateY(20px) scale(0.6); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes search-left {
+  from { transform: rotate(-30deg); }
+  to { transform: rotate(18deg); }
+}
+
+@keyframes search-right {
+  from { transform: rotate(30deg); }
+  to { transform: rotate(-18deg); }
 }
 
 @keyframes trophy-wiggle {
@@ -1866,35 +2281,37 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   50% { transform: rotate(6deg); }
 }
 
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.55; transform: scale(0.94); }
-  50% { opacity: 1; transform: scale(1.04); }
+@keyframes drum {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
 }
 
 @keyframes medal-in {
-  0% { opacity: 0; transform: scale(0.2) rotate(-30deg); }
-  55% { opacity: 1; transform: scale(1.18) rotate(8deg); }
-  75% { transform: scale(0.95) rotate(-3deg); }
-  100% { transform: none; }
+  0% { opacity: 0; transform: perspective(700px) translateY(-120px) rotateY(540deg) scale(0.4); }
+  70% { opacity: 1; transform: perspective(700px) translateY(8px) rotateY(-10deg) scale(1.06); }
+  100% { opacity: 1; transform: none; }
 }
 
-@keyframes confetti-fall {
-  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+@keyframes petal-fall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate3d(1, 0.4, 0.2, 0deg); }
   85% { opacity: 1; }
-  100% { opacity: 0; transform: translate3d(var(--drift), 105vh, 0) rotate(var(--spin)); }
+  100% { opacity: 0; transform: translate3d(var(--drift), 105vh, 0) rotate3d(1, 0.4, 0.2, var(--spin)); }
 }
+
+/* Свет на сцене: у каждого настроения своя анимация, чтобы она запускалась заново при смене */
+@keyframes lights-correct { from { opacity: 0; } }
+@keyframes lights-wrong { from { opacity: 0; } }
+@keyframes lights-timeout { from { opacity: 0; } }
+@keyframes lights-ceremony { from { opacity: 0; } }
+@keyframes lights-winner { from { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-
   .confetti {
     display: none;
+  }
+
+  .timebar::after {
+    opacity: 1;
   }
 }
 
@@ -1902,7 +2319,7 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 
 @media (min-width: 720px) {
   .views {
-    width: min(720px, 100%);
+    width: min(760px, 100%);
     margin: 0 auto;
   }
 
@@ -1911,8 +2328,9 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   }
 
   .answer-shape {
-    width: 60px;
-    height: 60px;
+    width: 64px;
+    height: 64px;
+    padding: 14px;
   }
 }
 
@@ -1923,8 +2341,18 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     margin-top: 0;
   }
 
+  .logo .brand-mark {
+    width: 64px;
+    height: 58px;
+  }
+
+  .logo .brand-word {
+    font-size: 30px;
+  }
+
   .camera {
     width: min(170px, 38vh);
+    margin: 10px auto 12px;
   }
 
   .photo-choice {
@@ -1933,7 +2361,7 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 
   .view {
     gap: 10px;
-    padding-top: 10px;
+    padding-top: 12px;
     padding-bottom: calc(10px + var(--safe-bottom));
   }
 
@@ -1948,7 +2376,7 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   }
 
   .q-kind {
-    padding: 5px 12px;
+    padding: 5px 11px;
   }
 
   .timebar {
@@ -1964,42 +2392,45 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   }
 
   .q-text {
+    padding: 12px 16px;
     font-size: 17px;
   }
 
   .view-question[data-phase='reading'] .q-text {
-    font-size: 19px;
+    padding: 16px 18px;
+    font-size: 20px;
   }
 
   .read-ring {
-    width: 72px;
-    height: 72px;
+    width: 76px;
+    height: 76px;
   }
 
   .read-ring-value {
-    font-size: 28px;
+    font-size: 30px;
   }
 
   .answer-buttons {
-    gap: 8px;
+    gap: 12px;
   }
 
   .answer-button {
-    min-height: 60px;
     flex-direction: row;
     gap: 10px;
+    min-height: 60px;
     padding: 8px 12px;
     font-size: 16px;
-    box-shadow: 0 5px 0 color-mix(in srgb, var(--tone) 60%, black);
   }
 
   .answer-text {
     -webkit-line-clamp: 2;
   }
 
-  .answer-shape {
-    width: 30px;
-    height: 30px;
+  .answer-shape,
+  .has-long-answers .answer-shape {
+    width: 34px;
+    height: 34px;
+    padding: 7px;
   }
 
   .text-answer-input {
@@ -2015,27 +2446,35 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   .result-icon,
   .message-icon,
   .answered-badge {
-    width: 76px;
-    height: 76px;
-    font-size: 40px;
+    width: 78px;
+    height: 78px;
+  }
+
+  .answered-badge {
+    margin: 14px 0 6px;
+  }
+
+  .answered-badge::before {
+    inset: -13px;
   }
 
   .answered-badge .shape {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
   }
 
   .result-points {
-    font-size: 34px;
+    font-size: 36px;
   }
 
-  h1 {
-    font-size: 24px;
+  .view h1,
+  #result-title {
+    font-size: 26px;
   }
 
   .drumroll {
-    width: 180px;
-    height: 150px;
+    width: 190px;
+    height: 160px;
   }
 
   .drumroll-trophy {
@@ -2055,12 +2494,17 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   .final-place {
     width: 150px;
     height: 140px;
+    margin-top: 18px;
   }
 
   .medal-disc,
   .medal-plain .medal-disc {
-    width: 92px;
-    height: 92px;
+    width: 94px;
+    height: 94px;
+  }
+
+  .medal-disc::before {
+    inset: 11px;
   }
 
   .medal-number,
@@ -2069,15 +2513,15 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   }
 
   .medal-ribbon {
-    top: -30px;
-    width: 60px;
-    height: 50px;
+    top: -32px;
+    width: 62px;
+    height: 52px;
   }
 
   .medal-ribbon::before,
   .medal-ribbon::after {
     width: 24px;
-    height: 50px;
+    height: 52px;
   }
 
   .final-rank {
@@ -2104,8 +2548,8 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
     justify-content: center;
+    gap: 8px;
     grid-column: 1;
     grid-row: 3;
     min-height: 0;
@@ -2132,7 +2576,7 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     min-height: 56px;
   }
 
-  /* Шаг «Фото»: круг слева, кнопки справа */
+  /* Шаг «Фото»: рама слева, кнопки справа */
   .screen {
     width: min(760px, 100%);
     gap: 12px;
@@ -2142,9 +2586,9 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    column-gap: 24px;
+    column-gap: 28px;
     row-gap: 10px;
-    padding: 18px 22px;
+    padding: 0 24px 18px;
     text-align: left;
   }
 
@@ -2152,11 +2596,15 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     grid-column: 2;
   }
 
+  .photo-panel > .panel-stub {
+    grid-column: 1 / -1;
+  }
+
   .photo-panel > .camera {
     grid-column: 1;
-    grid-row: 1 / span 5;
-    width: min(210px, 52vh);
-    margin: 0;
+    grid-row: 2 / span 5;
+    width: min(200px, 48vh);
+    margin: 12px;
   }
 
   .photo-panel > .muted {
@@ -2170,7 +2618,7 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     align-content: center;
     align-content: safe center;
     justify-content: center;
-    column-gap: 32px;
+    column-gap: 36px;
     row-gap: 6px;
   }
 
@@ -2183,7 +2631,6 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
 
   .view-result {
     grid-template-columns: auto minmax(0, 360px);
-    row-gap: 0;
   }
 
   .view-result > * {
@@ -2193,7 +2640,6 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
     text-align: left;
   }
 
-  /* Пустые строки без промежутков: значок остаётся ровно по центру текста */
   .view-result > .result-icon {
     grid-column: 1;
     grid-row: 1 / span 6;
@@ -2207,29 +2653,22 @@ body[data-mood='wrong'] .result-icon { color: #b91c1c; }
   }
 
   .view-final {
-    grid-template-columns: minmax(0, 420px);
-    justify-items: center;
+    grid-template-columns: auto minmax(0, 360px);
   }
 
-  .view-final:has(.final-podium-wrap:not([hidden])) {
-    grid-template-columns: minmax(0, 340px) minmax(0, 340px);
-    align-items: center;
+  .view-final > * {
+    grid-column: 2;
+    justify-self: start;
+    text-align: left;
   }
 
-  .view-final:has(.final-podium-wrap:not([hidden])) > .final-caption { grid-area: 1 / 1; }
-  .view-final:has(.final-podium-wrap:not([hidden])) > .final-place { grid-area: 2 / 1; }
-  .view-final:has(.final-podium-wrap:not([hidden])) > .final-rank { grid-area: 3 / 1; }
-  .view-final:has(.final-podium-wrap:not([hidden])) > .view-text { grid-area: 4 / 1; }
-  .view-final:has(.final-podium-wrap:not([hidden])) > .final-podium-wrap { grid-area: 1 / 2 / 4 / 3; width: 100%; }
-  .view-final:has(.final-podium-wrap:not([hidden])) > #play-again { grid-area: 4 / 2; width: 100%; }
-  .view-final:has(.final-podium-wrap:not([hidden])) > #final-note { grid-area: 5 / 2; }
-
-  .view-final .view-text {
-    font-size: 16px;
-    text-wrap: balance;
+  .view-final > .final-place {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+    align-self: center;
   }
 
-  .final-podium li {
-    padding: 8px 12px;
+  .view-final > .confetti {
+    grid-column: auto;
   }
 }
