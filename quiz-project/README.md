@@ -4,19 +4,27 @@
 
 | Часть | Что делает | Порт по умолчанию |
 |---|---|---|
-| `server/` | Node.js + Express + Socket.IO. Вся игровая логика, таймер и подсчёт очков, REST API для сохранённых игр | 3000 |
-| `host-site/` | Сайт ведущего: список игр, редактор, лобби, экран игры, итоги | 5500 |
+| `server/` | Node.js + Express + Socket.IO + PostgreSQL. Вся игровая логика, таймер и подсчёт очков, аккаунты ведущих, REST API для сохранённых игр | 3000 |
+| `host-site/` | Сайт ведущего: вход и регистрация, список игр, редактор, лобби, экран игры, итоги | 5500 |
 | `player-site/` | Сайт игрока: код комнаты → селфи → ник → игра | 5501 |
 
 Сайты ничего не знают друг о друге и общаются только с сервером. Клиентам сервер не доверяет: правильные ответы, время и очки знает только он.
+
+Создавать и запускать игры (в том числе демо) может только вошедший ведущий; игроку аккаунт не нужен — он входит по коду комнаты. Аккаунты, сессии, игры и картинки хранятся в PostgreSQL. План и ход работ по аккаунтам, админ-консоли, журналам и блокировкам — в [`docs/ACCOUNTS_PLAN.md`](docs/ACCOUNTS_PLAN.md).
 
 ```
 quiz-project/
 ├── server/
 │   ├── server.js            # Express + Socket.IO + CORS, REST API
+│   ├── migrations/          # схема БД: 001_…sql, 002_…sql — применяются при старте по порядку
 │   ├── src/
 │   │   ├── config.js        # настройки из .env
-│   │   ├── auth.js          # владелец игр (токен браузера; сюда добавляется логин)
+│   │   ├── db/              # пул PostgreSQL (index.js) и миграции под блокировкой (migrate.js)
+│   │   ├── identity/        # посетитель (cookie vid), сессии (cookie sid), аккаунты, CSRF, IP за прокси
+│   │   ├── security/        # лимиты попыток входа и регистрации (в БД)
+│   │   ├── routes/auth.js   # /api/auth/*: вход, регистрация, выход, смена пароля, резервный код
+│   │   ├── stores/          # игры и картинки в PostgreSQL, перенос старых игр из quizzes.json
+│   │   ├── auth.js          # владелец игр = аккаунт из сессии
 │   │   ├── rooms.js         # комнаты, уникальный 6-значный код
 │   │   ├── game.js          # состояния lobby → question (чтение → ответы) → results → final, таймеры, церемония
 │   │   ├── scoring.js       # очки: правильность + скорость, рейтинг
@@ -28,15 +36,16 @@ quiz-project/
 │   │   ├── sockets.js       # события Socket.IO
 │   │   ├── rateLimit.js     # ограничение частоты запросов
 │   │   └── errors.js
-│   ├── data/quizzes.json
+│   ├── data/quizzes.json    # игры из версии без аккаунтов (переносятся в БД при старте)
 │   ├── scripts/loadtest.js  # нагрузочный тест: наплыв игроков из одной сети
-│   ├── test/                # node:test — unit и интеграционные тесты
+│   ├── scripts/hash-password.js  scripts/migrate.js   # хэш пароля админа, миграции без запуска сервера
+│   ├── test/                # node:test — unit и интеграционные тесты (нужна база: TEST_DATABASE_URL)
 │   └── .env.example
 ├── host-site/
-│   ├── index.html  editor.html  lobby.html  game.html  results.html
+│   ├── login.html  index.html  editor.html  lobby.html  game.html  results.html
 │   ├── css/theatre.css      # общая основа «Большой театр»: токены, кнопки, занавес
-│   ├── css/home.css  editor.css  lobby.css  game.css  ceremony.css   # стили экранов
-│   └── js/ config.js api.js session.js socket.js ui.js theatre.js home.js editor.js lobby.js game.js results.js
+│   ├── css/login.css  home.css  editor.css  lobby.css  game.css  ceremony.css   # стили экранов
+│   └── js/ config.js auth.js api.js session.js socket.js ui.js theatre.js login.js home.js editor.js lobby.js game.js results.js
 ├── player-site/
 │   ├── index.html  photo.html  name.html  play.html
 │   ├── css/theatre.css  css/style.css   # общая основа + экраны игрока
@@ -53,7 +62,26 @@ render.yaml                  # (в корне репозитория) депло
 
 ## Установка и запуск
 
-Нужен **Node.js 18.18+** (рекомендуется 20 или 22).
+Нужен **Node.js 18.18+** (рекомендуется 20 или 22) и **PostgreSQL 13+**.
+
+### База данных
+
+Сервер не запустится без `DATABASE_URL`: аккаунты, сессии, игры и картинки хранятся в PostgreSQL.
+Таблицы создаются сами при первом запуске (миграции из `server/migrations/`).
+
+```bash
+# Например, через Docker:
+docker run -d --name alstudio-db -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+docker exec alstudio-db createdb -U postgres alstudio
+docker exec alstudio-db createdb -U postgres alstudio_test   # для тестов
+
+cd quiz-project/server
+cp .env.example .env
+# в .env:  DATABASE_URL=postgresql://postgres:postgres@localhost:5432/alstudio
+```
+
+Администратор задаётся только в `.env` (или в настройках Render): `ADMIN_LOGIN` и `ADMIN_PASSWORD_HASH` —
+хэш пароля, а не сам пароль. Получить хэш: `cd server && npm run hash-password` (пароль вводится скрытно).
 
 ### Всё одной командой
 
@@ -128,8 +156,19 @@ PLAYER_SITE_URL=http://192.168.1.5:3000 npm run single
 | `PLAYER_SITE_ORIGIN` | адрес сайта игрока (CORS). Несколько — через запятую | `http://localhost:5501,http://127.0.0.1:5501` |
 | `PLAYER_SITE_URL` | публичный адрес сайта игрока, его видно в лобби и в QR-коде | первый из `PLAYER_SITE_ORIGIN` |
 | `SERVE_SITES` | `true` — сервер сам отдаёт оба сайта (`/` и `/host/`) | `false` |
-| `DATA_FILE` | путь к JSON-файлу с играми | `./data/quizzes.json` |
+| `DATABASE_URL` | адрес PostgreSQL (**обязательно**) | — |
+| `DATABASE_SSL` | `disable` / `require` / `verify` | `disable` для localhost и внутренней сети Render, иначе `require` |
+| `SESSION_SECRET` | секрет для CSRF-токенов, от 32 символов (**обязательно на Render**) | случайный на время работы процесса |
+| `COOKIE_SECURE` | cookie только по HTTPS | `true` на Render и при `NODE_ENV=production` |
+| `SESSION_IDLE_DAYS`, `SESSION_ABSOLUTE_DAYS` | сессия истекает без активности / не живёт дольше | `14`, `60` |
+| `REGISTRATIONS_PER_IP_PER_HOUR`, `REGISTRATIONS_PER_HOUR` | защита от массовых регистраций | `5`, `300` |
+| `ADMIN_LOGIN`, `ADMIN_PASSWORD_HASH` | администратор (логин может быть кириллицей; хэш — `npm run hash-password`) | вход админа выключен |
+| `ADMIN_CONTACT` | контакт для заблокированных пользователей | — |
+| `HOST_SITE_URL` | куда ведёт кнопка «Создать свою игру» на сайте игрока | `/host/` или первый из `HOST_SITE_ORIGIN` |
+| `DATA_FILE` | JSON-файл с играми из версии без аккаунтов: переносятся в БД при старте | `./data/quizzes.json` |
 | `TRUST_PROXY` | `true`, если сервер за прокси (Render, Railway, nginx) | `false` |
+| `TRUST_PROXY_HOPS` | сколько прокси перед сервером: IP берётся N-м справа в `X-Forwarded-For` | как `TRUST_PROXY` |
+| `CLIENT_IP_MODE`, `CLIENT_IP_HEADER` | `header` — IP из заголовка доверенного прокси (например, `cf-connecting-ip`) | `hops` |
 | `HOST_RECONNECT_MS` | сколько ждать ведущего после отключения, прежде чем закрыть комнату | `15000` |
 | `PLAYER_RECONNECT_MS` | сколько ждать игрока в лобби, прежде чем убрать его из списка | `30000` |
 | `MAX_PLAYERS_PER_ROOM`, `MAX_ROOMS` | ограничения | `100`, `500` |
@@ -150,15 +189,17 @@ PLAYER_SITE_URL=http://192.168.1.5:3000 npm run single
 
 ```bash
 cd quiz-project/server
-npm test                               # 26 тестов: валидация, очки, полный цикл игры, фаза чтения, ответы вручную, церемония, картинки, наплыв игроков
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/alstudio_test npm test
+                                       # 38 тестов: аккаунты и сессии, CSRF, лимиты входа, админ из окружения,
+                                       # чужие игры, валидация, очки, полный цикл игры, церемония, картинки, наплыв игроков
 npm start
-curl http://localhost:3000/health      # {"status":"ok","rooms":0,...}
-curl http://localhost:3000/api/quizzes # 401 — без токена ведущего игры не отдаются
+curl http://localhost:3000/health      # {"status":"ok","db":"ok","rooms":0,...}
+curl http://localhost:3000/api/quizzes # 401 — без входа игры не отдаются
 npm run loadtest                       # нагрузочный тест: 80 игроков из одной сети, сбой сети, ответы
 node scripts/loadtest.js https://ваш-сервер 150   # то же против задеплоенного сервера
 ```
 
-Интеграционные тесты поднимают сервер на случайном порту и проверяют: CRUD игр и изоляцию по токену, CORS, создание комнаты, вход игроков (уникальный ник, обязательное и проверенное фото), команды ведущего только от его сокета, фазу чтения (варианты не уходят раньше времени), вопросы с ответом вручную, один ответ на вопрос, отказ в ответе после таймера, подсчёт очков, скрытие мест после последнего вопроса, церемонию награждения по шагам, загрузку картинок, вход 60 игроков с одного IP и их возврат после сбоя, закрытие комнаты при уходе ведущего, переподключение ведущего и игрока, удаление игрока.
+Каждый файл тестов работает в своей схеме базы `TEST_DATABASE_URL` и удаляет её после себя. Интеграционные тесты поднимают сервер на случайном порту и проверяют: регистрацию и вход (одинаковая ошибка для неизвестного логина и неверного пароля, новая сессия при входе, отзыв сессий при выходе и смене пароля), блокировку подбора пароля, CSRF, администратора только из окружения, CRUD игр и изоляцию по аккаунту, CORS, создание комнаты, вход игроков (уникальный ник, обязательное и проверенное фото), команды ведущего только от его сокета, фазу чтения (варианты не уходят раньше времени), вопросы с ответом вручную, один ответ на вопрос, отказ в ответе после таймера, подсчёт очков, скрытие мест после последнего вопроса, церемонию награждения по шагам, загрузку картинок, вход 60 игроков с одного IP и их возврат после сбоя, закрытие комнаты при уходе ведущего, переподключение ведущего и игрока, удаление игрока.
 
 ### 2. Сайт ведущего
 
@@ -230,7 +271,14 @@ node scripts/loadtest.js https://ваш-сервер 150   # то же прот�
 
 | Метод | Путь | Кто | Описание |
 |---|---|---|---|
-| GET | `/api/quizzes` | ведущий (`Authorization: Bearer <token>`) | список игр |
+| GET | `/api/auth/session` | оба сайта | кто вошёл + CSRF-токен для изменяющих запросов |
+| POST | `/api/auth/register` | все | регистрация `{ login, password }` → аккаунт и резервный код (показывается один раз) |
+| POST | `/api/auth/login` | все | вход `{ login, password }` |
+| POST | `/api/auth/logout` | ведущий | выход |
+| POST | `/api/auth/password` | ведущий | смена пароля `{ currentPassword, newPassword }`, остальные сессии отзываются |
+| POST | `/api/auth/backup-code` | ведущий | новый резервный код `{ currentPassword }` |
+| GET / POST | `/api/legacy`, `/api/legacy/claim` | ведущий + старый токен браузера | сколько игр осталось с версии без аккаунтов / перенести их в аккаунт |
+| GET | `/api/quizzes` | ведущий (cookie сессии) | список игр |
 | GET | `/api/quizzes/:id` | ведущий | игра целиком |
 | POST | `/api/quizzes` | ведущий | создать |
 | PUT | `/api/quizzes/:id` | ведущий | изменить |
@@ -244,7 +292,9 @@ node scripts/loadtest.js https://ваш-сервер 150   # то же прот�
 
 ### Безопасность и надёжность
 
-* Команды `host:*` принимаются только от сокета, который сейчас управляет комнатой: создавшего её или вернувшегося с `hostKey` **и** тем же токеном ведущего.
+* Ведущий — вошедший аккаунт. Сессия хранится в БД, в браузере — только HttpOnly-cookie (`SameSite=Lax`, `Secure` и префикс `__Host-` на HTTPS); при входе выдаётся новая сессия, выход и смена пароля отзывают сессии. Пароли — argon2id, резервные коды — только хэшем. Изменяющие запросы проверяются по `Origin` и CSRF-токену. Лимиты попыток входа и регистрации хранятся в БД и переживают перезапуск.
+* Роль и владелец берутся только из сессии на сервере. Администратор задаётся только переменными окружения.
+* Команды `host:*` принимаются только от сокета, который сейчас управляет комнатой: создавшего её или вернувшегося с `hostKey` **и** тем же аккаунтом; сессия перепроверяется перед `host:create` и `host:resume`.
 * Сервер проверяет всё: код (6 цифр), ник (длина, символы, уникальность), фото (только `data:image/jpeg|png;base64`, до 100 КБ, проверка сигнатуры файла), номер вопроса и ответа, структуру игры.
 * Один ответ на вопрос; ответы после окончания таймера отклоняются (`TOO_LATE`).
 * CORS: игры (`/api/quizzes`) доступны только сайту ведущего, проверки комнаты — обоим сайтам. Для WebSocket сервер сам проверяет заголовок `Origin`.
@@ -320,60 +370,13 @@ node scripts/loadtest.js https://ваш-сервер 150   # то же прот�
 
 ## Как развивать проект
 
-### Переход на SQLite
+### Хранилище
 
-Всё хранение игр — в классе `JsonQuizStore` (`server/src/quizzes.js`). Достаточно написать класс с теми же методами и передать его в `QuizService` в `server.js`:
+Сервер работает с базой только через `server/src/db/index.js` (`query`, `one`, `many`, `tx`; все запросы параметризованы). Игры и картинки — в `server/src/stores/` (`PgQuizStore`, `PgImageStore`) с теми же методами, что у прежних `JsonQuizStore` и `ImageStore`, поэтому `QuizService` и игровая логика от хранилища не зависят. Изменения схемы — только новыми файлами `server/migrations/NNN_название.sql`: применённая миграция не меняется, данные не удаляются.
 
-```js
-// server/src/sqliteStore.js  (npm install better-sqlite3)
-import Database from 'better-sqlite3';
+### Аккаунты
 
-export class SqliteQuizStore {
-  constructor(file) {
-    this.db = new Database(file);
-  }
-  async init() {
-    this.db.exec(`CREATE TABLE IF NOT EXISTS quizzes (
-      id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, data TEXT NOT NULL,
-      created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
-    this.db.exec('CREATE INDEX IF NOT EXISTS quizzes_owner ON quizzes(owner_id)');
-  }
-  #row(row) {
-    return row && { id: row.id, ownerId: row.owner_id, ...JSON.parse(row.data), createdAt: row.created_at, updatedAt: row.updated_at };
-  }
-  async listAll() {
-    return this.db.prepare('SELECT * FROM quizzes').all().map((r) => this.#row(r));
-  }
-  async listByOwner(ownerId) {
-    return this.db.prepare('SELECT * FROM quizzes WHERE owner_id = ?').all(ownerId).map((r) => this.#row(r));
-  }
-  async findById(id) {
-    return this.#row(this.db.prepare('SELECT * FROM quizzes WHERE id = ?').get(id)) ?? null;
-  }
-  async insert(quiz) {
-    const { id, ownerId, createdAt, updatedAt, ...data } = quiz;
-    this.db.prepare('INSERT INTO quizzes VALUES (?, ?, ?, ?, ?)').run(id, ownerId, JSON.stringify(data), createdAt, updatedAt);
-    return quiz;
-  }
-  async update(id, changes) {
-    const current = await this.findById(id);
-    if (!current) return null;
-    const { ownerId, createdAt, updatedAt, ...data } = { ...current, ...changes };
-    delete data.id;
-    this.db.prepare('UPDATE quizzes SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(data), updatedAt, id);
-    return { id, ownerId, ...data, createdAt, updatedAt };
-  }
-  async remove(id) {
-    return this.db.prepare('DELETE FROM quizzes WHERE id = ?').run(id).changes > 0;
-  }
-}
-```
-
-В `server.js` замените `new JsonQuizStore(config.dataFile)` на `new SqliteQuizStore(config.dataFile.replace(/\.json$/, '.db'))`.
-
-### Вход по логину
-
-Код сервера работает только с `owner.id` и не знает, как ведущий вошёл. В `server/src/auth.js` добавьте резолвер (cookie-сессия, JWT, OAuth), который возвращает `{ id: 'user:<id>', kind: 'user' }`, и поставьте его первым в `RESOLVERS`. На сайте ведущего вместо `getHostToken()` в `js/api.js` и `js/socket.js` передавайте токен сессии. Чтобы перенести игры с устройства в аккаунт, замените их `ownerId` с `device:…` на `user:…`.
+Владелец игр определяется сервером по cookie сессии (`server/src/identity/`): HTTP — `req.identity.account`, Socket.IO — `socket.identity.account`. Остальной код работает только с `owner.id` (UUID аккаунта). Игры из версии без аккаунтов (владелец — токен браузера) переносятся в аккаунт кнопкой «Перенести в мой аккаунт» на главной ведущего в том же браузере.
 
 ### Новые функции ведущего
 

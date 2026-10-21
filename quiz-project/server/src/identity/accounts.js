@@ -157,7 +157,8 @@ export class AccountService {
   /**
    * Аккаунт администратора из окружения: ADMIN_LOGIN + ADMIN_PASSWORD_HASH (argon2id).
    * Других администраторов нет: аккаунты с ролью admin и другим логином понижаются до user.
-   * Если логин уже занят обычным аккаунтом — роль не выдаётся (иначе его владелец стал бы админом).
+   * Если логин занят аккаунтом, который зарегистрировал пользователь, роль не выдаётся (иначе его
+   * владелец стал бы админом). Аккаунт, созданный сервером из окружения, можно повысить снова.
    * Возвращает { status, revokedSessions }.
    */
   async ensureAdmin({ login, passwordHash }, sessions) {
@@ -177,21 +178,24 @@ export class AccountService {
       return { status: 'bad-login', demoted: demoted.length };
     }
 
-    const existing = await this.db.one('SELECT id, role, password_hash FROM accounts WHERE login_normalized = $1', [normalized]);
+    const existing = await this.db.one('SELECT id, role, password_hash, managed_by_env FROM accounts WHERE login_normalized = $1', [normalized]);
     if (!existing) {
       await this.db.query(
-        "INSERT INTO accounts (login, login_normalized, password_hash, role) VALUES ($1, $2, $3, 'admin')",
+        "INSERT INTO accounts (login, login_normalized, password_hash, role, managed_by_env) VALUES ($1, $2, $3, 'admin', true)",
         [login, normalized, passwordHash],
       );
       return { status: 'created', demoted: demoted.length };
     }
-    if (existing.role !== 'admin') {
+    if (!existing.managed_by_env) {
       console.error('[admin] Логин ADMIN_LOGIN уже занят обычным аккаунтом — роль администратора НЕ выдана. Выберите другой ADMIN_LOGIN.');
       return { status: 'conflict', demoted: demoted.length };
     }
-    if (existing.password_hash !== passwordHash) {
-      // Пароль администратора сменили в окружении — старые сессии больше не действуют.
-      await this.db.query('UPDATE accounts SET password_hash = $2, password_changed_at = now(), login = $3 WHERE id = $1', [existing.id, passwordHash, login]);
+    if (existing.role !== 'admin' || existing.password_hash !== passwordHash) {
+      // Пароль администратора сменили в окружении (или аккаунт снова стал админским) — старые сессии больше не действуют.
+      await this.db.query(
+        "UPDATE accounts SET role = 'admin', password_hash = $2, password_changed_at = now(), login = $3 WHERE id = $1",
+        [existing.id, passwordHash, login],
+      );
       await sessions?.revokeAll(existing.id, 'password-changed');
       return { status: 'updated', demoted: demoted.length };
     }

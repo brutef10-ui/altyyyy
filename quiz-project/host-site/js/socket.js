@@ -11,6 +11,7 @@
 // и не даёт экрану телефона погаснуть посреди игры.
 import { SERVER_URL } from './config.js';
 import { getHostToken } from './api.js';
+import { goToLogin } from './auth.js';
 import { flash, hostSession, launchRequest } from './session.js';
 import { hideOverlay, showOverlay } from './ui.js';
 import { curtain } from './theatre.js';
@@ -175,7 +176,9 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
   showOverlay('Подключение к серверу…');
   const io = await loadClientWithRetry();
 
+  // withCredentials — cookie сессии уходит и на сервер с другим адресом (локальная разработка).
   const socket = io(SERVER_URL, {
+    withCredentials: true,
     auth: { token: getHostToken() },
     transports: ['websocket', 'polling'],
     reconnectionDelayMax: 3000,
@@ -215,7 +218,12 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
       onReady(snapshot, session);
     } catch (error) {
       if (current !== generation || stopped) return;
-      if (FATAL_CODES.has(error.code)) {
+      if (error.code === 'UNAUTHORIZED') {
+        // Сессия истекла или из неё вышли в другой вкладке: войти заново и вернуться сюда.
+        stop();
+        socket.disconnect();
+        goToLogin();
+      } else if (FATAL_CODES.has(error.code)) {
         goHome(error.message, 'error');
       } else if (TRANSIENT_CODES.has(error.code)) {
         const delay = retryDelay(attempt);

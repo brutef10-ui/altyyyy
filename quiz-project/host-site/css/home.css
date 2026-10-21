@@ -277,3 +277,57 @@
     font-size: 15px;
   }
 }
+
+/* ---------- Аккаунт в шапке ---------- */
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--gold-light);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.account-chip-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.account-chip b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 17px;
+}
+
+@media (max-width: 760px) {
+  .account-chip-label {
+    display: none;
+  }
+
+  .account-chip {
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 520px) {
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .account-chip {
+    display: none;
+  }
+}

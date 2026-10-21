@@ -12,7 +12,9 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "loadtest": "node scripts/loadtest.js"
+    "loadtest": "node scripts/loadtest.js",
+    "migrate": "node scripts/migrate.js",
+    "hash-password": "node scripts/hash-password.js"
   },
   "dependencies": {
     "argon2": "^0.45.1",

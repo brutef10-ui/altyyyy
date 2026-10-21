@@ -4,6 +4,9 @@
 //   npm run loadtest --prefix server                      # 80 игроков против http://localhost:3000
 //   node scripts/loadtest.js https://al-studio-xxxx.onrender.com 120
 //
+// Комнату создаёт вошедший ведущий: LOADTEST_LOGIN и LOADTEST_PASSWORD — существующий аккаунт,
+// без них тест регистрирует временный (регистраций с одного IP — не больше 5 в час).
+//
 // Сценарий: ведущий создаёт комнату → игроки входят (проверка кода, ника, player:join с фото) →
 // старт → все отвечают на вопросы → «моргание сети»: все соединения рвутся и восстанавливаются
 // одновременно → игра продолжается до финала. В конце — сводка ошибок и задержек.
@@ -35,9 +38,10 @@ function photo() {
   return `data:image/jpeg;base64,${bytes.toString('base64')}`;
 }
 
-function connect(auth) {
+function connect(cookie) {
   return new Promise((resolve, reject) => {
-    const socket = io(SERVER, { auth, transports: ['websocket'], forceNew: true, reconnection: false, timeout: 20_000 });
+    const extraHeaders = cookie ? { Cookie: cookie } : undefined;
+    const socket = io(SERVER, { extraHeaders, transports: ['websocket'], forceNew: true, reconnection: false, timeout: 20_000 });
     socket.once('connect', () => resolve(socket));
     socket.once('connect_error', reject);
   });
@@ -148,9 +152,34 @@ class Player {
   }
 }
 
+// Вход ведущего: cookie сессии для подключения Socket.IO.
+async function hostCookie() {
+  const jar = new Map();
+  const call = async (path, body, csrf) => {
+    const headers = { Cookie: [...jar].map(([key, value]) => `${key}=${value}`).join('; ') };
+    if (body) headers['Content-Type'] = 'application/json';
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+    const response = await fetch(SERVER + path, { method: body ? 'POST' : 'GET', headers, body: body ? JSON.stringify(body) : undefined });
+    for (const line of response.headers.getSetCookie()) {
+      const [pair] = line.split(';');
+      const index = pair.indexOf('=');
+      jar.set(pair.slice(0, index), pair.slice(index + 1));
+    }
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(`${path}: ${data?.error || response.status}`);
+    return data;
+  };
+  const { csrfToken } = await call('/api/auth/session');
+  const login = process.env.LOADTEST_LOGIN;
+  const password = process.env.LOADTEST_PASSWORD;
+  if (login && password) await call('/api/auth/login', { login, password }, csrfToken);
+  else await call('/api/auth/register', { login: `load${randomBytes(4).toString('hex')}`, password: randomBytes(12).toString('hex') }, csrfToken);
+  return [...jar].map(([key, value]) => `${key}=${value}`).join('; ');
+}
+
 async function main() {
   console.log(`Сервер: ${SERVER}, игроков: ${PLAYERS}`);
-  const host = await connect({ token: randomBytes(32).toString('hex') });
+  const host = await connect(await hostCookie());
   const created = await emit(host, 'host:create', { quiz });
   if (!created.ok) throw new Error(`host:create: ${created.error}`);
   const { code } = created;

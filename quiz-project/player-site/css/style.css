@@ -2798,3 +2798,43 @@ body > .toast {
     grid-column: auto;
   }
 }
+
+/* ---------- Главная игрока: вход для ведущих и уведомление о данных ---------- */
+
+.host-offer {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+  animation: fade-in 700ms ease 900ms backwards;
+}
+
+.host-offer-rule {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--muted);
+}
+
+.host-offer-rule::before,
+.host-offer-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(216, 172, 76, 0.55), transparent);
+}
+
+.host-offer-note {
+  font-size: 15px;
+}
+
+.privacy-note {
+  margin-top: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  opacity: 0.8;
+}

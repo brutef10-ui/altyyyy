@@ -56,6 +56,17 @@ function initCodeStep() {
   const message = flash.take();
   if (message) showError(error, message);
   input.focus();
+  linkHostSite();
+}
+
+// «Создать свою игру» ведёт на сайт ведущего: по умолчанию он рядом (/host/), иначе — адрес из настроек сервера.
+async function linkHostSite() {
+  try {
+    const config = await api('/api/config');
+    if (config.hostSiteUrl) document.getElementById('host-link').href = config.hostSiteUrl;
+  } catch {
+    /* оставляем адрес по умолчанию */
+  }
 }
 
 // ---------- Шаг 3: ник ----------

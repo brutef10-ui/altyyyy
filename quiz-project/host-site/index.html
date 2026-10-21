@@ -22,14 +22,18 @@
       <svg class="brand-mark" viewBox="0 0 64 58" aria-hidden="true"><path d="M5 56V19Q5 5 19 5h26q14 0 14 14v37z" fill="#d8ac4c" stroke="#8f6a22" stroke-width="1.6"/><path d="M11 56V21q0-9 9-9h24q9 0 9 9v35z" fill="#1a0910"/><path d="M11 21q0-9 9-9h24q9 0 9 9v2q-4 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0-4.2 5-8.4 0Q15 28 11 23z" fill="#8c1529"/><path d="M11 23.2q4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0 4.2 4.8 8.4 0" fill="none" stroke="#f3d98b" stroke-width="1.2"/><path d="M11 24c9 3 9 18 4.6 32H11z" fill="#b3243d"/><path d="M53 24c-9 3-9 18-4.6 32H53z" fill="#b3243d"/><path d="M13.4 27c3 5 2.6 14 .6 26M50.6 27c-3 5-2.6 14-.6 26" fill="none" stroke="#5c0c1b" stroke-width="1.1" stroke-linecap="round"/><circle cx="16.8" cy="40" r="1.9" fill="#f3d98b" stroke="#8f6a22" stroke-width=".8"/><circle cx="47.2" cy="40" r="1.9" fill="#f3d98b" stroke="#8f6a22" stroke-width=".8"/><rect x="11" y="51.5" width="42" height="4.5" fill="#6b3f22"/><text x="32" y="47" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-weight="900" font-size="15.5" fill="#f3d98b">AL</text></svg>
       <span class="brand-word"><span class="brand-al">AL</span><span class="brand-studio">Studio</span></span>
     </a>
-    <a class="btn btn-primary" href="editor.html">+ Создать новую</a>
+    <div class="topbar-actions">
+      <span class="account-chip" id="account-chip" hidden><span class="account-chip-label">Ведущий</span><b id="account-name"></b></span>
+      <button class="btn btn-ghost btn-small" type="button" id="logout" hidden>Выйти</button>
+      <a class="btn btn-primary" href="editor.html">+ Создать новую</a>
+    </div>
   </header>
 
   <main class="container">
     <section class="page-intro">
       <p class="kicker">Репертуар</p>
       <h1>Мои игры</h1>
-      <p class="muted">Игры сохраняются на сервере и привязаны к этому браузеру. Запустите любую — для каждого запуска создаётся новая комната с новым кодом.</p>
+      <p class="muted">Игры сохраняются на сервере и привязаны к вашему аккаунту — они доступны с любого устройства после входа. Запустите любую — для каждого запуска создаётся новая комната с новым кодом.</p>
     </section>
 
     <div id="active-game" class="banner" hidden>
@@ -37,6 +41,13 @@
       <span class="banner-actions">
         <a class="btn btn-small btn-primary" href="lobby.html">Вернуться</a>
         <button class="btn btn-small btn-ghost" id="forget-game" type="button">Забыть</button>
+      </span>
+    </div>
+
+    <div id="legacy-games" class="banner" hidden>
+      <span>В этом браузере остались игры, созданные до появления аккаунтов: <b id="legacy-count"></b>.</span>
+      <span class="banner-actions">
+        <button class="btn btn-small btn-primary" id="claim-legacy" type="button">Перенести в мой аккаунт</button>
       </span>
     </div>
 

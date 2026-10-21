@@ -1,5 +1,6 @@
 // Главная ведущего: список сохранённых игр.
-import { api } from './api.js';
+import { api, forgetDeviceToken } from './api.js';
+import { logout, requireAccount } from './auth.js';
 import { flash, hostSession } from './session.js';
 import { launchGame } from './socket.js';
 import { confirmDialog, formatDate, h, plural, stageIcon, toast } from './ui.js';
@@ -98,7 +99,51 @@ function showActiveGame() {
   });
 }
 
+// Вошедший ведущий в шапке и кнопка «Выйти».
+async function showAccount() {
+  const account = await requireAccount();
+  if (!account) return;
+  document.getElementById('account-name').textContent = account.login;
+  document.getElementById('account-chip').hidden = false;
+  const button = document.getElementById('logout');
+  button.hidden = false;
+  button.addEventListener('click', () => {
+    button.disabled = true;
+    hostSession.clear();
+    logout();
+  });
+  offerLegacyGames();
+}
+
+// Игры, созданные в этом браузере до появления аккаунтов, переносятся в аккаунт по кнопке.
+async function offerLegacyGames() {
+  let count = 0;
+  try {
+    count = await api.legacyCount();
+  } catch {
+    return;
+  }
+  if (!count) return;
+  const banner = document.getElementById('legacy-games');
+  document.getElementById('legacy-count').textContent = count;
+  banner.hidden = false;
+  document.getElementById('claim-legacy').addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      const claimed = await api.claimLegacy();
+      forgetDeviceToken();
+      banner.hidden = true;
+      toast(`Перенесено игр: ${claimed}`);
+      load();
+    } catch (error) {
+      event.currentTarget.disabled = false;
+      toast(error.message, 'error');
+    }
+  });
+}
+
 const message = flash.take();
 if (message) toast(message.message, message.type, 6000);
+showAccount();
 showActiveGame();
 load();

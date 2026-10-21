@@ -1,6 +1,7 @@
 // Редактор игры: название, вопросы двух типов (варианты ответа / ввод ответа), картинки,
 // время на чтение и на ответ.
 import { api, imageUrl } from './api.js';
+import { requireAccount } from './auth.js';
 import { editorDraft } from './session.js';
 import { launchGame } from './socket.js';
 import { ANSWER_SHAPES, confirmDialog, h, plural, shapeIcon, toast } from './ui.js';
@@ -1038,4 +1039,6 @@ async function init() {
   if (!quiz.title) titleInput.focus();
 }
 
+// Создавать игры (и открывать демо) можно только после входа. Сервер всё равно проверит это сам.
+requireAccount();
 init();

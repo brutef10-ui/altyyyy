@@ -1,11 +1,14 @@
 // REST API сервера: сохранённые игры ведущего.
+// Владельца определяет сервер по cookie сессии (credentials: 'include'); изменяющие запросы
+// дополнительно несут CSRF-токен. Без входа сервер отвечает 401 — тогда открываем страницу входа.
 import { SERVER_URL } from './config.js';
+import { csrfToken, goToLogin, loadSession } from './auth.js';
 
 const TOKEN_KEY = 'alstudio.host.token';
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
 
-// Секретный токен браузера ведущего. Заменяет аккаунт: по нему сервер понимает, чьи это игры.
-// Когда появится вход по логину, достаточно будет отправлять вместо него токен сессии.
+// Токен браузера ведущего из времён до аккаунтов. Доступа к играм он больше не даёт:
+// по нему сервер только находит старые игры этого браузера, чтобы перенести их в аккаунт.
 export function getHostToken() {
   let token = null;
   try {
@@ -34,24 +37,58 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { method = 'GET', body, auth = true } = {}) {
-  const headers = {};
-  if (auth) headers.Authorization = `Bearer ${getHostToken()}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+/** Старый токен этого браузера, если он есть (новый не создаём). */
+function existingDeviceToken() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    return TOKEN_PATTERN.test(token || '') ? token : null;
+  } catch {
+    return null;
+  }
+}
 
+export function forgetDeviceToken() {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* недоступно */
+  }
+}
+
+const unreachable = () => new ApiError(`Сервер недоступен (${SERVER_URL}). Проверьте, что он запущен.`);
+
+// Запрос с cookie сессии. Изменяющим запросам — CSRF-токен; если он устарел (сервер перезапущен
+// без постоянного секрета), берём новый и повторяем один раз.
+async function send(path, { method = 'GET', headers = {}, body } = {}, retried = false) {
+  const all = { ...headers };
+  if (method !== 'GET') {
+    if (!csrfToken()) await loadSession().catch(() => {});
+    all['X-CSRF-Token'] = csrfToken() ?? '';
+  }
   let response;
   try {
-    response = await fetch(`${SERVER_URL}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    response = await fetch(`${SERVER_URL}${path}`, { method, headers: all, body, credentials: 'include' });
   } catch {
-    throw new ApiError(`Сервер недоступен (${SERVER_URL}). Проверьте, что он запущен.`);
+    throw unreachable();
   }
+  if (response.status === 403 && !retried) {
+    const data = await response.clone().json().catch(() => null);
+    if (data?.code === 'CSRF') {
+      await loadSession({ force: true }).catch(() => {});
+      return send(path, { method, headers, body }, true);
+    }
+  }
+  return response;
+}
+
+async function request(path, { method = 'GET', body, auth = true, headers = {} } = {}) {
+  const all = { ...headers };
+  if (body !== undefined) all['Content-Type'] = 'application/json';
+  const response = await send(path, { method, headers: all, body: body === undefined ? undefined : JSON.stringify(body) });
 
   if (response.status === 204) return null;
   const data = await response.json().catch(() => null);
+  if (response.status === 401 && auth) goToLogin();
   if (!response.ok) {
     throw new ApiError(data?.error || `Ошибка сервера (${response.status})`, {
       status: response.status,
@@ -69,17 +106,9 @@ export function imageUrl(id) {
 
 /** Загружает картинку (Blob/File JPEG, PNG или WebP до 1 МБ). Возвращает { id, url }. */
 async function uploadImage(blob) {
-  let response;
-  try {
-    response = await fetch(`${SERVER_URL}/api/images`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${getHostToken()}`, 'Content-Type': blob.type || 'image/jpeg' },
-      body: blob,
-    });
-  } catch {
-    throw new ApiError(`Сервер недоступен (${SERVER_URL}). Проверьте, что он запущен.`);
-  }
+  const response = await send('/api/images', { method: 'POST', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
   const data = await response.json().catch(() => null);
+  if (response.status === 401) goToLogin();
   if (!response.ok) throw new ApiError(data?.error || `Не удалось загрузить картинку (${response.status})`, { status: response.status, code: data?.code });
   return data;
 }
@@ -92,4 +121,17 @@ export const api = {
   createQuiz: async (quiz) => (await request('/api/quizzes', { method: 'POST', body: quiz })).quiz,
   updateQuiz: async (id, quiz) => (await request(`/api/quizzes/${encodeURIComponent(id)}`, { method: 'PUT', body: quiz })).quiz,
   deleteQuiz: (id) => request(`/api/quizzes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  /** Сколько старых игр (созданных до аккаунтов) осталось в этом браузере. */
+  async legacyCount() {
+    const token = existingDeviceToken();
+    if (!token) return 0;
+    return (await request('/api/legacy', { headers: { Authorization: `Bearer ${token}` } })).count;
+  },
+  /** Перенести старые игры этого браузера в аккаунт. */
+  async claimLegacy() {
+    const token = existingDeviceToken();
+    if (!token) return 0;
+    return (await request('/api/legacy/claim', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })).claimed;
+  },
 };

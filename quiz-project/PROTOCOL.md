@@ -3,6 +3,19 @@
 Справочник для разработки сайтов. Сервер — единственный источник правды: таймеры, приём ответов,
 очки и места считает только он. Клиенты лишь показывают то, что пришло.
 
+## Вход ведущего
+
+Ведущий входит в аккаунт на `host-site/login.html`. Сессия — HttpOnly-cookie, которую сервер ставит сам;
+сайт отправляет запросы с `credentials: 'include'`, а Socket.IO — с `withCredentials: true`.
+
+* `GET /api/auth/session` → `{ account: { id, login, role } | null, csrfToken, adminContact }`.
+* Изменяющие запросы (`POST`, `PUT`, `DELETE`) несут заголовок `X-CSRF-Token: <csrfToken>`.
+  Ошибка `403 { code: 'CSRF' }` — взять токен заново и повторить.
+* `401 { code: 'UNAUTHORIZED' }` (REST) или `{ ok: false, code: 'UNAUTHORIZED' }` (`host:create`, `host:resume`) —
+  входа нет или сессия отозвана: открыть `login.html?next=<текущая страница>`.
+* Игрокам вход не нужен: `player:*` и `/api/rooms/*` работают как раньше.
+* Поле `socket.handshake.auth.token` (токен браузера из прежней версии) сервер больше не использует для прав.
+
 ## Модель игры
 
 ```js
@@ -35,7 +48,7 @@ Question = {
 
 ## Картинки
 
-* `POST /api/images` — только ведущий (`Authorization: Bearer <token>`). Тело — байты картинки,
+* `POST /api/images` — только вошедший ведущий (cookie сессии + заголовок `X-CSRF-Token`). Тело — байты картинки,
   `Content-Type: image/jpeg | image/png | image/webp`, не больше 1 МБ.
   Ответ `201 { id, url }`, где `url = "/api/images/<id>"` (относительно адреса сервера).
   Ошибки: 413 (больше 1 МБ), 415 (не JPEG/PNG/WebP), 409 (превышена квота).
