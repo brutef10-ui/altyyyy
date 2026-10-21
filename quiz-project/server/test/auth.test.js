@@ -13,7 +13,7 @@ const quiz = { title: 'Своя игра', questions: [{ text: 'Q?', answers: ['
 
 before(async () => {
   const adminPasswordHash = await argon2.hash(ADMIN_PASSWORD, { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 });
-  server = await startTestServer('auth', { adminLogin: ADMIN_LOGIN, adminPasswordHash });
+  server = await startTestServer('auth', { adminLogin: ADMIN_LOGIN, adminPasswordHash, hostSessionRecheckMs: 0 });
 });
 
 after(async () => {
@@ -178,6 +178,31 @@ test('Socket.IO: создать комнату можно только воше�
   await host.json('/api/auth/logout', { method: 'POST' });
   assert.equal((await socket.timeout(3000).emitWithAck('host:create', { quiz })).code, 'UNAUTHORIZED', 'выход закрывает и уже открытое соединение');
   socket.disconnect();
+});
+
+test('Socket.IO: команды хода игры перепроверяют сессию ведущего', async () => {
+  const host = await hostBrowser(server);
+  const socket = await host.socket();
+  const created = await socket.timeout(3000).emitWithAck('host:create', { quiz });
+  assert.equal(created.ok, true);
+
+  // Тот же аккаунт с другого устройства вошёл и вышел везде — команды этого сокета отклоняются.
+  const phone = new Browser(server);
+  await phone.login(host.account.login, 'correct-horse-9');
+  await phone.json('/api/auth/logout-all', { method: 'POST' });
+  for (const event of ['host:start', 'host:next', 'host:reveal', 'host:kick', 'host:close']) {
+    assert.equal((await socket.timeout(3000).emitWithAck(event, {})).code, 'UNAUTHORIZED', event);
+  }
+  assert.ok(server.rooms.get(created.code), 'комната не закрыта чужой командой');
+
+  // После нового входа ведущий возвращается в свою комнату по ключу и продолжает.
+  await host.login(host.account.login, 'correct-horse-9');
+  const again = await host.socket();
+  const resumed = await again.timeout(3000).emitWithAck('host:resume', { code: created.code, hostKey: created.hostKey });
+  assert.equal(resumed.ok, true, resumed.error);
+  assert.equal((await again.timeout(3000).emitWithAck('host:close', {})).ok, true);
+  socket.disconnect();
+  again.disconnect();
 });
 
 test('перенос старых игр: только по токену того же браузера', async () => {

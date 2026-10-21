@@ -26,6 +26,8 @@ const CLOSE_MESSAGES = {
 };
 
 export function registerSocketHandlers(io, { rooms, quizService, images, config, identity = null }) {
+  // Как часто перепроверять сессию ведущего перед командами хода игры (start/next/reveal/kick/close).
+  const HOST_RECHECK_MS = config.hostSessionRecheckMs ?? 15_000;
   const eventLimiter = new RateLimiter({ windowMs: 10_000, max: 60 }); // любые события одного сокета
   // По IP считаем только неудачные попытки входа (неверный код): все игроки одной Wi-Fi сети
   // выглядят для сервера как один IP, и успешные входы ограничивать нельзя.
@@ -117,10 +119,11 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
     return socket.identity?.ip ?? ipFromSocket(socket, config);
   }
 
-  // Ведущий — только вошедший создатель игр. Сессию перепроверяем перед каждой командой создания
-  // и возврата в комнату: её могли отозвать (выход, смена пароля) уже после подключения.
-  async function requireHostAccount(socket) {
-    if (identity && socket.identity) await identity.refresh(socket.identity);
+  // Ведущий — только вошедший создатель игр. Сессию перепроверяем перед командами ведущего: её могли
+  // отозвать (выход, смена пароля, блокировка) уже после подключения. Создание комнаты и возврат в неё —
+  // всегда по БД, остальные команды — не реже раза в HOST_RECHECK_MS (ход игры не ждёт запроса к БД).
+  async function requireHostAccount(socket, { maxAgeMs = 0 } = {}) {
+    if (identity && socket.identity) await identity.refresh(socket.identity, { maxAgeMs });
     const owner = ownerFromSocket(socket);
     if (!owner) throw new AppError('Войдите в аккаунт, чтобы продолжить.', { status: 401, code: 'UNAUTHORIZED' });
     return owner;
@@ -185,9 +188,11 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
   io.on('connection', (socket) => {
     socket.data = {};
 
-    const requireHostRoom = () => {
+    const requireHostRoom = async () => {
       const room = rooms.findByHostSocket(socket.id);
       if (!room) throw forbidden('Команда доступна только ведущему этой комнаты');
+      const owner = await requireHostAccount(socket, { maxAgeMs: HOST_RECHECK_MS });
+      if (owner.id !== room.ownerId) throw forbidden('Команда доступна только ведущему этой комнаты');
       return room;
     };
 
@@ -243,30 +248,30 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
     });
 
     on(socket, 'host:start', async () => {
-      const room = requireHostRoom();
+      const room = await requireHostRoom();
       room.game.start();
       return {};
     });
 
     on(socket, 'host:next', async () => {
-      const room = requireHostRoom();
+      const room = await requireHostRoom();
       room.game.next();
       return { state: room.game.state };
     });
 
     on(socket, 'host:reveal', async ({ count }) => {
-      const room = requireHostRoom();
+      const room = await requireHostRoom();
       return room.game.reveal(count);
     });
 
     on(socket, 'host:kick', async ({ playerId }) => {
-      const room = requireHostRoom();
+      const room = await requireHostRoom();
       if (typeof playerId !== 'string' || !removePlayer(room, playerId, 'kicked')) throw notFound('Игрок не найден');
       return {};
     });
 
     on(socket, 'host:close', async () => {
-      const room = requireHostRoom();
+      const room = await requireHostRoom();
       closeRoom(room, 'host-closed');
       return {};
     });

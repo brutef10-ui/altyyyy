@@ -82,6 +82,8 @@ export async function request(socket, event, payload = {}, timeoutMs = 10_000) {
     throw Object.assign(new Error('Сервер не ответил. Проверьте соединение.'), { code: 'TIMEOUT' });
   }
   if (!response?.ok) {
+    // Сессия истекла или отозвана (выход на другом устройстве, смена пароля): войти заново.
+    if (response?.code === 'UNAUTHORIZED') goToLogin();
     throw Object.assign(new Error(response?.error || 'Ошибка сервера'), { code: response?.code || 'UNKNOWN' });
   }
   return response;

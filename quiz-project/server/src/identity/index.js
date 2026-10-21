@@ -145,15 +145,34 @@ export function createIdentity({ db, config }) {
       session,
       account: session?.account ?? null,
       sessionToken: session ? sessionToken : null,
+      checkedAt: Date.now(),
     };
   }
 
-  /** Перепроверить сессию подключения (её могли отозвать: выход, смена пароля, блокировка). */
-  async function refresh(identity) {
+  // Если БД на минуту недоступна, ведущий, проверенный совсем недавно, может продолжать игру
+  // (отозвать сессию в это время всё равно нельзя). Дольше — команды отклоняются.
+  const REFRESH_GRACE_MS = 2 * 60_000;
+
+  /**
+   * Перепроверить сессию подключения (её могли отозвать: выход, смена пароля, блокировка).
+   * maxAgeMs — не чаще, чем раз в столько миллисекунд (для частых команд ведущего).
+   */
+  async function refresh(identity, { maxAgeMs = 0 } = {}) {
     if (!identity?.sessionToken) return identity;
-    const session = await sessions.resolve(identity.sessionToken, { ip: identity.ip, userAgent: identity.userAgent });
+    if (maxAgeMs > 0 && Date.now() - (identity.checkedAt ?? 0) < maxAgeMs) return identity;
+    let session;
+    try {
+      session = await sessions.resolve(identity.sessionToken, { ip: identity.ip, userAgent: identity.userAgent });
+    } catch (error) {
+      if (Date.now() - (identity.checkedAt ?? 0) < REFRESH_GRACE_MS) {
+        console.warn('[auth] не удалось перепроверить сессию, работаем по недавней проверке:', error.message);
+        return identity;
+      }
+      throw error;
+    }
     identity.session = session;
     identity.account = session?.account ?? null;
+    identity.checkedAt = Date.now();
     if (!session) identity.sessionToken = null;
     return identity;
   }

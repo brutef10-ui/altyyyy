@@ -80,6 +80,8 @@ export function loadConfig(overrides = {}) {
     finishedRoomTtlMs: 15 * 60_000,
     roomMaxAgeMs: 6 * 60 * 60_000,
     roomSweepIntervalMs: 60_000,
+    // Сессия ведущего перепроверяется перед командами хода игры не реже, чем раз в столько мс.
+    hostSessionRecheckMs: 15_000,
 
     production,
     // ---------- База данных ----------
