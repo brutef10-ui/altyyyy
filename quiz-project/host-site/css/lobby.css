@@ -325,13 +325,16 @@
   transform: none;
 }
 
-/* «Старт» — свет на сцене: табличка мягко дышит, пока есть кого звать */
-#start:not(:disabled) {
-  animation: cta-breathe 2.6s ease-in-out infinite;
-}
-
-#start:not(:disabled):hover {
-  animation: none;
+/* «Старт» — свет на сцене, пока есть кого звать. */
+#start:not(:disabled)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(90% 130% at 50% 0%, rgba(255, 250, 225, 0.8), transparent 70%);
+  opacity: 0;
+  animation: plaque-glow 2.6s ease-in-out infinite;
+  pointer-events: none;
 }
 
 /* ---------- Анимации ---------- */
@@ -379,9 +382,9 @@
   to { opacity: 0; transform: perspective(900px) translateY(50px) rotateX(-70deg) scale(0.8); }
 }
 
-@keyframes cta-breathe {
-  0%, 100% { transform: perspective(600px) scale(1); }
-  50% { transform: perspective(600px) scale(1.045); }
+@keyframes plaque-glow {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }
 
 /* ---------- Небольшие экраны ---------- */

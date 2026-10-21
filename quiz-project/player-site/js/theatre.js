@@ -18,7 +18,7 @@ export const EASE_OUT = 'cubic-bezier(.22, 1, .36, 1)';
 export const EASE_CURTAIN = 'cubic-bezier(.65, 0, .35, 1)';
 export const EASE_SPRING = 'cubic-bezier(.34, 1.56, .64, 1)';
 
-const CLOSE_MS = 780;
+const CLOSE_MS = 860;
 
 // ---------- Занавес ----------
 
@@ -28,7 +28,8 @@ function curtainNode() {
     node = document.createElement('div');
     node.className = 'curtain is-open';
     node.setAttribute('aria-hidden', 'true');
-    node.innerHTML = '<div class="curtain-drape curtain-left"></div><div class="curtain-drape curtain-right"></div><div class="curtain-valance"></div>';
+    const folds = '<i></i>'.repeat(8);
+    node.innerHTML = `<div class="curtain-drape curtain-left">${folds}</div><div class="curtain-drape curtain-right">${folds}</div><div class="curtain-valance"></div>`;
     document.body.prepend(node);
   }
   return node;

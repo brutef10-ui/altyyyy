@@ -30,11 +30,43 @@ export function h(tag, props = {}, ...children) {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+// Фигуры вариантов — театральные эмблемы: маска комедии, маска трагедии, арфа, полумаска.
+// Рисуются цветом currentColor (viewBox 0 0 24 24); части без своего fill заливаются цветом.
+const MASK_FACE = 'M3.6 4.6c0-1 .9-1.7 1.9-1.5 4.3.9 8.7.9 13 0 1-.2 1.9.5 1.9 1.5 0 7.6-3.4 16-8.4 16S3.6 12.2 3.6 4.6z';
+const LINE = { fill: 'none', stroke: 'currentColor', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' };
+
 export const ANSWER_SHAPES = [
-  { name: 'Треугольник', tag: 'path', attrs: { d: 'M12 2.8 22.2 20.6H1.8z' } },
-  { name: 'Круг', tag: 'circle', attrs: { cx: 12, cy: 12, r: 9.6 } },
-  { name: 'Звезда', tag: 'path', attrs: { d: 'M12 1.6l3.1 6.6 7.2.9-5.3 5 1.4 7.2L12 17.8l-6.4 3.5L7 14.1 1.7 9.1l7.2-.9z' } },
-  { name: 'Квадрат', tag: 'rect', attrs: { x: 3, y: 3, width: 18, height: 18, rx: 2.5 } },
+  {
+    name: 'Комедия',
+    parts: [['path', {
+      d: `${MASK_FACE}M6.3 9.9c.8-2.3 3.5-2.3 4.3 0-1.4-.8-2.9-.8-4.3 0zM13.4 9.9c.8-2.3 3.5-2.3 4.3 0-1.4-.8-2.9-.8-4.3 0zM7.4 12.9c3 .9 6.2.9 9.2 0-.4 3.2-2.3 4.9-4.6 4.9s-4.2-1.7-4.6-4.9z`,
+      'fill-rule': 'evenodd',
+      transform: 'rotate(-7 12 12)',
+    }]],
+  },
+  {
+    name: 'Трагедия',
+    parts: [['path', {
+      d: `${MASK_FACE}M6.3 8.6c1.4.9 2.9.9 4.3 0-.6 2.2-3.7 2.2-4.3 0zM13.4 8.6c1.4.9 2.9.9 4.3 0-.6 2.2-3.7 2.2-4.3 0zM7.9 17.6c.6-3 2.2-4.3 4.1-4.3s3.5 1.3 4.1 4.3c-1.3-1-2.6-1.4-4.1-1.4s-2.8.4-4.1 1.4z`,
+      'fill-rule': 'evenodd',
+      transform: 'rotate(7 12 12)',
+    }]],
+  },
+  {
+    name: 'Арфа',
+    parts: [
+      ['path', { d: 'M6.2 20.4V6.2C9 3.2 11.4 7.4 14.4 6.2c2-.8 2.8-2.6 5-2.4L8.2 20.4', ...LINE, 'stroke-width': 2.3 }],
+      ['path', { d: 'M4.6 20.6h5.6', ...LINE, 'stroke-width': 2.1 }],
+      ['path', { d: 'M8.9 5.4V17.6M11.4 6.4V14M13.9 6.4V10.4M16.4 5.4V6.9', ...LINE, 'stroke-width': 1.1 }],
+    ],
+  },
+  {
+    name: 'Маска',
+    parts: [['path', {
+      d: 'M1.3 6.8c3.3-.5 7.3.8 10.7 3 3.4-2.2 7.4-3.5 10.7-3 .5 5.3-1.8 10-6.1 10-2 0-3.5-1.2-4.6-2.6-1.1 1.4-2.6 2.6-4.6 2.6-4.3 0-6.6-4.7-6.1-10zM4.4 11.4c1.4-1.8 4.4-1.8 5.6.4-1.5 1.2-4.2 1.2-5.6-.4zM19.6 11.4c-1.4-1.8-4.4-1.8-5.6.4 1.5 1.2 4.2 1.2 5.6-.4z',
+      'fill-rule': 'evenodd',
+    }]],
+  },
 ];
 
 export function shapeIcon(index, className = 'shape') {
@@ -43,10 +75,12 @@ export function shapeIcon(index, className = 'shape') {
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('class', className);
-  const figure = document.createElementNS(SVG_NS, shape.tag);
-  for (const [name, value] of Object.entries(shape.attrs)) figure.setAttribute(name, value);
-  figure.setAttribute('fill', 'currentColor');
-  svg.append(figure);
+  for (const [tag, attrs] of shape.parts) {
+    const part = document.createElementNS(SVG_NS, tag);
+    for (const [name, value] of Object.entries(attrs)) part.setAttribute(name, value);
+    if (!('fill' in attrs)) part.setAttribute('fill', 'currentColor');
+    svg.append(part);
+  }
   return svg;
 }
 
@@ -59,7 +93,13 @@ const STAGE_ICONS = {
   quill: ['M20 4c-6 1-11 6-13 13l-1.5 3.5', 'M20 4c-1 5-4.5 9-9.5 10.5', 'M7.5 14.5l3 3'],
   sound: ['M4 9.5h3.5L12 5.5v13l-4.5-4H4z', 'M15.5 9a4.2 4.2 0 0 1 0 6', 'M18 6.5a7.6 7.6 0 0 1 0 11'],
   mute: ['M4 9.5h3.5L12 5.5v13l-4.5-4H4z', 'M16 9.5l5 5', 'M21 9.5l-5 5'],
-  hourglass: ['M6.5 3h11', 'M6.5 21h11', 'M8 3c0 5 8 5.6 8 9s-8 4-8 9', 'M16 3c0 5-8 5.6-8 9s8 4 8 9'],
+  hourglass: [
+    { d: 'M4.8 2.6h14.4a1.05 1.05 0 0 1 0 2.1H4.8a1.05 1.05 0 0 1 0-2.1zM4.8 19.3h14.4a1.05 1.05 0 0 1 0 2.1H4.8a1.05 1.05 0 0 1 0-2.1z', fill: true },
+    { d: 'M5.9 4.7v14.6M18.1 4.7v14.6', width: 1.4 },
+    { d: 'M8.1 4.7c0 4.4 3.1 5.4 3.1 7.3s-3.1 2.9-3.1 7.3M15.9 4.7c0 4.4-3.1 5.4-3.1 7.3s3.1 2.9 3.1 7.3', width: 1.6 },
+    { d: 'M8.8 19.3c.4-2.5 1.8-3.8 3.2-4.1 1.4.3 2.8 1.6 3.2 4.1z', fill: true },
+    { d: 'M12 12.7v2.3', width: 1.1 },
+  ],
 };
 
 export function stageIcon(name, className = 'stage-icon') {
@@ -67,14 +107,18 @@ export function stageIcon(name, className = 'stage-icon') {
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('class', className);
-  for (const d of STAGE_ICONS[name] || []) {
+  for (const part of STAGE_ICONS[name] || []) {
+    // Часть — строка (линия) или { d, fill, width } (заливка или линия своей толщины).
+    const { d, fill = name === 'play', width = 2.2 } = typeof part === 'string' ? { d: part } : part;
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', d);
-    path.setAttribute('fill', name === 'play' ? 'currentColor' : 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-width', '2.2');
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('fill', fill ? 'currentColor' : 'none');
+    if (!fill || name === 'play') {
+      path.setAttribute('stroke', 'currentColor');
+      path.setAttribute('stroke-width', String(width));
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+    }
     svg.append(path);
   }
   return svg;

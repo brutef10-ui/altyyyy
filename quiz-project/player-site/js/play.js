@@ -541,15 +541,29 @@ async function submitAnswer(value) {
   }
 }
 
+// Веер «ответ принят»: пластины раскрываются из сложенного положения, на веере — эмблема ответа
+// (эмблема выбранного варианта или карандаш, если ответ написан словами). Сам веер — светло-бежевый.
+const FAN_SLATS = 11;
+
+function answerFan(icon, index = null) {
+  return h('div', { class: 'fan', 'aria-hidden': 'true' },
+    h('div', { class: 'fan-slats' },
+      Array.from({ length: FAN_SLATS }, (_, i) => h('span', { class: 'fan-slat', style: `--i: ${i - (FAN_SLATS - 1) / 2}` })),
+    ),
+    h('span', { class: `fan-emblem${index === null ? ' is-text' : ` answer-${index}`}` }, icon),
+    h('span', { class: 'fan-pivot' }),
+  );
+}
+
 function showAnswered(value) {
   const isText = typeof value === 'string';
   const quote = $('answered-quote');
   if (isText) {
-    $('answered-shape').replaceChildren(h('div', { class: 'answered-badge answered-badge-text' }, pencilIcon('shape')));
+    $('answered-shape').replaceChildren(answerFan(pencilIcon('fan-icon')));
     quote.textContent = `«${value}»`;
     quote.hidden = false;
   } else {
-    $('answered-shape').replaceChildren(h('div', { class: `answered-badge answer-${value}` }, shapeIcon(value, 'shape')));
+    $('answered-shape').replaceChildren(answerFan(shapeIcon(value, 'fan-icon'), value));
     const label = question?.answers?.[value];
     quote.textContent = label ? `«${label}»` : '';
     quote.hidden = !label;
@@ -648,11 +662,51 @@ function showCeremony() {
 
 const MEDAL_TONES = ['gold', 'silver', 'bronze'];
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** Лавровый венок на медали: две ветви листьев по дуге (viewBox 0 0 100 100). */
+function laurel() {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('class', 'medal-laurel');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const side of [-1, 1]) {
+    const stem = document.createElementNS(SVG_NS, 'path');
+    const x = (value) => 50 + side * value;
+    stem.setAttribute('d', `M${x(6)} 84 Q${x(34)} 76 ${x(36)} 50 Q${x(36)} 34 ${x(28)} 22`);
+    stem.setAttribute('fill', 'none');
+    stem.setAttribute('stroke', 'currentColor');
+    stem.setAttribute('stroke-width', '2');
+    svg.append(stem);
+    for (let i = 0; i < 6; i += 1) {
+      const angle = 100 + i * 16; // от низа к верху по дуге
+      const radians = (angle * Math.PI) / 180;
+      const cx = 50 + side * -Math.cos(radians) * 33;
+      const cy = 52 + Math.sin(radians) * 31;
+      const leaf = document.createElementNS(SVG_NS, 'ellipse');
+      leaf.setAttribute('cx', cx.toFixed(1));
+      leaf.setAttribute('cy', cy.toFixed(1));
+      leaf.setAttribute('rx', '7');
+      leaf.setAttribute('ry', '3');
+      leaf.setAttribute('fill', 'currentColor');
+      leaf.setAttribute('transform', `rotate(${(side * (angle - 50)).toFixed(0)} ${cx.toFixed(1)} ${cy.toFixed(1)})`);
+      svg.append(leaf);
+    }
+  }
+  return svg;
+}
+
 function medal(rank) {
   const tone = MEDAL_TONES[rank - 1] || 'plain';
+  const plain = tone === 'plain';
   return h('div', { class: `medal medal-${tone}` },
-    tone === 'plain' ? null : h('span', { class: 'medal-ribbon' }),
-    h('span', { class: 'medal-disc' }, h('span', { class: 'medal-number', text: rank })),
+    plain ? null : h('span', { class: 'medal-ribbon' }, h('span', { class: 'ribbon-strap' }), h('span', { class: 'ribbon-strap' })),
+    plain ? null : h('span', { class: 'medal-loop' }),
+    h('span', { class: 'medal-disc' },
+      plain ? null : laurel(),
+      h('span', { class: 'medal-number', text: rank }),
+      h('span', { class: 'medal-glint' }),
+    ),
   );
 }
 
@@ -678,7 +732,7 @@ function showPodium(final) {
 function launchConfetti() {
   const layer = $('confetti');
   // Лепестки роз и позолота.
-  const colors = ['var(--velvet-light)', 'var(--gold)', 'var(--ruby)', 'var(--gold-light)', 'var(--velvet)', '#fff3d6'];
+  const colors = ['var(--velvet-light)', 'var(--gold)', 'var(--rose)', 'var(--gold-light)', 'var(--velvet)', '#fff3d6'];
   layer.replaceChildren(...Array.from({ length: 36 }, (_, i) => h('span', {
     style: [
       `--x: ${Math.round(Math.random() * 100)}%`,

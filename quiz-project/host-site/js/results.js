@@ -10,7 +10,7 @@
 import { api } from './api.js';
 import { editorDraft, hostSession } from './session.js';
 import { closeRoom, launchGame, openHostRoom, request } from './socket.js';
-import { avatar, confirmDialog, formatScore, h, plural, toast } from './ui.js';
+import { avatar, confirmDialog, formatScore, h, plural, shapeIcon, stageIcon, toast } from './ui.js';
 import { curtain } from './theatre.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -31,7 +31,7 @@ const saveButton = document.getElementById('save');
 const soundButton = document.getElementById('sound');
 
 const PODIUM_LAYOUT = [2, 1, 3]; // места на пьедестале слева направо
-const MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
+const MEDAL_TONES = { 1: 'gold', 2: 'silver', 3: 'bronze' };
 const PLACE_NAMES = { 1: 'Первое место', 2: 'Второе место', 3: 'Третье место' };
 const MAX_FACES = 12; // при большой ничьей остальные игроки — в значке «+N»
 
@@ -312,7 +312,7 @@ const sound = (() => {
 })();
 
 function renderSoundButton() {
-  soundButton.textContent = sound.muted ? '🔇' : '🔊';
+  soundButton.replaceChildren(stageIcon(sound.muted ? 'mute' : 'sound'));
   soundButton.setAttribute('aria-pressed', String(!sound.muted));
   soundButton.title = sound.muted ? 'Включить звук' : 'Выключить звук';
   soundButton.setAttribute('aria-label', soundButton.title);
@@ -334,7 +334,8 @@ document.addEventListener('keydown', () => sound.unlock());
 const confetti = (() => {
   const canvas = document.getElementById('confetti');
   const context = canvas.getContext('2d');
-  const palette = ['#ff4d6d', '#2f8cff', '#f2a516', '#14b885', '#ffffff', '#ff6a3d', '#ffd166'];
+  // Лепестки роз, бархат и позолота.
+  const palette = ['#8c1529', '#b3243d', '#c42a43', '#d8ac4c', '#f3d98b', '#f7ecd4', '#fff3d6'];
   let pieces = [];
   let frame = 0;
   let ratio = 1;
@@ -431,7 +432,7 @@ function celebrate() {
 function sparkle(node, rank) {
   const rect = node.querySelector('.podium-people')?.getBoundingClientRect();
   if (!rect) return;
-  const colors = rank === 2 ? ['#ffffff', '#e5e7f0', '#a9adc4', '#2f8cff'] : ['#f0a77a', '#c56b3c', '#ffd166', '#ffffff'];
+  const colors = rank === 2 ? ['#ffffff', '#e9e8e3', '#b8b7b2', '#f3d98b'] : ['#ffd2a6', '#c47a3e', '#d8ac4c', '#fff3d6'];
   confetti.burst({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, angle: -90, spread: 300, speed: 11, count: 46, colors });
 }
 
@@ -461,7 +462,7 @@ function renderPodium() {
       h('div', { class: 'podium-column' },
         h('div', { class: 'podium-frame', 'aria-hidden': 'true' }, h('span', { text: rank })),
         h('div', { class: 'podium-block' },
-          h('span', { class: 'podium-medal', 'aria-hidden': 'true', text: MEDALS[rank] || '' }),
+          h('span', { class: `podium-medal medal-${MEDAL_TONES[rank] || 'gold'}`, 'aria-hidden': 'true' }, h('span', { text: rank })),
           h('span', { class: 'podium-rank', text: rank }),
         ),
       ),
@@ -538,14 +539,14 @@ function setCaption(text, mood) {
 }
 
 function suspenseCaption(group) {
-  if (group.rank === 1) return group.rows.length > 1 ? '🥁 И победители…' : '🥁 И победитель…';
-  return `🥁 ${PLACE_NAMES[group.rank] || `${group.rank} место`}…`;
+  if (group.rank === 1) return group.rows.length > 1 ? 'И победители…' : 'И победитель…';
+  return `${PLACE_NAMES[group.rank] || `${group.rank} место`}…`;
 }
 
 function revealedCaption(group) {
-  if (group.rank === 1) return group.rows.length > 1 ? '🏆 Победители!' : '🏆 Победитель!';
+  if (group.rank === 1) return group.rows.length > 1 ? 'Победители!' : 'Победитель!';
   const tie = group.rows.length > 1 ? ` · ${group.rows.length} ${playersWord(group.rows.length)}` : '';
-  return `${MEDALS[group.rank] || ''} ${PLACE_NAMES[group.rank] || `${group.rank} место`}${tie}`.trim();
+  return `${PLACE_NAMES[group.rank] || `${group.rank} место`}${tie}`;
 }
 
 // ---------- Синхронизация с сервером ----------
@@ -727,7 +728,7 @@ function init(final) {
 
   if (ceremony.groups.length === 0) {
     podium.replaceChildren(h('div', { class: 'podium-empty' },
-      h('span', { class: 'podium-empty-icon', 'aria-hidden': 'true', text: '🎈' }),
+      h('span', { class: 'podium-empty-icon', 'aria-hidden': 'true' }, shapeIcon(0, 'shape'), shapeIcon(1, 'shape')),
       h('p', { text: 'В игре не осталось игроков — награждать некого.' }),
     ));
     finish();
@@ -778,7 +779,7 @@ function updateSaveButton() {
   saveButton.hidden = false;
   if (session?.draft) {
     saveButton.disabled = false;
-    saveButton.textContent = session.quizId ? '💾 Сохранить изменения' : '💾 Сохранить игру';
+    saveButton.textContent = session.quizId ? 'Сохранить изменения' : 'Сохранить игру';
   } else {
     saveButton.disabled = true;
     saveButton.textContent = '✓ Игра сохранена';

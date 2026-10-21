@@ -28,12 +28,16 @@ body::before {
   left: 0;
   border-right: 2px solid var(--gold-deep);
   box-shadow: 4px 0 12px rgba(0, 0, 0, 0.45);
+  transform-origin: 0 0;
+  animation: drape-breathe 9s ease-in-out infinite;
 }
 
 body::after {
   right: 0;
   border-left: 2px solid var(--gold-deep);
   box-shadow: -4px 0 12px rgba(0, 0, 0, 0.45);
+  transform-origin: 100% 0;
+  animation: drape-breathe 9s ease-in-out -4.5s infinite;
 }
 
 .btn {
@@ -1451,48 +1455,113 @@ body[data-mood='final'] .views::before {
   font-weight: 700;
 }
 
-/* ---------- Ответ принят: сургучная печать в золотой розетке ---------- */
+/* ---------- Ответ принят: раскрывающийся веер ---------- */
 
-.answered-badge {
-  position: relative;
+#answered-shape {
   display: grid;
   place-items: center;
-  width: 128px;
-  height: 128px;
-  margin: 26px 0 10px;
-  border-radius: 50%;
-  color: var(--gold-light);
-  background: radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--tone) 62%, white), var(--tone) 46%, color-mix(in srgb, var(--tone) 58%, black));
-  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--gold-deep), 0 16px 34px rgba(0, 0, 0, 0.55);
-  animation: seal-stamp 760ms var(--ease-out) 160ms backwards;
 }
 
-/* Розетка вокруг печати */
-.answered-badge::before {
+/* Веер: 11 бумажных пластин на деревянных спицах, раскрываются от общей заклёпки */
+.fan {
+  --r: 140px;
+  --w: 41px;
+  position: relative;
+  width: calc(var(--r) * 1.95);
+  height: calc(var(--r) + 14px);
+  margin: 18px 0 6px;
+  animation: fan-rise 620ms var(--ease-out) 120ms backwards;
+}
+
+.fan-slats {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.45));
+}
+
+.fan-slat {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  width: var(--w);
+  height: var(--r);
+  margin-left: calc(var(--w) / -2);
+  transform-origin: 50% calc(100% - 4px);
+  transform: rotate(calc(var(--i) * 15deg));
+  animation: fan-open 1000ms var(--ease-spring) 380ms backwards;
+}
+
+/* Спица */
+.fan-slat::before {
   content: '';
   position: absolute;
-  inset: -20px;
-  z-index: -1;
+  left: 50%;
+  bottom: 0;
+  width: 4px;
+  height: 100%;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4a2a16, var(--wood-light), #4a2a16);
+}
+
+/* Бумажная пластина: светло-бежевая, складки чередуются светом и тенью, по краю — золотая кайма */
+.fan-slat::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 72%;
+  background:
+    linear-gradient(180deg, var(--gold) 0 4px, var(--gold-deep) 4px 5px, transparent 5px 12px, rgba(216, 172, 76, 0.65) 12px 14px, transparent 14px),
+    linear-gradient(90deg, #fbf2de, #efdcb6);
+  clip-path: polygon(0 0, 100% 0, 63% 100%, 37% 100%);
+}
+
+.fan-slat:nth-child(even)::after {
+  background:
+    linear-gradient(180deg, var(--gold) 0 4px, var(--gold-deep) 4px 5px, transparent 5px 12px, rgba(216, 172, 76, 0.65) 12px 14px, transparent 14px),
+    linear-gradient(90deg, #e3cda1, #f5e7c9);
+}
+
+/* Эмблема ответа на веере */
+.fan-emblem {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--r) * 0.2);
+  display: grid;
+  place-items: center;
+  width: calc(var(--r) * 0.46);
+  height: calc(var(--r) * 0.46);
+  margin-left: calc(var(--r) * -0.23);
   border-radius: 50%;
-  background: repeating-conic-gradient(var(--gold) 0 6deg, var(--gold-deep) 6deg 12deg);
-  -webkit-mask: radial-gradient(circle, transparent 57%, #000 58%);
-  mask: radial-gradient(circle, transparent 57%, #000 58%);
-  animation: rosette-in 900ms var(--ease-out) 420ms backwards;
+  color: var(--tone, var(--velvet));
+  background: radial-gradient(circle at 35% 30%, #fffaf0, var(--ivory) 50%, var(--paper-2));
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 0 0 5px var(--gold), 0 0 0 6px var(--gold-deep), 0 6px 14px rgba(43, 18, 24, 0.35);
+  animation: emblem-in 700ms var(--ease-spring) 1050ms backwards;
 }
 
-.answered-badge .shape {
-  width: 62px;
-  height: 62px;
-  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
+.fan-emblem.is-text {
+  color: var(--ink);
 }
 
-.answered-badge-text {
-  --tone: var(--velvet);
+.fan-icon {
+  width: 62%;
+  height: 62%;
+  overflow: visible;
 }
 
-.answered-badge-text .shape {
-  width: 56px;
-  height: 56px;
+/* Заклёпка, на которой держатся спицы */
+.fan-pivot {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff4d2, var(--gold) 55%, var(--gold-deep));
+  box-shadow: 0 0 0 1.5px #5a3d0c, 0 3px 6px rgba(0, 0, 0, 0.45);
 }
 
 /* Ваш ответ — строка на бумажке */
@@ -1887,12 +1956,56 @@ body[data-mood='timeout'] .result-points {
   animation: fade-in 900ms ease 400ms backwards, spin 22s linear infinite;
 }
 
-/* Медаль — золочёный медальон на бархатной ленте */
+/* Медаль — литой металл: фрезерованный край, утопленное поле с лавровым венком, выпуклая цифра,
+   бегущий блик; висит на бархатной ленте с кольцом и слегка поворачивается в 3D */
 .medal {
+  --size: 144px;
+  --metal-1: #7a5517;
+  --metal-2: #f7e3a1;
+  --metal-3: #c99a3d;
+  --metal-4: #6e4c14;
+  --metal-5: #e4c06a;
+  --metal-6: #fff2c2;
+  --field-1: #fff7d6;
+  --field-2: #f0d283;
+  --field-3: #d4a84a;
+  --field-4: #a87a2a;
+  --emboss: #7a5517;
+  --glow: rgba(243, 217, 139, 0.5);
   position: relative;
   display: grid;
   justify-items: center;
-  animation: medal-in 1100ms var(--ease-spring) 260ms backwards;
+  animation: medal-in 1100ms var(--ease-spring) 260ms backwards, medal-sway 6s ease-in-out 1.6s infinite;
+}
+
+.medal-silver {
+  --metal-1: #5f6066;
+  --metal-2: #ffffff;
+  --metal-3: #b9bac0;
+  --metal-4: #55565c;
+  --metal-5: #d9dade;
+  --metal-6: #ffffff;
+  --field-1: #ffffff;
+  --field-2: #e6e7ea;
+  --field-3: #c2c3c8;
+  --field-4: #8c8d93;
+  --emboss: #4d4e54;
+  --glow: rgba(235, 236, 240, 0.4);
+}
+
+.medal-bronze {
+  --metal-1: #6a3814;
+  --metal-2: #ffd2a6;
+  --metal-3: #c47a3e;
+  --metal-4: #5c2f10;
+  --metal-5: #e3a066;
+  --metal-6: #ffe4c8;
+  --field-1: #ffe6cc;
+  --field-2: #eeaa72;
+  --field-3: #c47a3e;
+  --field-4: #8a4f22;
+  --emboss: #5c2f10;
+  --glow: rgba(234, 167, 113, 0.4);
 }
 
 .medal-disc {
@@ -1900,113 +2013,146 @@ body[data-mood='timeout'] .result-points {
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 138px;
-  height: 138px;
+  width: var(--size);
+  height: var(--size);
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 28%, #fff7dc, var(--gold-light) 30%, var(--gold) 62%, #a87a2a);
+  isolation: isolate;
+  background: conic-gradient(from 200deg, var(--metal-1), var(--metal-2) 12%, var(--metal-3) 25%, var(--metal-4) 38%, var(--metal-5) 52%, var(--metal-6) 62%, var(--metal-3) 76%, var(--metal-1));
   box-shadow:
-    inset 0 0 0 6px rgba(255, 244, 210, 0.45),
-    inset 0 0 0 8px rgba(143, 106, 34, 0.6),
-    inset 0 -12px 18px rgba(0, 0, 0, 0.18),
-    0 0 0 3px var(--gold-deep),
-    0 0 54px rgba(243, 217, 139, 0.55),
-    0 18px 40px rgba(0, 0, 0, 0.5);
+    0 0 0 1.5px var(--metal-4),
+    0 4px 0 var(--metal-4),
+    0 6px 0 var(--metal-1),
+    0 24px 40px rgba(0, 0, 0, 0.55),
+    0 0 64px var(--glow);
 }
 
-/* Гравированный поясок */
+/* Фрезеровка по краю */
 .medal-disc::before {
   content: '';
   position: absolute;
-  inset: 16px;
-  border: 2px dotted rgba(90, 61, 12, 0.45);
+  inset: 1px;
+  z-index: -1;
   border-radius: 50%;
+  background: repeating-conic-gradient(rgba(40, 26, 6, 0.32) 0 1.4deg, transparent 1.4deg 4deg);
+  -webkit-mask: radial-gradient(circle, transparent 86%, #000 87%);
+  mask: radial-gradient(circle, transparent 86%, #000 87%);
+}
+
+/* Утопленное поле */
+.medal-disc::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--size) * 0.095);
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, var(--field-1) 0, var(--field-2) 24%, var(--field-3) 58%, var(--field-4) 92%);
+  box-shadow:
+    inset 0 4px 8px rgba(40, 26, 6, 0.55),
+    inset 0 -3px 5px rgba(255, 248, 215, 0.55),
+    0 -1px 0 rgba(255, 248, 215, 0.6),
+    0 1.5px 0 rgba(40, 26, 6, 0.45);
+}
+
+.medal-laurel {
+  position: absolute;
+  inset: calc(var(--size) * 0.13);
+  width: calc(100% - var(--size) * 0.26);
+  height: calc(100% - var(--size) * 0.26);
+  color: var(--emboss);
+  opacity: 0.55;
+  filter: drop-shadow(0 1px 0 rgba(255, 248, 215, 0.7));
 }
 
 .medal-number {
+  position: relative;
+  color: var(--emboss);
   font-family: var(--font-display);
-  font-size: 68px;
+  font-size: calc(var(--size) * 0.46);
   font-weight: 900;
   line-height: 1;
-  color: #5a3d0c;
-  text-shadow: 0 2px 0 rgba(255, 244, 210, 0.6);
+  text-shadow: 0 1.5px 0 rgba(255, 246, 210, 0.9), 0 -1px 0 rgba(40, 26, 6, 0.55), 0 3px 4px rgba(40, 26, 6, 0.35);
 }
 
-.medal-silver .medal-disc {
-  background: radial-gradient(circle at 34% 28%, #ffffff, #e9e8e3 32%, #b8b7b2 66%, #807f7a);
-  box-shadow:
-    inset 0 0 0 6px rgba(255, 255, 255, 0.45),
-    inset 0 0 0 8px rgba(90, 89, 85, 0.5),
-    inset 0 -12px 18px rgba(0, 0, 0, 0.16),
-    0 0 0 3px #6e6d69,
-    0 0 46px rgba(240, 240, 235, 0.35),
-    0 18px 40px rgba(0, 0, 0, 0.5);
+/* Блик бежит по металлу */
+.medal-glint {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.medal-silver .medal-number {
-  color: #34322e;
+.medal-glint::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.65) 48%, rgba(255, 255, 255, 0.1) 54%, transparent 60%);
+  transform: translateX(-80%);
+  animation: glint 4.2s ease-in-out 1.8s infinite;
 }
 
-.medal-bronze .medal-disc {
-  background: radial-gradient(circle at 34% 28%, #ffe2c6, #eaa771 32%, #c47a3e 64%, #7f4519);
-  box-shadow:
-    inset 0 0 0 6px rgba(255, 226, 198, 0.4),
-    inset 0 0 0 8px rgba(110, 58, 20, 0.5),
-    inset 0 -12px 18px rgba(0, 0, 0, 0.18),
-    0 0 0 3px #6e3a14,
-    0 0 46px rgba(234, 167, 113, 0.35),
-    0 18px 40px rgba(0, 0, 0, 0.5);
+/* Лента: две бархатные полосы с золотой серединой и складкой */
+.medal-ribbon {
+  position: absolute;
+  top: calc(var(--size) * -0.36);
+  left: 50%;
+  width: calc(var(--size) * 0.66);
+  height: calc(var(--size) * 0.56);
+  transform: translateX(-50%);
 }
 
-.medal-bronze .medal-number {
-  color: #3b1d08;
+.ribbon-strap {
+  position: absolute;
+  top: 0;
+  width: 46%;
+  height: 100%;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 30%),
+    linear-gradient(90deg, var(--velvet-deep) 0 10%, var(--velvet) 10% 36%, var(--gold) 36% 44%, var(--gold-light) 44% 56%, var(--gold) 56% 64%, var(--velvet-light) 64% 90%, var(--velvet-deep) 90%);
+  box-shadow: inset 0 -6px 8px rgba(0, 0, 0, 0.3);
 }
 
+.ribbon-strap:first-child {
+  left: 4%;
+  transform: skewX(22deg);
+}
+
+.ribbon-strap:last-child {
+  right: 4%;
+  transform: skewX(-22deg);
+}
+
+/* Кольцо, на котором висит медаль */
+.medal-loop {
+  position: absolute;
+  top: calc(var(--size) * -0.12);
+  left: 50%;
+  z-index: 2;
+  width: calc(var(--size) * 0.2);
+  height: calc(var(--size) * 0.15);
+  border: 4px solid var(--metal-3);
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 var(--metal-6), 0 2px 3px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+}
+
+/* Не призовое место — бархатный медальон с золотой цифрой */
 .medal-plain .medal-disc {
-  width: 126px;
-  height: 126px;
+  width: calc(var(--size) * 0.9);
+  height: calc(var(--size) * 0.9);
   background: radial-gradient(circle at 35% 30%, var(--velvet-light), var(--velvet) 55%, var(--velvet-deep));
-  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--gold-deep), 0 0 0 12px rgba(216, 172, 76, 0.14), 0 18px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--gold-deep), 0 4px 0 5px #3a0712, 0 0 0 14px rgba(216, 172, 76, 0.14), 0 20px 40px rgba(0, 0, 0, 0.5);
 }
 
-.medal-plain .medal-disc::before {
-  border-color: rgba(243, 217, 139, 0.4);
+.medal-plain .medal-disc::before,
+.medal-plain .medal-disc::after {
+  display: none;
 }
 
 .medal-plain .medal-number {
   color: var(--gold-light);
-  font-size: 56px;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
-}
-
-/* Лента — две бархатные полосы с золотой кромкой */
-.medal-ribbon {
-  position: absolute;
-  top: -46px;
-  left: 50%;
-  width: 88px;
-  height: 74px;
-  transform: translateX(-50%);
-}
-
-.medal-ribbon::before,
-.medal-ribbon::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  width: 34px;
-  height: 74px;
-  border-inline: 3px solid var(--gold);
-  background: linear-gradient(180deg, var(--velvet-light), var(--velvet-deep));
-}
-
-.medal-ribbon::before {
-  left: 6px;
-  transform: skewX(20deg);
-}
-
-.medal-ribbon::after {
-  right: 6px;
-  transform: skewX(-20deg);
+  font-size: calc(var(--size) * 0.4);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
 }
 
 .final-rank {
@@ -2244,15 +2390,19 @@ body > .toast {
   100% { transform: scale(1.04); }
 }
 
-@keyframes seal-stamp {
-  0% { opacity: 0; transform: scale(2.3) rotate(-28deg); }
-  55% { opacity: 1; transform: scale(0.9) rotate(5deg); }
-  78% { transform: scale(1.05) rotate(-2deg); }
-  100% { transform: none; }
+/* Веер поднимается сложенным и раскрывается — пластины расходятся с лёгким пружинным отскоком */
+@keyframes fan-rise {
+  0% { opacity: 0; transform: perspective(700px) translateY(40px) rotateX(30deg) scale(0.7); }
+  100% { opacity: 1; transform: none; }
 }
 
-@keyframes rosette-in {
-  from { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+@keyframes fan-open {
+  from { transform: rotate(0deg); }
+}
+
+@keyframes emblem-in {
+  0% { opacity: 0; transform: perspective(500px) rotateY(-90deg) scale(0.5); }
+  100% { opacity: 1; transform: none; }
 }
 
 @keyframes medal-drop {
@@ -2284,6 +2434,16 @@ body > .toast {
 @keyframes drum {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-7px); }
+}
+
+@keyframes medal-sway {
+  0%, 100% { transform: perspective(700px) rotateY(-12deg); }
+  50% { transform: perspective(700px) rotateY(12deg); }
+}
+
+@keyframes glint {
+  0%, 55% { transform: translateX(-80%); }
+  85%, 100% { transform: translateX(80%); }
 }
 
 @keyframes medal-in {
@@ -2444,23 +2604,15 @@ body > .toast {
   }
 
   .result-icon,
-  .message-icon,
-  .answered-badge {
+  .message-icon {
     width: 78px;
     height: 78px;
   }
 
-  .answered-badge {
-    margin: 14px 0 6px;
-  }
-
-  .answered-badge::before {
-    inset: -13px;
-  }
-
-  .answered-badge .shape {
-    width: 40px;
-    height: 40px;
+  .fan {
+    --r: 92px;
+    --w: 27px;
+    margin: 10px 0 4px;
   }
 
   .result-points {
@@ -2497,31 +2649,8 @@ body > .toast {
     margin-top: 18px;
   }
 
-  .medal-disc,
-  .medal-plain .medal-disc {
-    width: 94px;
-    height: 94px;
-  }
-
-  .medal-disc::before {
-    inset: 11px;
-  }
-
-  .medal-number,
-  .medal-plain .medal-number {
-    font-size: 44px;
-  }
-
-  .medal-ribbon {
-    top: -32px;
-    width: 62px;
-    height: 52px;
-  }
-
-  .medal-ribbon::before,
-  .medal-ribbon::after {
-    width: 24px;
-    height: 52px;
+  .medal {
+    --size: 96px;
   }
 
   .final-rank {
