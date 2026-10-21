@@ -3,7 +3,7 @@
 // Ведущий → сервер: host:create, host:resume, host:start, host:next, host:reveal, host:kick, host:close
 // Игрок → сервер:   player:join, player:rejoin, player:answer
 // Сервер → клиенты: lobby:update, game:started, question, question:progress, results,
-//                   game:ceremony, game:end, room:closed, player:kicked, error
+//                   game:ceremony, game:end, room:closed, player:kicked, access:banned, error
 // Подробности и форматы данных — в PROTOCOL.md.
 //
 // Каждый запрос клиента получает ответ через acknowledgement: { ok: true, ... } или
@@ -15,6 +15,8 @@ import { PlayerRegistry } from './players.js';
 import { RateLimiter } from './rateLimit.js';
 import { STATES } from './game.js';
 import { isPlainObject, quizImageIds, validateNickname, validatePhoto, validateQuiz, validateRoomCode } from './validate.js';
+import { EVENT_TYPES } from './logs/events.js';
+import { publicBan } from './security/bans.js';
 
 const playersChannel = (code) => `players:${code}`;
 
@@ -22,10 +24,11 @@ const CLOSE_MESSAGES = {
   'host-left': 'Ведущий отключился. Игра завершена.',
   'host-closed': 'Ведущий закрыл комнату.',
   expired: 'Время комнаты истекло.',
+  'host-banned': 'Игра остановлена администратором.',
   shutdown: 'Сервер перезапускается. Игра завершена.',
 };
 
-export function registerSocketHandlers(io, { rooms, quizService, images, config, identity = null }) {
+export function registerSocketHandlers(io, { rooms, quizService, images, config, identity = null, events = null }) {
   // Как часто перепроверять сессию ведущего перед командами хода игры (start/next/reveal/kick/close).
   const HOST_RECHECK_MS = config.hostSessionRecheckMs ?? 15_000;
   const eventLimiter = new RateLimiter({ windowMs: 10_000, max: 60 }); // любые события одного сокета
@@ -126,7 +129,13 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
     if (identity && socket.identity) await identity.refresh(socket.identity, { maxAgeMs });
     const owner = ownerFromSocket(socket);
     if (!owner) throw new AppError('Войдите в аккаунт, чтобы продолжить.', { status: 401, code: 'UNAUTHORIZED' });
+    requireNotBanned(socket);
     return owner;
+  }
+
+  // Блокировки проверяются по списку в памяти — без запроса к БД на каждое игровое событие.
+  function requireNotBanned(socket) {
+    identity?.checkBan(socket.identity);
   }
 
   async function checkImagesExist(quiz) {
@@ -169,6 +178,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
           error: known ? error.message : 'Внутренняя ошибка сервера',
           code: known ? error.code : 'INTERNAL',
         };
+        if (known && error.code === 'BANNED') response.ban = error.details;
         if (ack) ack(response);
         else socket.emit('error', { event, message: response.error, code: response.code });
       }
@@ -224,6 +234,10 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
 
       const room = rooms.create({ quiz, ownerId: owner.id, hostSocketId: socket.id, createNotifier });
       socket.data = { role: 'host', roomCode: room.code };
+      events?.record(EVENT_TYPES.roomCreate, socket.identity, {
+        roomCode: room.code,
+        details: { title: quiz.title, quizId: payload.quizId ?? null, questions: quiz.questions.length },
+      });
       return { code: room.code, hostKey: room.hostKey, snapshot: hostSnapshot(room) };
     });
 
@@ -280,6 +294,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
 
     on(socket, 'player:join', async ({ code, nickname, photo }) => {
       if (socket.data.role) throw conflict('Вы уже в игре');
+      requireNotBanned(socket);
 
       const room = findRoomForJoin(socket, code);
       if (!room.isJoinable) throw conflict('Игра уже началась — войти нельзя', 'GAME_STARTED');
@@ -297,6 +312,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
       socket.data = { role: 'player', roomCode: room.code, playerId: player.id };
       socket.join(playersChannel(room.code));
       lobbyUpdate(room, { action: 'join', player: PlayerRegistry.toPublic(player, { withAvatar: true }) });
+      events?.record(EVENT_TYPES.roomJoin, socket.identity, { nickname: player.nickname, roomCode: room.code });
 
       return {
         playerId: player.id,
@@ -310,6 +326,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
     // после сбоя сети все игроки зала переподключаются одновременно.
     on(socket, 'player:rejoin', async ({ code, token }) => {
       if (socket.data.role) throw conflict('Вы уже в игре');
+      requireNotBanned(socket);
 
       const room = findRoom(code);
       const player = room.players.findByToken(token);
@@ -331,6 +348,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
     });
 
     on(socket, 'player:answer', async ({ questionIndex, answer }) => {
+      requireNotBanned(socket);
       const { room, player } = requirePlayer();
       return room.game.submitAnswer(player.id, { questionIndex, answer });
     });
@@ -364,8 +382,31 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
     });
   });
 
+  /**
+   * Применить блокировки к уже подключённым: игрок удаляется из комнаты обычной логикой (как при удалении
+   * ведущим), комната заблокированного ведущего закрывается; клиент получает access:banned и отключается.
+   */
+  function enforceBans() {
+    if (!identity) return 0;
+    let affected = 0;
+    for (const socket of io.sockets.sockets.values()) {
+      const ban = identity.banFor(socket.identity);
+      if (!ban) continue;
+      affected += 1;
+      socket.identity.ban = ban;
+      const { role, roomCode, playerId } = socket.data;
+      const room = roomCode ? rooms.get(roomCode) : null;
+      if (room && role === 'player') removePlayer(room, playerId, 'banned');
+      if (room && role === 'host' && room.hostSocketId === socket.id) closeRoom(room, 'host-banned');
+      socket.emit('access:banned', { ...publicBan(ban), contact: config.adminContact || null });
+      socket.disconnect(true);
+    }
+    return affected;
+  }
+
   return {
     closeRoom,
+    enforceBans,
     closeAll(reason = 'shutdown') {
       for (const room of rooms.all()) closeRoom(room, reason);
     },

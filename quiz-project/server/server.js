@@ -20,6 +20,10 @@ import { createIdentity } from './src/identity/index.js';
 import { authRouter } from './src/routes/auth.js';
 import { adminRouter } from './src/admin/routes.js';
 import { AuditLog } from './src/logs/audit.js';
+import { EVENT_TYPES, EventLog } from './src/logs/events.js';
+import { Retention } from './src/logs/retention.js';
+import { publicBan } from './src/security/bans.js';
+import { ipFromSocket } from './src/identity/clientIp.js';
 import { PgQuizStore } from './src/stores/pgQuizStore.js';
 import { PgImageStore } from './src/stores/pgImageStore.js';
 import { LegacyService, importLegacyData } from './src/stores/legacy.js';
@@ -40,7 +44,8 @@ function mountSites(app, config) {
 
   // Без входа страницы ведущего не отдаём — сразу на страницу входа (данные защищены и на уровне API).
   app.use('/host', (req, res, next) => {
-    if ((req.method === 'GET' || req.method === 'HEAD') && HOST_PAGES.has(req.path) && !req.identity?.account) {
+    // Заблокированному — тоже на страницу входа: она покажет причину и срок блокировки.
+    if ((req.method === 'GET' || req.method === 'HEAD') && HOST_PAGES.has(req.path) && (!req.identity?.account || req.identity.ban)) {
       res.set('Cache-Control', 'no-store');
       res.redirect(302, `/host/login.html?next=${encodeURIComponent(req.originalUrl)}`);
       return;
@@ -82,7 +87,7 @@ function withTimeout(promise, ms) {
   })]).finally(() => clearTimeout(timer));
 }
 
-function createApp({ config, db, identity, audit, legacy, quizService, images, rooms, roomLimiter }) {
+function createApp({ config, db, identity, audit, events, legacy, quizService, images, rooms, roomLimiter }) {
   const app = express();
   app.disable('x-powered-by');
   // Express узнаёт HTTPS (для Secure-cookie) из X-Forwarded-Proto только от доверенных прокси.
@@ -128,7 +133,7 @@ function createApp({ config, db, identity, audit, legacy, quizService, images, r
 
   // ---------- Картинки к вопросам ----------
   // Загружает только ведущий; смотрят все (картинка показывается на проекторе и на телефонах).
-  app.post('/api/images', hostCors, requireOwner, identity.csrf, express.raw({ type: IMAGE_TYPES, limit: QUIZ_LIMITS.imageMaxBytes }), async (req, res) => {
+  app.post('/api/images', hostCors, requireOwner, identity.rejectBanned, identity.csrf, express.raw({ type: IMAGE_TYPES, limit: QUIZ_LIMITS.imageMaxBytes }), async (req, res) => {
     const type = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase();
     if (!Buffer.isBuffer(req.body)) throw new AppError('Картинка должна быть в формате JPEG, PNG или WebP', { status: 415, code: 'BAD_IMAGE' });
     const image = await images.save(req.owner.id, req.body, type);
@@ -151,7 +156,7 @@ function createApp({ config, db, identity, audit, legacy, quizService, images, r
   });
 
   // ---------- Вход и аккаунт ----------
-  app.use('/api/auth', anyCors, authRouter({ identity, config }));
+  app.use('/api/auth', anyCors, authRouter({ identity, config, events }));
 
   // ---------- Администратор ----------
   app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config }));
@@ -159,7 +164,7 @@ function createApp({ config, db, identity, audit, legacy, quizService, images, r
   // ---------- Перенос игр, созданных до появления аккаунтов ----------
   // Нужны и сессия (куда переносить), и старый токен браузера в Authorization (откуда).
   const legacyApi = express.Router();
-  legacyApi.use(requireOwner, identity.csrf, (req, res, next) => {
+  legacyApi.use(requireOwner, identity.rejectBanned, identity.csrf, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     req.deviceOwner = deviceOwnerFromRequest(req);
     next();
@@ -174,7 +179,7 @@ function createApp({ config, db, identity, audit, legacy, quizService, images, r
 
   // ---------- Сохранённые игры (только ведущий) ----------
   const quizzesApi = express.Router();
-  quizzesApi.use(express.json({ limit: '256kb' }), requireOwner, identity.csrf, (req, res, next) => {
+  quizzesApi.use(express.json({ limit: '256kb' }), requireOwner, identity.rejectBanned, identity.csrf, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     next();
   });
@@ -185,7 +190,9 @@ function createApp({ config, db, identity, audit, legacy, quizService, images, r
     res.json({ quiz: await quizService.get(req.owner.id, req.params.id) });
   });
   quizzesApi.post('/', async (req, res) => {
-    res.status(201).json({ quiz: await quizService.create(req.owner.id, req.body) });
+    const quiz = await quizService.create(req.owner.id, req.body);
+    events.record(EVENT_TYPES.quizCreate, req.identity, { details: { quizId: quiz.id, title: quiz.title } });
+    res.status(201).json({ quiz });
   });
   quizzesApi.put('/:id', async (req, res) => {
     res.json({ quiz: await quizService.update(req.owner.id, req.params.id, req.body) });
@@ -199,7 +206,7 @@ function createApp({ config, db, identity, audit, legacy, quizService, images, r
   // ---------- Проверки для игрока перед входом ----------
   const roomsApi = express.Router();
   // Считаются только неверные коды: игроки одной Wi-Fi сети приходят с одного IP, и это нормально.
-  roomsApi.use(roomLimiter.failuresMiddleware('Слишком много попыток с неверным кодом. Подождите минуту.'), express.json({ limit: '2kb' }), (req, res, next) => {
+  roomsApi.use(roomLimiter.failuresMiddleware('Слишком много попыток с неверным кодом. Подождите минуту.'), identity.rejectBanned, express.json({ limit: '2kb' }), (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     next();
   });
@@ -289,6 +296,9 @@ export async function startServer(overrides = {}) {
   }
   const legacy = new LegacyService(db);
   const audit = new AuditLog(db);
+  const events = new EventLog(db);
+  await identity.bans.load();
+  identity.bans.start();
 
   const store = new PgQuizStore(db);
   const images = new PgImageStore(db, { maxBytes: QUIZ_LIMITS.imageMaxBytes });
@@ -317,7 +327,20 @@ export async function startServer(overrides = {}) {
   }, 60 * 60_000);
   maintenance.unref();
 
-  const app = createApp({ config, db, identity, audit, legacy, quizService, images, rooms, roomLimiter });
+  // Сроки хранения журналов: раз в сутки (первый раз — через минуту после старта).
+  const retention = new Retention(db, config);
+  const runRetention = () => retention.run()
+    .then((result) => {
+      const changed = Object.entries(result).filter(([, count]) => count > 0);
+      if (changed.length && !config.quiet) console.log('[retention]', Object.fromEntries(changed));
+    })
+    .catch((error) => console.error('[retention] не удалось:', error.message));
+  const retentionFirst = setTimeout(runRetention, 60_000);
+  retentionFirst.unref();
+  const retentionTimer = setInterval(runRetention, 24 * 60 * 60_000);
+  retentionTimer.unref();
+
+  const app = createApp({ config, db, identity, audit, events, legacy, quizService, images, rooms, roomLimiter });
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: config.allOrigins, methods: ['GET', 'POST'], credentials: true },
@@ -342,11 +365,21 @@ export async function startServer(overrides = {}) {
       socket.identity = await identity.fromHandshake(socket);
     } catch (error) {
       console.error('[socket] не удалось определить сессию:', error.message);
-      socket.identity = { ip: null, userAgent: null, visitorId: null, session: null, account: null, sessionToken: null };
+      socket.identity = { ip: ipFromSocket(socket, config), userAgent: socket.handshake.headers['user-agent'] || null, visitorId: null, session: null, account: null, sessionToken: null };
+      socket.identity.ban = identity.banFor(socket.identity);
+    }
+    // Заблокированных не пускаем: клиент получит connect_error с data.code = 'BANNED' и покажет экран блокировки.
+    if (socket.identity.ban) {
+      const error = new Error('Вы заблокированы');
+      error.data = { code: 'BANNED', ban: { ...publicBan(socket.identity.ban), contact: config.adminContact || null } };
+      next(error);
+      return;
     }
     next();
   });
-  const sockets = registerSocketHandlers(io, { rooms, quizService, images, config, identity });
+  const sockets = registerSocketHandlers(io, { rooms, quizService, images, config, identity, events });
+  // Новая блокировка действует сразу: заблокированные выходят из идущих игр.
+  identity.bans.onChange(() => sockets.enforceBans());
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -374,6 +407,8 @@ export async function startServer(overrides = {}) {
         identity.stop();
         clearInterval(imageGc);
         clearInterval(maintenance);
+        clearInterval(retentionTimer);
+        clearTimeout(retentionFirst);
         await new Promise((resolve) => io.close(() => resolve()));
         if (ownsDb) await db.close();
       })();

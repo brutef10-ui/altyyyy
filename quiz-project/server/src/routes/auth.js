@@ -6,10 +6,12 @@ import { AppError } from '../errors.js';
 import { normalizeLogin } from '../identity/accounts.js';
 import { unauthorized } from '../identity/index.js';
 import { RULES, throttled } from '../security/throttle.js';
+import { bannedError, publicBan } from '../security/bans.js';
+import { EVENT_TYPES } from '../logs/events.js';
 
 const HOUR = 60 * 60;
 
-export function authRouter({ identity, config }) {
+export function authRouter({ identity, config, events }) {
   const { accounts, sessions, throttle } = identity;
   const router = express.Router();
   router.use(express.json({ limit: '4kb' }), (req, res, next) => {
@@ -36,17 +38,21 @@ export function authRouter({ identity, config }) {
 
   const body = (req) => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
 
-  // Текущее состояние: кто вошёл и CSRF-токен для изменяющих запросов.
+  // Текущее состояние: кто вошёл, CSRF-токен для изменяющих запросов и действующая блокировка (если есть).
   router.get('/session', (req, res) => {
-    const { account, visitorId } = req.identity;
+    const { account, visitorId, ban } = req.identity;
     res.json({
       account: account ? { id: account.id, login: account.login, role: account.role } : null,
       csrfToken: visitorId ? identity.csrfToken(visitorId) : null,
       adminContact: config.adminContact || null,
+      ban: publicBan(ban),
     });
   });
 
-  router.post('/register', identity.csrf, async (req, res) => {
+  // Блокировка аккаунта, найденного по логину и паролю (устройство и IP проверены до входа).
+  const accountBan = (req, account) => identity.bans.find({ account, visitorId: req.identity.visitorId, ip: req.identity.ip });
+
+  router.post('/register', identity.csrf, identity.rejectBanned, async (req, res) => {
     const input = body(req);
     // Поле-ловушка: человек его не видит и не заполняет.
     if (input.website) throw new AppError('Не удалось зарегистрироваться. Обновите страницу.', { code: 'REJECTED' });
@@ -63,10 +69,11 @@ export function authRouter({ identity, config }) {
       throttle.hit('register:global', registerRules.global),
     ]);
     await startSession(req, res, account);
+    events?.record(EVENT_TYPES.register, req.identity, { account });
     res.status(201).json({ account, backupCode });
   });
 
-  router.post('/login', identity.csrf, async (req, res) => {
+  router.post('/login', identity.csrf, identity.rejectBanned, async (req, res) => {
     const input = body(req);
     const { ip } = req.identity;
     const login = normalizeLogin(input.login).slice(0, 64);
@@ -87,7 +94,10 @@ export function authRouter({ identity, config }) {
       throw error;
     }
     await throttle.reset(keys.pair);
+    const ban = accountBan(req, account);
+    if (ban) throw bannedError(ban, config.adminContact);
     await startSession(req, res, account);
+    events?.record(EVENT_TYPES.login, req.identity, { account });
     res.json({ account });
   });
 
@@ -99,7 +109,7 @@ export function authRouter({ identity, config }) {
   });
 
   // Смена пароля: нужен текущий пароль. Остальные сессии аккаунта отзываются, текущая — заменяется новой.
-  router.post('/password', identity.csrf, async (req, res) => {
+  router.post('/password', identity.csrf, identity.rejectBanned, async (req, res) => {
     const { account, session } = req.identity;
     if (!account) throw unauthorized();
     const key = `password:${account.id}`;
@@ -127,7 +137,7 @@ export function authRouter({ identity, config }) {
 
   // Восстановление доступа: логин + резервный код или одноразовый код от администратора + новый пароль.
   // Все сессии аккаунта отзываются, выдаётся новая сессия и новый резервный код (показывается один раз).
-  router.post('/recover', identity.csrf, async (req, res) => {
+  router.post('/recover', identity.csrf, identity.rejectBanned, async (req, res) => {
     const input = body(req);
     const { ip } = req.identity;
     const login = normalizeLogin(input.login).slice(0, 64);
@@ -147,12 +157,19 @@ export function authRouter({ identity, config }) {
       }
       throw error;
     }
+    events?.record(EVENT_TYPES.recover, req.identity, { account: result.account, details: { method: result.method } });
+    // Заблокированному аккаунту пароль сменить можно (и новый код он должен увидеть), а войти — нет.
+    const ban = accountBan(req, result.account);
+    if (ban) {
+      res.json({ account: null, backupCode: result.backupCode, ban: { ...publicBan(ban), contact: config.adminContact || null } });
+      return;
+    }
     await startSession(req, res, result.account);
     res.json({ account: result.account, backupCode: result.backupCode });
   });
 
   // Новый резервный код (старый перестаёт действовать). Показывается один раз.
-  router.post('/backup-code', identity.csrf, async (req, res) => {
+  router.post('/backup-code', identity.csrf, identity.rejectBanned, async (req, res) => {
     const { account } = req.identity;
     if (!account) throw unauthorized();
     const key = `password:${account.id}`;

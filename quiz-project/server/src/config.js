@@ -100,6 +100,13 @@ export function loadConfig(overrides = {}) {
     registrationsPerHour: integer(env.REGISTRATIONS_PER_HOUR, 300, { min: 1, max: 100_000 }),
     // Сколько минут действует одноразовый код восстановления, выданный администратором.
     recoveryCodeTtlMinutes: integer(env.RECOVERY_CODE_TTL_MINUTES, 60, { min: 5, max: 7 * 24 * 60 }),
+    // ---------- Сроки хранения (дни) ----------
+    // Журнал заходов: обезличить (IP → сеть, без user-agent) и удалить.
+    eventsAnonymizeDays: integer(env.EVENTS_ANONYMIZE_DAYS, 180, { min: 1, max: 3650 }),
+    eventsDeleteDays: integer(env.EVENTS_DELETE_DAYS, 1095, { min: 1, max: 3650 }),
+    // Журнал действий администратора и история блокировок (после снятия или окончания).
+    auditRetentionDays: integer(env.AUDIT_RETENTION_DAYS, 1095, { min: 30, max: 3650 }),
+    banHistoryRetentionDays: integer(env.BAN_HISTORY_RETENTION_DAYS, 1095, { min: 30, max: 3650 }),
     // ---------- IP клиента за прокси (docs/ACCOUNTS_PLAN.md, раздел 4) ----------
     // hops: N-й адрес справа в X-Forwarded-For; header: заголовок, который выставляет доверенный прокси.
     clientIpMode: env.CLIENT_IP_MODE === 'header' ? 'header' : 'hops',

@@ -39,9 +39,11 @@ export const uniqueLogin = (prefix = 'user') => `${prefix}${++counter}x${randomB
 
 /** Браузер: хранит cookie, получает CSRF-токен, ходит в API и подключается к Socket.IO. */
 export class Browser {
-  constructor(server, { origin = 'http://localhost:5500' } = {}) {
+  // headers — заголовки каждого запроса этого «браузера» (например, User-Agent, X-Forwarded-For).
+  constructor(server, { origin = 'http://localhost:5500', headers = {} } = {}) {
     this.server = server;
     this.origin = origin;
+    this.headers = headers;
     this.cookies = new Map();
     this.csrfToken = null;
     this.account = null;
@@ -52,7 +54,7 @@ export class Browser {
   }
 
   async fetch(pathname, { method = 'GET', body, headers = {}, raw = false, csrf = true } = {}) {
-    const all = { Origin: this.origin, ...headers };
+    const all = { Origin: this.origin, ...this.headers, ...headers };
     const cookie = this.cookie();
     if (cookie) all.Cookie = cookie;
     if (body !== undefined && !raw) all['Content-Type'] = 'application/json';
@@ -107,7 +109,7 @@ export class Browser {
   /** Подключение Socket.IO с cookie этого браузера. */
   socket({ auth } = {}) {
     return new Promise((resolve, reject) => {
-      const extraHeaders = { Origin: this.origin };
+      const extraHeaders = { Origin: this.origin, ...this.headers };
       const cookie = this.cookie();
       if (cookie) extraHeaders.Cookie = cookie;
       const socket = connect(this.server.url, { auth, extraHeaders, transports: ['websocket'], forceNew: true, reconnection: false });
@@ -115,6 +117,17 @@ export class Browser {
       socket.once('connect_error', reject);
     });
   }
+}
+
+/** Ждать событие сокета (с таймаутом). */
+export function waitFor(socket, event, timeoutMs = 3_000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`нет события ${event}`)), timeoutMs);
+    socket.once(event, (payload) => {
+      clearTimeout(timer);
+      resolve(payload);
+    });
+  });
 }
 
 /** Вошедший ведущий: браузер с новым аккаунтом. */

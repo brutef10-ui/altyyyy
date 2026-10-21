@@ -4,6 +4,7 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { AppError } from '../errors.js';
 import { Throttle } from '../security/throttle.js';
+import { BanService, bannedError } from '../security/bans.js';
 import { AccountService } from './accounts.js';
 import { ipFromRequest, ipFromSocket } from './clientIp.js';
 import { cookieNames, cookieOptions, readCookies } from './cookies.js';
@@ -31,6 +32,17 @@ export function createIdentity({ db, config }) {
   const accounts = new AccountService(db, { adminLogin: config.adminLogin });
   const throttle = new Throttle(db);
   const recovery = new RecoveryService(db, { accounts, sessions, codeTtlMinutes: config.recoveryCodeTtlMinutes });
+  const bans = new BanService(db);
+
+  /** Действующая блокировка для личности (по аккаунту, устройству и IP) или null. Только память, без БД. */
+  const banFor = (who) => bans.find({ account: who?.account, visitorId: who?.visitorId, ip: who?.ip });
+
+  /** Бросить BANNED, если личность заблокирована. */
+  function checkBan(who) {
+    const ban = banFor(who);
+    if (who) who.ban = ban;
+    if (ban) throw bannedError(ban, config.adminContact);
+  }
 
   // CSRF-токен привязан к посетителю: его знает только страница, которой сервер его выдал.
   const csrfToken = (visitorId) => createHmac('sha256', secret).update(`csrf:${visitorId}`).digest('base64url');
@@ -83,6 +95,7 @@ export function createIdentity({ db, config }) {
           session,
           account: session?.account ?? null,
         };
+        req.identity.ban = banFor(req.identity);
         next();
       } catch (error) {
         next(error);
@@ -99,6 +112,16 @@ export function createIdentity({ db, config }) {
     }
     req.owner = { id: account.id, kind: 'account' };
     next();
+  }
+
+  /** Заблокированным — 403 BANNED с причиной и сроком (выход из аккаунта и GET /api/auth/session доступны). */
+  function rejectBanned(req, res, next) {
+    try {
+      checkBan(req.identity);
+      next();
+    } catch (error) {
+      next(error);
+    }
   }
 
   function requireAdmin(req, res, next) {
@@ -138,7 +161,7 @@ export function createIdentity({ db, config }) {
     const visitor = await visitors.find(cookies[names.visitor], meta);
     const sessionToken = cookies[names.session] || null;
     const session = sessionToken ? await sessions.resolve(sessionToken, meta) : null;
-    return {
+    const who = {
       ip,
       userAgent,
       visitorId: visitor?.id ?? null,
@@ -147,6 +170,8 @@ export function createIdentity({ db, config }) {
       sessionToken: session ? sessionToken : null,
       checkedAt: Date.now(),
     };
+    who.ban = banFor(who);
+    return who;
   }
 
   // Если БД на минуту недоступна, ведущий, проверенный совсем недавно, может продолжать игру
@@ -174,6 +199,7 @@ export function createIdentity({ db, config }) {
     identity.account = session?.account ?? null;
     identity.checkedAt = Date.now();
     if (!session) identity.sessionToken = null;
+    identity.ban = banFor(identity);
     return identity;
   }
 
@@ -184,6 +210,10 @@ export function createIdentity({ db, config }) {
     accounts,
     throttle,
     recovery,
+    bans,
+    banFor,
+    checkBan,
+    rejectBanned,
     csrfToken,
     setSessionCookie,
     clearSessionCookie,
@@ -195,6 +225,7 @@ export function createIdentity({ db, config }) {
     refresh,
     stop() {
       visitors.stop();
+      bans.stop();
     },
   };
 }
