@@ -30,6 +30,8 @@ export async function migrate(db, { dir = MIGRATIONS_DIR, log = console.log } = 
   const migrations = await listMigrations(dir);
   return db.tx(async (tx) => {
     await tx.query('SELECT pg_advisory_xact_lock($1)', [LOCK_KEY]);
+    // Отдельная схема (DATABASE_SCHEMA) — например, своя для каждого набора тестов. Имя проверено в createDb.
+    if (db.schema) await tx.query(`CREATE SCHEMA IF NOT EXISTS ${db.schema}`);
     await tx.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       version integer PRIMARY KEY,
       name text NOT NULL,

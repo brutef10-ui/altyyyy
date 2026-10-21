@@ -1,19 +1,13 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { io as connect } from 'socket.io-client';
-import { startServer } from '../server.js';
+import { hostBrowser, startTestServer } from './helpers.js';
 
 // Новые возможности протокола v2: фаза чтения, ответы вручную, скрытые места, церемония,
 // картинки и вход большого числа игроков из одной сети.
 const HOST_ORIGIN = 'http://localhost:5500';
 let server;
-let tempDir;
-
-const token = () => randomBytes(32).toString('hex');
 const photo = () => {
   const bytes = Buffer.alloc(300, 7);
   bytes.set([0xff, 0xd8, 0xff, 0xe0]);
@@ -25,9 +19,10 @@ const jpegBytes = (size = 2_000) => {
   return bytes;
 };
 
-function client(auth) {
+function client(browser) {
+  if (browser) return browser.socket();
   return new Promise((resolve, reject) => {
-    const socket = connect(server.url, { auth, transports: ['websocket'], forceNew: true, reconnection: false });
+    const socket = connect(server.url, { transports: ['websocket'], forceNew: true, reconnection: false });
     socket.once('connect', () => resolve(socket));
     socket.once('connect_error', reject);
   });
@@ -43,7 +38,7 @@ const once = (socket, event, filter = () => true) => new Promise((resolve) => {
 });
 
 async function room(quiz, names) {
-  const host = await client({ token: token() });
+  const host = await client(await hostBrowser(server));
   const created = await request(host, 'host:create', { quiz });
   assert.equal(created.ok, true, created.error);
   const players = [];
@@ -60,10 +55,7 @@ async function room(quiz, names) {
 }
 
 before(async () => {
-  tempDir = await mkdtemp(path.join(os.tmpdir(), 'alstudio-play-'));
-  server = await startServer({
-    port: 0,
-    dataFile: path.join(tempDir, 'quizzes.json'),
+  server = await startTestServer('gameplay', {
     hostOrigins: [HOST_ORIGIN],
     playerOrigins: ['http://localhost:5501'],
   });
@@ -71,7 +63,6 @@ before(async () => {
 
 after(async () => {
   await server.close();
-  await rm(tempDir, { recursive: true, force: true });
 });
 
 test('фаза чтения: сначала только вопрос, варианты открываются по таймеру или по команде ведущего', async () => {
@@ -215,12 +206,8 @@ test('после последнего вопроса места скрыты, ц
 });
 
 test('картинки: загрузка, раздача, проверка формата и ссылок', async () => {
-  const hostToken = token();
-  const upload = (body, type, auth = hostToken) => fetch(`${server.url}/api/images`, {
-    method: 'POST',
-    headers: { 'Content-Type': type, Authorization: `Bearer ${auth}`, Origin: HOST_ORIGIN },
-    body,
-  });
+  const hostToken = await hostBrowser(server);
+  const upload = (body, type) => hostToken.fetch('/api/images', { method: 'POST', headers: { 'Content-Type': type }, body, raw: true });
 
   assert.equal((await fetch(`${server.url}/api/images`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpegBytes() })).status, 401);
   assert.equal((await upload(Buffer.from('<svg/>'), 'image/svg+xml')).status, 415);
@@ -239,16 +226,12 @@ test('картинки: загрузка, раздача, проверка фо�
   assert.equal((await fetch(`${server.url}/api/images/${'0'.repeat(32)}`)).status, 404);
 
   const quiz = (imageId) => ({ title: 'С картинкой', questions: [{ type: 'choice', text: 'Кто на фото?', image: imageId, answers: ['A', 'B'], correct: 0, timeLimit: 10, readTime: 0 }] });
-  const save = (body) => fetch(`${server.url}/api/quizzes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${hostToken}`, Origin: HOST_ORIGIN },
-    body: JSON.stringify(body),
-  });
+  const save = (body) => hostToken.fetch('/api/quizzes', { method: 'POST', body });
   assert.equal((await save(quiz(id))).status, 201);
   assert.equal((await save(quiz('f'.repeat(32)))).status, 422, 'несуществующая картинка');
   assert.equal((await save(quiz('../../etc/passwd'))).status, 422, 'некорректный id');
 
-  const host = await client({ token: hostToken });
+  const host = await client(hostToken);
   assert.equal((await request(host, 'host:create', { quiz: quiz('e'.repeat(32)) })).code, 'IMAGE_MISSING');
   const created = await request(host, 'host:create', { quiz: quiz(id) });
   assert.equal(created.ok, true);
@@ -263,7 +246,7 @@ test('картинки: загрузка, раздача, проверка фо�
 });
 
 test('наплыв: 60 игроков из одной Wi-Fi сети входят и возвращаются после сбоя', async () => {
-  const host = await client({ token: token() });
+  const host = await client(await hostBrowser(server));
   const quiz = { title: 'Толпа', questions: [{ type: 'choice', text: 'Q', answers: ['A', 'B'], correct: 0, timeLimit: 30, readTime: 0 }] };
   const { code } = await request(host, 'host:create', { quiz });
 

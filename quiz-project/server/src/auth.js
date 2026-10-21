@@ -1,31 +1,33 @@
 // Определение владельца игр.
 //
-// Сейчас аккаунтов нет: браузер ведущего хранит секретный токен в localStorage
-// и присылает его в заголовке Authorization (REST) или в socket.handshake.auth (Socket.IO).
-// На сервере хранится только SHA-256 от токена, поэтому утечка quizzes.json не раскрывает токены.
+// Владелец — аккаунт создателя игр. Его определяет сервер по cookie сессии (src/identity):
+// HTTP — req.identity.account, Socket.IO — socket.identity.account. Данные клиента
+// (тело запроса, socket.handshake.auth) владельца и роль не задают.
 //
-// Как добавить логин позже: допишите ещё один «резолвер» (например, по cookie-сессии или JWT),
-// который возвращает { id: 'user:<id>', kind: 'user' }, и поставьте его первым в RESOLVERS.
-// Остальной код работает только с owner.id и ничего не знает о способе входа.
-// Чтобы перенести игры с устройства в аккаунт, достаточно заменить ownerId 'device:…' на 'user:…'.
+// Остальной код работает только с owner.id (UUID аккаунта) и ничего не знает о способе входа.
+//
+// Токен устройства (до появления аккаунтов браузер ведущего хранил его в localStorage) больше
+// не даёт доступа к играм: по нему только находятся старые игры этого браузера, чтобы перенести их
+// в аккаунт (см. stores/legacy.js).
 import { createHash } from 'node:crypto';
 import { AppError } from './errors.js';
 
 const DEVICE_TOKEN = /^[a-f0-9]{64}$/;
 
-function ownerFromDeviceToken(token) {
+/** Старый владелец 'device:<sha256 токена>' — только для переноса игр в аккаунт. */
+export function ownerFromDeviceToken(token) {
   if (typeof token !== 'string' || !DEVICE_TOKEN.test(token)) return null;
   const hash = createHash('sha256').update(token).digest('hex');
   return { id: `device:${hash}`, kind: 'device' };
 }
 
-function bearerToken(header) {
+export function bearerToken(header) {
   const match = /^Bearer\s+(\S+)$/i.exec(header || '');
   return match ? match[1] : null;
 }
 
 const RESOLVERS = [
-  (credentials) => ownerFromDeviceToken(credentials.token),
+  (credentials) => (credentials.account?.id ? { id: credentials.account.id, kind: 'account' } : null),
 ];
 
 export function resolveOwner(credentials) {
@@ -37,18 +39,23 @@ export function resolveOwner(credentials) {
 }
 
 export function ownerFromRequest(req) {
-  return resolveOwner({ token: bearerToken(req.get('authorization')) });
+  return resolveOwner({ account: req.identity?.account });
 }
 
 export function ownerFromSocket(socket) {
-  return resolveOwner({ token: socket.handshake.auth?.token });
+  return resolveOwner({ account: socket.identity?.account });
 }
 
-// Express-middleware: пропускает дальше только запросы с известным владельцем.
+/** Владелец старых игр по токену устройства из заголовка Authorization. */
+export function deviceOwnerFromRequest(req) {
+  return ownerFromDeviceToken(bearerToken(req.get('authorization')));
+}
+
+// Express-middleware: пропускает дальше только запросы вошедшего создателя игр.
 export function requireOwner(req, res, next) {
   const owner = ownerFromRequest(req);
   if (!owner) {
-    next(new AppError('Не удалось определить ведущего. Обновите страницу.', { status: 401, code: 'UNAUTHORIZED' }));
+    next(new AppError('Войдите в аккаунт, чтобы продолжить.', { status: 401, code: 'UNAUTHORIZED' }));
     return;
   }
   req.owner = owner;

@@ -15,6 +15,17 @@ const TYPES = {
 
 export const IMAGE_TYPES = Object.freeze(Object.keys(TYPES));
 
+/** Проверка формата по содержимому файла (а не по заголовку Content-Type) и размера. */
+export function checkImageBuffer(buffer, type, maxBytes) {
+  const kind = TYPES[type];
+  if (!kind || !Buffer.isBuffer(buffer) || buffer.length < 16 || !kind.check(buffer)) {
+    throw new AppError('Картинка должна быть в формате JPEG, PNG или WebP', { status: 415, code: 'BAD_IMAGE' });
+  }
+  if (buffer.length > maxBytes) {
+    throw new AppError('Картинка больше 1 МБ', { status: 413, code: 'IMAGE_TOO_LARGE' });
+  }
+}
+
 export class ImageStore {
   #index = new Map(); // id → { id, ownerId, type, size, createdAt }
   #queue = Promise.resolve();
@@ -58,13 +69,7 @@ export class ImageStore {
 
   /** Сохраняет картинку после проверки формата по содержимому файла. */
   async save(ownerId, buffer, type) {
-    const kind = TYPES[type];
-    if (!kind || !Buffer.isBuffer(buffer) || buffer.length < 16 || !kind.check(buffer)) {
-      throw new AppError('Картинка должна быть в формате JPEG, PNG или WebP', { status: 415, code: 'BAD_IMAGE' });
-    }
-    if (buffer.length > this.maxBytes) {
-      throw new AppError('Картинка больше 1 МБ', { status: 413, code: 'IMAGE_TOO_LARGE' });
-    }
+    checkImageBuffer(buffer, type, this.maxBytes);
     const owned = [...this.#index.values()].filter((item) => item.ownerId === ownerId).length;
     if (owned >= this.maxPerOwner) {
       throw new AppError('Слишком много картинок. Удалите ненужные игры.', { status: 409, code: 'TOO_MANY_IMAGES' });
@@ -83,6 +88,22 @@ export class ImageStore {
   locate(id) {
     const item = IMAGE_ID_PATTERN.test(id) ? this.#index.get(id) : null;
     return item ? { path: this.#fileOf(item), type: item.type } : null;
+  }
+
+  /** { type, bytes } или null — тот же интерфейс, что у хранилища в БД. */
+  async read(id) {
+    const found = this.locate(id);
+    if (!found) return null;
+    try {
+      return { type: found.type, bytes: await fs.readFile(found.path) };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Все записи (для переноса картинок в БД). */
+  list() {
+    return [...this.#index.values()].map((item) => ({ ...item }));
   }
 
   /**

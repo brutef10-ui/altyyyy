@@ -10,6 +10,7 @@
 // { ok: false, error, code }. Если клиент не передал callback, ошибка приходит событием «error».
 import { AppError, conflict, forbidden, notFound } from './errors.js';
 import { ownerFromSocket } from './auth.js';
+import { ipFromSocket } from './identity/clientIp.js';
 import { PlayerRegistry } from './players.js';
 import { RateLimiter } from './rateLimit.js';
 import { STATES } from './game.js';
@@ -24,7 +25,7 @@ const CLOSE_MESSAGES = {
   shutdown: 'Сервер перезапускается. Игра завершена.',
 };
 
-export function registerSocketHandlers(io, { rooms, quizService, images, config }) {
+export function registerSocketHandlers(io, { rooms, quizService, images, config, identity = null }) {
   const eventLimiter = new RateLimiter({ windowMs: 10_000, max: 60 }); // любые события одного сокета
   // По IP считаем только неудачные попытки входа (неверный код): все игроки одной Wi-Fi сети
   // выглядят для сервера как один IP, и успешные входы ограничивать нельзя.
@@ -111,16 +112,26 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config 
 
   // ---------- Вспомогательные функции ----------
 
-  // IP клиента по тем же правилам, что и req.ip в Express: доверяем ровно trustProxy последним прокси.
+  // IP клиента по тем же правилам, что и для HTTP (src/identity/clientIp.js).
   function clientIp(socket) {
-    const hops = typeof config.trustProxy === 'number' ? config.trustProxy : config.trustProxy ? 1 : 0;
-    const forwarded = String(socket.handshake.headers['x-forwarded-for'] || '')
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .reverse();
-    const chain = [socket.handshake.address, ...forwarded];
-    return chain[Math.min(hops, chain.length - 1)];
+    return socket.identity?.ip ?? ipFromSocket(socket, config);
+  }
+
+  // Ведущий — только вошедший создатель игр. Сессию перепроверяем перед каждой командой создания
+  // и возврата в комнату: её могли отозвать (выход, смена пароля) уже после подключения.
+  async function requireHostAccount(socket) {
+    if (identity && socket.identity) await identity.refresh(socket.identity);
+    const owner = ownerFromSocket(socket);
+    if (!owner) throw new AppError('Войдите в аккаунт, чтобы продолжить.', { status: 401, code: 'UNAUTHORIZED' });
+    return owner;
+  }
+
+  async function checkImagesExist(quiz) {
+    for (const id of quizImageIds(quiz)) {
+      if (!(await images.has(id))) {
+        throw new AppError('Одна из картинок не найдена на сервере — загрузите её заново в редакторе', { status: 422, code: 'IMAGE_MISSING' });
+      }
+    }
   }
 
   // Поиск комнаты при входе игрока: неверные коды считаются попытками подбора.
@@ -191,8 +202,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config 
     // ----- Ведущий -----
 
     on(socket, 'host:create', async (payload) => {
-      const owner = ownerFromSocket(socket);
-      if (!owner) throw new AppError('Не удалось определить ведущего. Обновите страницу.', { status: 401, code: 'UNAUTHORIZED' });
+      const owner = await requireHostAccount(socket);
       if (socket.data.role) throw conflict('Это соединение уже участвует в игре');
       if (!createLimiter.take(owner.id)) throw new AppError('Слишком много новых комнат. Подождите минуту.', { status: 429, code: 'RATE_LIMIT' });
 
@@ -205,9 +215,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config 
         if (!checked.ok) throw new AppError(checked.errors[0], { status: 422, code: 'INVALID_QUIZ', details: checked.errors });
         quiz = checked.value;
       }
-      if (quizImageIds(quiz).some((id) => !images.has(id))) {
-        throw new AppError('Одна из картинок не найдена на сервере — загрузите её заново в редакторе', { status: 422, code: 'IMAGE_MISSING' });
-      }
+      await checkImagesExist(quiz);
 
       const room = rooms.create({ quiz, ownerId: owner.id, hostSocketId: socket.id, createNotifier });
       socket.data = { role: 'host', roomCode: room.code };
@@ -215,9 +223,9 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config 
     });
 
     on(socket, 'host:resume', async ({ code, hostKey }) => {
-      const owner = ownerFromSocket(socket);
+      const owner = await requireHostAccount(socket);
       const room = findRoom(code);
-      if (!owner || owner.id !== room.ownerId || !room.verifyHostKey(hostKey)) {
+      if (owner.id !== room.ownerId || !room.verifyHostKey(hostKey)) {
         throw notFound('Комната не найдена или уже закрыта', 'ROOM_NOT_FOUND');
       }
       if (socket.data.role === 'player') throw conflict('Это соединение уже участвует в игре как игрок');

@@ -1,17 +1,10 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { randomBytes } from 'node:crypto';
 import { io as connect } from 'socket.io-client';
-import { startServer } from '../server.js';
+import { Browser, hostBrowser, startTestServer } from './helpers.js';
 
 const HOST_ORIGIN = 'http://localhost:5500';
 let server;
-let tempDir;
-
-const token = () => randomBytes(32).toString('hex');
 const photo = () => {
   const bytes = Buffer.alloc(300, 7);
   bytes.set([0xff, 0xd8, 0xff, 0xe0]);
@@ -25,16 +18,16 @@ const quiz = {
   ],
 };
 
+// hostToken — браузер вошедшего ведущего (Browser из helpers.js) или ничего (аноним).
 function api(pathname, { method = 'GET', body, hostToken, origin = HOST_ORIGIN } = {}) {
-  const headers = { Origin: origin };
-  if (hostToken) headers.Authorization = `Bearer ${hostToken}`;
-  if (body) headers['Content-Type'] = 'application/json';
-  return fetch(server.url + pathname, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const browser = hostToken ?? new Browser(server, { origin });
+  return browser.fetch(pathname, { method, body, headers: { Origin: origin } });
 }
 
-function client(auth) {
+function client(browser) {
+  if (browser) return browser.socket();
   return new Promise((resolve, reject) => {
-    const socket = connect(server.url, { auth, transports: ['websocket'], forceNew: true, reconnection: false });
+    const socket = connect(server.url, { transports: ['websocket'], forceNew: true, reconnection: false });
     socket.once('connect', () => resolve(socket));
     socket.once('connect_error', reject);
   });
@@ -44,10 +37,7 @@ const request = (socket, event, payload) => socket.timeout(3000).emitWithAck(eve
 const once = (socket, event) => new Promise((resolve) => socket.once(event, resolve));
 
 before(async () => {
-  tempDir = await mkdtemp(path.join(os.tmpdir(), 'alstudio-test-'));
-  server = await startServer({
-    port: 0,
-    dataFile: path.join(tempDir, 'quizzes.json'),
+  server = await startTestServer('integration', {
     hostOrigins: [HOST_ORIGIN],
     playerOrigins: ['http://localhost:5501'],
     hostReconnectMs: 300,
@@ -57,12 +47,11 @@ before(async () => {
 
 after(async () => {
   await server.close();
-  await rm(tempDir, { recursive: true, force: true });
 });
 
-test('REST: CRUD игр привязан к токену ведущего', async () => {
-  const owner = token();
-  const stranger = token();
+test('REST: CRUD игр привязан к аккаунту ведущего', async () => {
+  const owner = await hostBrowser(server);
+  const stranger = await hostBrowser(server);
 
   assert.equal((await api('/api/quizzes')).status, 401);
 
@@ -90,17 +79,17 @@ test('REST: CRUD игр привязан к токену ведущего', asyn
 });
 
 test('CORS: игры доступны только сайту ведущего', async () => {
-  const fromHost = await api('/api/quizzes', { hostToken: token() });
+  const fromHost = await api('/api/quizzes', { hostToken: await hostBrowser(server) });
   assert.equal(fromHost.headers.get('access-control-allow-origin'), HOST_ORIGIN);
-  const fromPlayer = await api('/api/quizzes', { hostToken: token(), origin: 'http://localhost:5501' });
+  const fromPlayer = await api('/api/quizzes', { hostToken: await hostBrowser(server), origin: 'http://localhost:5501' });
   assert.equal(fromPlayer.headers.get('access-control-allow-origin'), null);
   const roomFromPlayer = await api('/api/rooms/123456', { origin: 'http://localhost:5501' });
   assert.equal(roomFromPlayer.headers.get('access-control-allow-origin'), 'http://localhost:5501');
 });
 
 test('Socket.IO: полная игра от лобби до финала', async () => {
-  const hostToken = token();
-  const host = await client({ token: hostToken });
+  const hostToken = await hostBrowser(server);
+  const host = await client(hostToken);
 
   const { quiz: saved } = await (await api('/api/quizzes', { method: 'POST', body: quiz, hostToken })).json();
   const created = await request(host, 'host:create', { quizId: saved.id });
@@ -132,9 +121,9 @@ test('Socket.IO: полная игра от лобби до финала', async
 
   // Команды ведущего только от сокета ведущего.
   assert.equal((await request(anna, 'host:start')).code, 'FORBIDDEN');
-  const intruder = await client({ token: token() });
+  const intruder = await client(await hostBrowser(server));
   assert.equal((await request(intruder, 'host:start')).code, 'FORBIDDEN');
-  assert.equal((await request(intruder, 'host:resume', { code, hostKey: created.hostKey })).code, 'ROOM_NOT_FOUND', 'чужой токен не может забрать комнату');
+  assert.equal((await request(intruder, 'host:resume', { code, hostKey: created.hostKey })).code, 'ROOM_NOT_FOUND', 'чужой аккаунт не может забрать комнату');
 
   const annaQuestion = once(anna, 'question');
   const hostQuestion = once(host, 'question');
@@ -196,8 +185,8 @@ test('Socket.IO: полная игра от лобби до финала', async
 });
 
 test('Socket.IO: ведущий возвращается по ключу, игрок — по токену', async () => {
-  const hostToken = token();
-  const host = await client({ token: hostToken });
+  const hostToken = await hostBrowser(server);
+  const host = await client(hostToken);
   const { code, hostKey } = await request(host, 'host:create', { quiz });
 
   const player = await client();
@@ -205,7 +194,7 @@ test('Socket.IO: ведущий возвращается по ключу, игр
 
   // Переход ведущего на другую страницу: старый сокет закрылся, новый восстановил комнату.
   host.disconnect();
-  const host2 = await client({ token: hostToken });
+  const host2 = await client(hostToken);
   const resumed = await request(host2, 'host:resume', { code, hostKey });
   assert.equal(resumed.ok, true);
   assert.equal(resumed.snapshot.players[0].nickname, 'Вера');
@@ -232,7 +221,7 @@ test('Socket.IO: ведущий возвращается по ключу, игр
 });
 
 test('Socket.IO: в лобби отключившийся игрок исчезает после паузы', async () => {
-  const host = await client({ token: token() });
+  const host = await client(await hostBrowser(server));
   const { code } = await request(host, 'host:create', { quiz });
   const player = await client();
   await request(player, 'player:join', { code, nickname: 'Гоша', photo: photo() });

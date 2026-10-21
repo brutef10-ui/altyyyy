@@ -5,14 +5,22 @@ import { promises as fs } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { Server } from 'socket.io';
 
 import { loadConfig } from './src/config.js';
 import { AppError } from './src/errors.js';
-import { requireOwner } from './src/auth.js';
+import { deviceOwnerFromRequest, requireOwner } from './src/auth.js';
 import { RateLimiter } from './src/rateLimit.js';
-import { JsonQuizStore, QuizService } from './src/quizzes.js';
-import { IMAGE_TYPES, ImageStore } from './src/images.js';
+import { QuizService } from './src/quizzes.js';
+import { IMAGE_TYPES } from './src/images.js';
+import { createDb } from './src/db/index.js';
+import { migrate } from './src/db/migrate.js';
+import { createIdentity } from './src/identity/index.js';
+import { authRouter } from './src/routes/auth.js';
+import { PgQuizStore } from './src/stores/pgQuizStore.js';
+import { PgImageStore } from './src/stores/pgImageStore.js';
+import { LegacyService, importLegacyData } from './src/stores/legacy.js';
 import { RoomManager } from './src/rooms.js';
 import { registerSocketHandlers } from './src/sockets.js';
 import { MAX_PHOTO_BYTES, QUIZ_LIMITS, quizImageIds, validateNickname, validateRoomCode } from './src/validate.js';
@@ -20,10 +28,23 @@ import { MAX_PHOTO_BYTES, QUIZ_LIMITS, quizImageIds, validateNickname, validateR
 // Фото до 100 КБ в base64 занимает ~137 КБ, игра на 50 вопросов — до ~100 КБ.
 const SOCKET_MAX_MESSAGE_BYTES = 256 * 1024;
 
+// Страницы сайта ведущего, которые доступны только после входа (создание и запуск игр, включая демо).
+const HOST_PAGES = new Set(['/', '/index.html', '/editor.html', '/lobby.html', '/game.html', '/results.html']);
+
 // Режим SERVE_SITES: оба сайта отдаёт сам сервер, поэтому адрес сервера для них — тот же, что у страницы.
 function mountSites(app, config) {
   const hostDir = path.join(config.sitesRoot, 'host-site');
   const playerDir = path.join(config.sitesRoot, 'player-site');
+
+  // Без входа страницы ведущего не отдаём — сразу на страницу входа (данные защищены и на уровне API).
+  app.use('/host', (req, res, next) => {
+    if ((req.method === 'GET' || req.method === 'HEAD') && HOST_PAGES.has(req.path) && !req.identity?.account) {
+      res.set('Cache-Control', 'no-store');
+      res.redirect(302, `/host/login.html?next=${encodeURIComponent(req.originalUrl)}`);
+      return;
+    }
+    next();
+  });
 
   const sameOriginConfig = (dir) => async (req, res) => {
     const source = await fs.readFile(path.join(dir, 'js', 'config.js'), 'utf8');
@@ -45,36 +66,67 @@ function isSameOrigin(origin, host) {
   }
 }
 
-function createApp({ config, quizService, images, rooms, roomLimiter }) {
+// Запросы, которым нужна личность (посетитель, сессия): страницы сайта и API, кроме картинок.
+function needsIdentity(req) {
+  if (req.path.startsWith('/api/')) return !(req.method === 'GET' && req.path.startsWith('/api/images/'));
+  // Страницы: «…/», «….html» и адреса без расширения (например, /host до перенаправления на /host/).
+  return (req.method === 'GET' || req.method === 'HEAD') && (req.path.endsWith('.html') || !/\.[A-Za-z0-9]+$/.test(req.path));
+}
+
+function withTimeout(promise, ms) {
+  let timer;
+  return Promise.race([promise, new Promise((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('timeout')), ms);
+  })]).finally(() => clearTimeout(timer));
+}
+
+function createApp({ config, db, identity, legacy, quizService, images, rooms, roomLimiter }) {
   const app = express();
   app.disable('x-powered-by');
-  if (config.trustProxy) app.set('trust proxy', config.trustProxy);
+  // Express узнаёт HTTPS (для Secure-cookie) из X-Forwarded-Proto только от доверенных прокси.
+  if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
+  else if (config.trustProxy) app.set('trust proxy', config.trustProxy);
 
-  app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('X-Frame-Options', 'DENY');
-    next();
-  });
+  // Заголовки безопасности. CSP включается отдельно, когда проверены все страницы обоих сайтов.
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'same-site' },
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'no-referrer' },
+  }));
 
   // CORS: игры доступны только сайту ведущего, проверка комнаты — обоим сайтам.
-  const corsBase = { methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'], maxAge: 600 };
+  // credentials — чтобы сайт с другого адреса (локальная разработка) мог отправлять cookie сессии.
+  const corsBase = { methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'], credentials: true, maxAge: 600 };
   const hostCors = cors({ ...corsBase, origin: config.hostOrigins });
   const anyCors = cors({ ...corsBase, origin: config.allOrigins });
+
+  const identify = identity.http();
+  app.use((req, res, next) => (needsIdentity(req) ? identify(req, res, next) : next()));
 
   if (config.serveSites) mountSites(app, config);
 
   app.get('/', (req, res) => res.json({ name: 'AL Studio — сервер квиз-игры', status: 'ok' }));
-  app.get('/health', (req, res) => res.json({ status: 'ok', rooms: rooms.size, uptime: Math.round(process.uptime()) }));
+  app.get('/health', async (req, res) => {
+    let database = 'ok';
+    try {
+      await withTimeout(db.ping(), 2_000);
+    } catch {
+      database = 'error';
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json({ status: database === 'ok' ? 'ok' : 'degraded', db: database, rooms: rooms.size, uptime: Math.round(process.uptime()) });
+  });
 
   app.get('/api/config', anyCors, (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ playerSiteUrl: config.playerSiteUrl, limits: QUIZ_LIMITS, maxPhotoBytes: MAX_PHOTO_BYTES, imageTypes: IMAGE_TYPES });
+    res.json({ playerSiteUrl: config.playerSiteUrl, hostSiteUrl: config.hostSiteUrl, limits: QUIZ_LIMITS, maxPhotoBytes: MAX_PHOTO_BYTES, imageTypes: IMAGE_TYPES });
   });
 
   // ---------- Картинки к вопросам ----------
   // Загружает только ведущий; смотрят все (картинка показывается на проекторе и на телефонах).
-  app.post('/api/images', hostCors, requireOwner, express.raw({ type: IMAGE_TYPES, limit: QUIZ_LIMITS.imageMaxBytes }), async (req, res) => {
+  app.post('/api/images', hostCors, requireOwner, identity.csrf, express.raw({ type: IMAGE_TYPES, limit: QUIZ_LIMITS.imageMaxBytes }), async (req, res) => {
     const type = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase();
     if (!Buffer.isBuffer(req.body)) throw new AppError('Картинка должна быть в формате JPEG, PNG или WebP', { status: 415, code: 'BAD_IMAGE' });
     const image = await images.save(req.owner.id, req.body, type);
@@ -82,8 +134,8 @@ function createApp({ config, quizService, images, rooms, roomLimiter }) {
   });
   app.options('/api/images', hostCors);
 
-  app.get('/api/images/:id', (req, res) => {
-    const image = images.locate(req.params.id);
+  app.get('/api/images/:id', async (req, res) => {
+    const image = await images.read(req.params.id);
     if (!image) {
       res.status(404).json({ error: 'Картинка не найдена', code: 'NOT_FOUND' });
       return;
@@ -93,12 +145,31 @@ function createApp({ config, quizService, images, rooms, roomLimiter }) {
       'Cache-Control': 'public, max-age=31536000, immutable',
       'Cross-Origin-Resource-Policy': 'cross-origin',
     });
-    res.sendFile(image.path);
+    res.send(image.bytes);
   });
+
+  // ---------- Вход и аккаунт ----------
+  app.use('/api/auth', anyCors, authRouter({ identity, config }));
+
+  // ---------- Перенос игр, созданных до появления аккаунтов ----------
+  // Нужны и сессия (куда переносить), и старый токен браузера в Authorization (откуда).
+  const legacyApi = express.Router();
+  legacyApi.use(requireOwner, identity.csrf, (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    req.deviceOwner = deviceOwnerFromRequest(req);
+    next();
+  });
+  legacyApi.get('/', async (req, res) => {
+    res.json({ count: req.deviceOwner ? await legacy.count(req.deviceOwner.id) : 0 });
+  });
+  legacyApi.post('/claim', async (req, res) => {
+    res.json({ claimed: req.deviceOwner ? await legacy.claim(req.deviceOwner.id, req.owner.id) : 0 });
+  });
+  app.use('/api/legacy', hostCors, legacyApi);
 
   // ---------- Сохранённые игры (только ведущий) ----------
   const quizzesApi = express.Router();
-  quizzesApi.use(express.json({ limit: '256kb' }), requireOwner, (req, res, next) => {
+  quizzesApi.use(express.json({ limit: '256kb' }), requireOwner, identity.csrf, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     next();
   });
@@ -180,13 +251,41 @@ function createApp({ config, quizService, images, rooms, roomLimiter }) {
   return app;
 }
 
-export async function startServer(overrides = {}) {
-  const config = loadConfig(overrides);
+// База могла ещё не проснуться (деплой, перезапуск БД) — несколько попыток перед отказом.
+async function connectDb(db, attempts) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await db.ping();
+      return;
+    } catch (error) {
+      if (attempt >= attempts) throw new Error(`Нет связи с базой данных: ${error.message}`);
+      console.warn(`[db] нет связи (${error.message}), попытка ${attempt}/${attempts}…`);
+      await new Promise((resolve) => setTimeout(resolve, 3_000));
+    }
+  }
+}
 
-  const store = new JsonQuizStore(config.dataFile);
-  await store.init();
-  const images = new ImageStore(config.imagesDir, { maxBytes: QUIZ_LIMITS.imageMaxBytes });
-  await images.init();
+export async function startServer(overrides = {}) {
+  const { db: providedDb, ...configOverrides } = overrides;
+  const config = loadConfig(configOverrides);
+
+  const db = providedDb ?? createDb({ url: config.databaseUrl, ssl: config.databaseSsl, schema: config.databaseSchema || undefined });
+  const ownsDb = !providedDb;
+  await connectDb(db, config.dbConnectAttempts ?? 10);
+  await migrate(db, { log: config.quiet ? null : console.log });
+
+  const identity = createIdentity({ db, config });
+  const admin = await identity.accounts.ensureAdmin({ login: config.adminLogin, passwordHash: config.adminPasswordHash }, identity.sessions);
+  if (!config.quiet && admin.status !== 'ok') console.log(`[admin] вход администратора: ${admin.status}`);
+  try {
+    await importLegacyData(db, { dataFile: config.dataFile, imagesDir: config.imagesDir, maxImageBytes: QUIZ_LIMITS.imageMaxBytes, log: config.quiet ? null : console.log });
+  } catch (error) {
+    console.error('[db] перенос старых игр не удался:', error.message);
+  }
+  const legacy = new LegacyService(db);
+
+  const store = new PgQuizStore(db);
+  const images = new PgImageStore(db, { maxBytes: QUIZ_LIMITS.imageMaxBytes });
   const quizService = new QuizService(store, { images });
   const rooms = new RoomManager({ maxRooms: config.maxRooms, maxPlayersPerRoom: config.maxPlayersPerRoom });
   const roomLimiter = new RateLimiter({ windowMs: 60_000, max: 30 });
@@ -205,10 +304,17 @@ export async function startServer(overrides = {}) {
   imageGc.unref();
   collectImages();
 
-  const app = createApp({ config, quizService, images, rooms, roomLimiter });
+  // Уборка старых счётчиков попыток и истёкших сессий — лёгкие запросы раз в час.
+  const maintenance = setInterval(() => {
+    identity.throttle.cleanup().catch((error) => console.error('[db] уборка лимитов:', error.message));
+    identity.sessions.cleanup().catch((error) => console.error('[db] уборка сессий:', error.message));
+  }, 60 * 60_000);
+  maintenance.unref();
+
+  const app = createApp({ config, db, identity, legacy, quizService, images, rooms, roomLimiter });
   const server = http.createServer(app);
   const io = new Server(server, {
-    cors: { origin: config.allOrigins, methods: ['GET', 'POST'] },
+    cors: { origin: config.allOrigins, methods: ['GET', 'POST'], credentials: true },
     maxHttpBufferSize: SOCKET_MAX_MESSAGE_BYTES,
     // Телефоны засыпают, переключаются между Wi-Fi и мобильной сетью, а бесплатный хостинг
     // может «задуматься» на пару секунд. Слишком строгие пинги рвали такие соединения,
@@ -223,7 +329,18 @@ export async function startServer(overrides = {}) {
       callback(null, !origin || config.allOrigins.includes(origin) || isSameOrigin(origin, req.headers.host));
     },
   });
-  const sockets = registerSocketHandlers(io, { rooms, quizService, images, config });
+  // Личность подключения (посетитель, сессия, аккаунт) — по cookie из handshake.
+  // Если БД недоступна, игрок всё равно может играть: подключение остаётся анонимным.
+  io.use(async (socket, next) => {
+    try {
+      socket.identity = await identity.fromHandshake(socket);
+    } catch (error) {
+      console.error('[socket] не удалось определить сессию:', error.message);
+      socket.identity = { ip: null, userAgent: null, visitorId: null, session: null, account: null, sessionToken: null };
+    }
+    next();
+  });
+  const sockets = registerSocketHandlers(io, { rooms, quizService, images, config, identity });
 
   await new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -239,6 +356,8 @@ export async function startServer(overrides = {}) {
     server,
     rooms,
     config,
+    db,
+    identity,
     port,
     url: `http://localhost:${port}`,
     close() {
@@ -246,8 +365,11 @@ export async function startServer(overrides = {}) {
         sockets.closeAll('shutdown');
         sockets.stop();
         roomLimiter.stop();
+        identity.stop();
         clearInterval(imageGc);
+        clearInterval(maintenance);
         await new Promise((resolve) => io.close(() => resolve()));
+        if (ownsDb) await db.close();
       })();
       return closing;
     },
@@ -257,7 +379,13 @@ export async function startServer(overrides = {}) {
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
-  const instance = await startServer();
+  let instance;
+  try {
+    instance = await startServer();
+  } catch (error) {
+    console.error(`AL Studio: сервер не запущен. ${error.message}`);
+    process.exit(1);
+  }
   const { config } = instance;
   console.log(`AL Studio: сервер запущен на порту ${instance.port}`);
   if (config.serveSites) {
@@ -267,7 +395,7 @@ if (isMain) {
     console.log(`  Сайт ведущего: ${config.hostOrigins.join(', ')}`);
     console.log(`  Сайт игрока:   ${config.playerOrigins.join(', ')}`);
   }
-  console.log(`  Данные игр:    ${config.dataFile}`);
+  console.log('  Данные игр:    PostgreSQL (DATABASE_URL)');
 
   const shutdown = async (signal) => {
     console.log(`\n${signal}: останавливаю сервер…`);

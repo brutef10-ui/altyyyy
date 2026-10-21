@@ -1,23 +1,17 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import { io as connect } from 'socket.io-client';
-import { startServer } from '../server.js';
+import { hostBrowser, startTestServer } from './helpers.js';
 
 // Режим SERVE_SITES: один сервис отдаёт и API, и оба сайта.
 let server;
-let tempDir;
 
 before(async () => {
-  tempDir = await mkdtemp(path.join(os.tmpdir(), 'alstudio-sites-'));
-  server = await startServer({ port: 0, dataFile: path.join(tempDir, 'quizzes.json'), serveSites: true });
+  server = await startTestServer('sites', { serveSites: true });
 });
 
 after(async () => {
   await server.close();
-  await rm(tempDir, { recursive: true, force: true });
 });
 
 function tryConnect(origin) {
@@ -36,12 +30,23 @@ test('сайт игрока отдаётся с корня, сайт ведущ�
   assert.equal(player.status, 200);
   assert.match(await player.text(), /Вход в игру/);
 
-  const host = await fetch(`${server.url}/host/`);
+  // Страницы ведущего — только после входа; без входа — переход на страницу входа.
+  const anonymous = await fetch(`${server.url}/host/`, { redirect: 'manual' });
+  assert.equal(anonymous.status, 302);
+  assert.equal(anonymous.headers.get('location'), '/host/login.html?next=%2Fhost%2F');
+  for (const page of ['editor.html', 'lobby.html', 'game.html', 'results.html']) {
+    assert.equal((await fetch(`${server.url}/host/${page}`, { redirect: 'manual' })).status, 302, page);
+  }
+  assert.equal((await fetch(`${server.url}/host/login.html`)).status, 200);
+
+  const browser = await hostBrowser(server);
+  const host = await browser.fetch('/host/');
   assert.equal(host.status, 200);
   assert.match(await host.text(), /Мои игры/);
 
-  const redirect = await fetch(`${server.url}/host`, { redirect: 'manual' });
+  const redirect = await browser.fetch('/host');
   assert.equal(redirect.status, 301);
+  assert.equal((await fetch(`${server.url}/host`, { redirect: 'manual' })).status, 302, 'без входа — на страницу входа');
 });
 
 test('config.js сайтов указывает на тот же адрес', async () => {

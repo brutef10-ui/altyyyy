@@ -1,0 +1,135 @@
+// /api/auth/* — вход, регистрация, выход, смена пароля, резервный код.
+// Пароли и коды не пишутся в логи и не возвращаются в ответах (кроме однократного показа нового
+// резервного кода его владельцу). Ошибки входа одинаковые для неизвестного логина и неверного пароля.
+import express from 'express';
+import { AppError } from '../errors.js';
+import { normalizeLogin } from '../identity/accounts.js';
+import { unauthorized } from '../identity/index.js';
+import { RULES, throttled } from '../security/throttle.js';
+
+const HOUR = 60 * 60;
+
+export function authRouter({ identity, config }) {
+  const { accounts, sessions, throttle } = identity;
+  const router = express.Router();
+  router.use(express.json({ limit: '4kb' }), (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
+
+  const registerRules = {
+    attemptsIp: { max: Math.max(30, config.registrationsPerIpPerHour * 3), windowSec: HOUR, blockSec: HOUR },
+    ip: { max: config.registrationsPerIpPerHour, windowSec: HOUR, blockSec: HOUR },
+    global: { max: config.registrationsPerHour, windowSec: HOUR, blockSec: 15 * 60 },
+  };
+
+  // Новая сессия после входа или регистрации: старая (если была) отзывается — защита от фиксации сессии.
+  async function startSession(req, res, account) {
+    const { identity: who } = req;
+    if (who.session) await sessions.revoke(who.session.id, 'rotated');
+    const session = await sessions.create(account.id, { visitorId: who.visitorId, ip: who.ip, userAgent: who.userAgent });
+    if (who.visitorId) await identity.visitors.linkAccount(who.visitorId, account.id);
+    await accounts.markLogin(account.id);
+    identity.setSessionCookie(res, session.token);
+    return session;
+  }
+
+  const body = (req) => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
+
+  // Текущее состояние: кто вошёл и CSRF-токен для изменяющих запросов.
+  router.get('/session', (req, res) => {
+    const { account, visitorId } = req.identity;
+    res.json({
+      account: account ? { id: account.id, login: account.login, role: account.role } : null,
+      csrfToken: visitorId ? identity.csrfToken(visitorId) : null,
+      adminContact: config.adminContact || null,
+    });
+  });
+
+  router.post('/register', identity.csrf, async (req, res) => {
+    const input = body(req);
+    // Поле-ловушка: человек его не видит и не заполняет.
+    if (input.website) throw new AppError('Не удалось зарегистрироваться. Обновите страницу.', { code: 'REJECTED' });
+    const { ip, visitorId } = req.identity;
+    const ipKey = `register:ip:${ip}`;
+    const visitorKey = `register:visitor:${visitorId}`;
+    await throttle.check(`register:attempts:${ip}`, ipKey, visitorKey, 'register:global');
+    await throttle.hit(`register:attempts:${ip}`, registerRules.attemptsIp);
+
+    const { account, backupCode } = await accounts.register({ login: input.login, password: input.password });
+    await Promise.all([
+      throttle.hit(ipKey, registerRules.ip),
+      throttle.hit(visitorKey, RULES.registerVisitor),
+      throttle.hit('register:global', registerRules.global),
+    ]);
+    await startSession(req, res, account);
+    res.status(201).json({ account, backupCode });
+  });
+
+  router.post('/login', identity.csrf, async (req, res) => {
+    const input = body(req);
+    const { ip } = req.identity;
+    const login = normalizeLogin(input.login).slice(0, 64);
+    const keys = { ip: `login:ip:${ip}`, account: `login:acct:${login}`, pair: `login:acct-ip:${login}|${ip}` };
+    await throttle.check(keys.ip, keys.pair, keys.account);
+    let account;
+    try {
+      account = await accounts.authenticate(input.login, input.password);
+    } catch (error) {
+      if (error.code === 'BAD_CREDENTIALS') {
+        const blocked = await Promise.all([
+          throttle.hit(keys.ip, RULES.loginIp),
+          throttle.hit(keys.pair, RULES.loginAccountIp),
+          throttle.hit(keys.account, RULES.loginAccount),
+        ]);
+        if (blocked.some(Boolean)) throw throttled(RULES.loginAccountIp.blockSec);
+      }
+      throw error;
+    }
+    await throttle.reset(keys.pair);
+    await startSession(req, res, account);
+    res.json({ account });
+  });
+
+  router.post('/logout', identity.csrf, async (req, res) => {
+    const { session } = req.identity;
+    if (session) await sessions.revoke(session.id, 'logout');
+    identity.clearSessionCookie(res);
+    res.status(204).end();
+  });
+
+  // Смена пароля: нужен текущий пароль. Остальные сессии аккаунта отзываются, текущая — заменяется новой.
+  router.post('/password', identity.csrf, async (req, res) => {
+    const { account, session } = req.identity;
+    if (!account) throw unauthorized();
+    const key = `password:${account.id}`;
+    await throttle.check(key);
+    const input = body(req);
+    try {
+      await accounts.changePassword(account.id, input.currentPassword, input.newPassword);
+    } catch (error) {
+      if (error.code === 'BAD_PASSWORD' && error.status === 403) await throttle.hit(key, RULES.passwordChange);
+      throw error;
+    }
+    await sessions.revokeAll(account.id, 'password-changed', { exceptId: session.id });
+    await startSession(req, res, account);
+    res.json({ ok: true });
+  });
+
+  // Новый резервный код (старый перестаёт действовать). Показывается один раз.
+  router.post('/backup-code', identity.csrf, async (req, res) => {
+    const { account } = req.identity;
+    if (!account) throw unauthorized();
+    const key = `password:${account.id}`;
+    await throttle.check(key);
+    try {
+      const backupCode = await accounts.regenerateBackupCode(account.id, body(req).currentPassword);
+      res.json({ backupCode });
+    } catch (error) {
+      if (error.code === 'BAD_PASSWORD' && error.status === 403) await throttle.hit(key, RULES.passwordChange);
+      throw error;
+    }
+  });
+
+  return router;
+}

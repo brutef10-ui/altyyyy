@@ -38,8 +38,24 @@ function trustProxy(value) {
   return Number.isFinite(hops) ? hops : value;
 }
 
+const flag = (value, fallback) => (value === 'true' ? true : value === 'false' ? false : fallback);
+
+// Локальной БД и внутренней сети Render (адрес без точек, например dpg-abc123-a) шифрование не нужно,
+// внешнему адресу облачной БД — нужно.
+function defaultDatabaseSsl(url) {
+  try {
+    const { hostname } = new URL(url);
+    if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || !hostname.includes('.')) return 'disable';
+    return 'require';
+  } catch {
+    return 'disable';
+  }
+}
+
 export function loadConfig(overrides = {}) {
   const env = process.env;
+  // Render сам выставляет RENDER=true в окружении сервиса.
+  const production = env.NODE_ENV === 'production' || env.RENDER === 'true';
   const hostOrigins = originList(env.HOST_SITE_ORIGIN, ['http://localhost:5500', 'http://127.0.0.1:5500']);
   const playerOrigins = originList(env.PLAYER_SITE_ORIGIN, ['http://localhost:5501', 'http://127.0.0.1:5501']);
 
@@ -64,8 +80,38 @@ export function loadConfig(overrides = {}) {
     finishedRoomTtlMs: 15 * 60_000,
     roomMaxAgeMs: 6 * 60 * 60_000,
     roomSweepIntervalMs: 60_000,
+
+    production,
+    // ---------- База данных ----------
+    databaseUrl: env.DATABASE_URL || '',
+    databaseSsl: env.DATABASE_SSL || defaultDatabaseSsl(env.DATABASE_URL),
+    databaseSchema: env.DATABASE_SCHEMA || '',
+    // ---------- Вход и сессии ----------
+    // Секрет для подписи CSRF-токенов. На Render — обязательная переменная окружения.
+    sessionSecret: env.SESSION_SECRET || '',
+    // Secure-cookie (только HTTPS). По умолчанию включено на Render и при NODE_ENV=production.
+    cookieSecure: flag(env.COOKIE_SECURE, production),
+    sessionIdleDays: integer(env.SESSION_IDLE_DAYS, 14, { min: 1, max: 90 }),
+    sessionAbsoluteDays: integer(env.SESSION_ABSOLUTE_DAYS, 60, { min: 1, max: 365 }),
+    // Регистрации: не больше N с одного IP в час и не больше M на весь сайт в час (защита от авторегистраций).
+    registrationsPerIpPerHour: integer(env.REGISTRATIONS_PER_IP_PER_HOUR, 5, { min: 1, max: 1_000 }),
+    registrationsPerHour: integer(env.REGISTRATIONS_PER_HOUR, 300, { min: 1, max: 100_000 }),
+    // ---------- IP клиента за прокси (docs/ACCOUNTS_PLAN.md, раздел 4) ----------
+    // hops: N-й адрес справа в X-Forwarded-For; header: заголовок, который выставляет доверенный прокси.
+    clientIpMode: env.CLIENT_IP_MODE === 'header' ? 'header' : 'hops',
+    clientIpHeader: String(env.CLIENT_IP_HEADER || '').trim().toLowerCase(),
+    // ---------- Администратор (только из окружения сервера) ----------
+    adminLogin: String(env.ADMIN_LOGIN || '').trim(),
+    adminPasswordHash: String(env.ADMIN_PASSWORD_HASH || '').trim(),
+    adminContact: String(env.ADMIN_CONTACT || '').trim(),
     ...overrides,
   };
+
+  // Сколько последних прокси добавляют свой адрес в X-Forwarded-For. По умолчанию — как TRUST_PROXY.
+  if (config.trustProxyHops === undefined) {
+    const fallback = typeof config.trustProxy === 'number' ? config.trustProxy : config.trustProxy ? 1 : 0;
+    config.trustProxyHops = integer(env.TRUST_PROXY_HOPS, fallback, { min: 0, max: 10 });
+  }
 
   // Картинки к вопросам хранятся рядом с файлом игр (на том же постоянном диске).
   config.imagesDir ??= path.join(path.dirname(config.dataFile), 'images');
@@ -73,6 +119,10 @@ export function loadConfig(overrides = {}) {
   if (config.playerSiteUrl === undefined) {
     // Без адреса в режиме SERVE_SITES лобби покажет адрес, с которого открыт сайт ведущего.
     config.playerSiteUrl = trimUrl(env.PLAYER_SITE_URL) || (config.serveSites ? platformUrl(env) : config.playerOrigins[0]) || null;
+  }
+  // Куда ведёт кнопка «Создать свою игру» на сайте игрока. null — сайт ведущего рядом, по адресу /host/.
+  if (config.hostSiteUrl === undefined) {
+    config.hostSiteUrl = trimUrl(env.HOST_SITE_URL) || (config.serveSites ? null : config.hostOrigins[0]) || null;
   }
   config.allOrigins = [...new Set([...config.hostOrigins, ...config.playerOrigins])];
   return Object.freeze(config);
