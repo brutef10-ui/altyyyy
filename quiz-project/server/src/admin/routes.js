@@ -6,6 +6,7 @@ import { AppError, notFound } from '../errors.js';
 import { forwardedChain } from '../identity/clientIp.js';
 import { RULES } from '../security/throttle.js';
 import { MIN_PREFIX, isUuid, parseIpTarget } from '../security/bans.js';
+import { AdminQueries } from './queries.js';
 
 const MAX_BAN_MINUTES = 10 * 365 * 24 * 60;
 const invalid = (message) => new AppError(message, { status: 422, code: 'INVALID' });
@@ -90,6 +91,36 @@ export function adminRouter({ db, identity, audit, config }) {
   const mutating = [identity.csrf, adminOps];
 
   const auditMeta = (req) => ({ admin: req.identity.account, ip: req.identity.ip, userAgent: req.identity.userAgent });
+  const queries = new AdminQueries(db);
+
+  // ---------- Чтение: списки, карточки, журналы ----------
+
+  router.get('/overview', async (req, res) => {
+    res.json(await queries.overview());
+  });
+  router.get('/accounts', async (req, res) => {
+    res.json(await queries.accounts(req.query));
+  });
+  router.get('/visitors', async (req, res) => {
+    res.json(await queries.visitors(req.query));
+  });
+  // Открытие карточки (IP, устройства, история) — доступ к персональным данным, поэтому пишется в аудит.
+  router.get('/accounts/:id', async (req, res) => {
+    const card = await queries.account(req.params.id);
+    await audit.record({ ...auditMeta(req), action: 'account.view', targetType: 'account', targetId: card.account.id, details: { login: card.account.login } });
+    res.json(card);
+  });
+  router.get('/visitors/:id', async (req, res) => {
+    const card = await queries.visitor(req.params.id);
+    await audit.record({ ...auditMeta(req), action: 'visitor.view', targetType: 'visitor', targetId: card.visitor.id });
+    res.json(card);
+  });
+  router.get('/events', async (req, res) => {
+    res.json(await queries.events(req.query));
+  });
+  router.get('/audit', async (req, res) => {
+    res.json(await queries.audit(req.query));
+  });
 
   // Одноразовый код восстановления для пользователя. Код возвращается один раз и нигде не сохраняется в открытом виде.
   router.post('/accounts/:id/recovery-code', ...mutating, async (req, res) => {

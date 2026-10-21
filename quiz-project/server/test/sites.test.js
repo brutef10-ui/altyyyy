@@ -67,3 +67,16 @@ test('Socket.IO принимает страницы с того же адрес�
   assert.equal(await tryConnect(`http://localhost:${server.port}`), true);
   assert.equal(await tryConnect('https://evil.example'), false);
 });
+
+test('общие файлы дизайна одинаковы во всех сайтах', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const path = await import('node:path');
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const same = async (files) => {
+    const [first, ...rest] = await Promise.all(files.map((file) => readFile(path.join(root, file), 'utf8')));
+    rest.forEach((content, index) => assert.equal(content, first, `${files[index + 1]} отличается от ${files[0]}`));
+  };
+  await same(['host-site/css/theatre.css', 'player-site/css/theatre.css', 'admin-site/css/theatre.css']);
+  await same(['host-site/js/theatre.js', 'player-site/js/theatre.js', 'admin-site/js/theatre.js']);
+  await same(['host-site/js/banned.js', 'player-site/js/banned.js']);
+});

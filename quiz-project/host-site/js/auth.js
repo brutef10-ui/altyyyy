@@ -38,7 +38,9 @@ export function safeNext(value, fallback = 'index.html') {
   try {
     const url = new URL(value, location.href);
     const base = new URL('./', location.href);
-    if (url.origin !== location.origin || !url.pathname.startsWith(base.pathname) || /login\.html$/.test(url.pathname)) return fallback;
+    // Сайт ведущего или админ-консоль на том же сервере (/admin/).
+    const allowed = url.pathname.startsWith(base.pathname) || url.pathname === '/admin/' || url.pathname.startsWith('/admin/');
+    if (url.origin !== location.origin || !allowed || /login\.html$/.test(url.pathname)) return fallback;
     return url.pathname + url.search + url.hash;
   } catch {
     return fallback;

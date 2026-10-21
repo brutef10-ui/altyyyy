@@ -65,6 +65,30 @@ function mountSites(app, config) {
   app.use(express.static(playerDir));
 }
 
+// Админ-консоль: сервер отдаёт её файлы (HTML, скрипты, стили) только администратору.
+// Гостя — на страницу входа, остальным — 403. Данные консоли — отдельно, в /api/admin/* с той же проверкой.
+function mountAdmin(app, config) {
+  const adminDir = path.join(config.sitesRoot, 'admin-site');
+  app.use('/admin', (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    const account = req.identity?.account;
+    if (!account) {
+      if (req.method === 'GET' && (req.path === '/' || req.path === '/index.html')) {
+        const login = config.serveSites ? '/host/login.html' : `${config.hostOrigins[0]}/login.html`;
+        res.redirect(302, config.serveSites ? `${login}?next=${encodeURIComponent('/admin/')}` : login);
+      } else {
+        res.status(401).type('text/plain; charset=utf-8').send('Войдите в аккаунт администратора.');
+      }
+      return;
+    }
+    if (account.role !== 'admin') {
+      res.status(403).type('text/html; charset=utf-8').send('<!doctype html><meta charset="utf-8"><title>Нет доступа</title><p>Недостаточно прав.</p>');
+      return;
+    }
+    next();
+  }, express.static(adminDir, { index: 'index.html' }));
+}
+
 function isSameOrigin(origin, host) {
   try {
     return new URL(origin).host === host;
@@ -76,6 +100,7 @@ function isSameOrigin(origin, host) {
 // Запросы, которым нужна личность (посетитель, сессия): страницы сайта и API, кроме картинок.
 function needsIdentity(req) {
   if (req.path.startsWith('/api/')) return !(req.method === 'GET' && req.path.startsWith('/api/images/'));
+  if (req.path === '/admin' || req.path.startsWith('/admin/')) return true;
   // Страницы: «…/», «….html» и адреса без расширения (например, /host до перенаправления на /host/).
   return (req.method === 'GET' || req.method === 'HEAD') && (req.path.endsWith('.html') || !/\.[A-Za-z0-9]+$/.test(req.path));
 }
@@ -113,6 +138,7 @@ function createApp({ config, db, identity, audit, events, legacy, quizService, i
   app.use((req, res, next) => (needsIdentity(req) ? identify(req, res, next) : next()));
 
   if (config.serveSites) mountSites(app, config);
+  mountAdmin(app, config);
 
   app.get('/', (req, res) => res.json({ name: 'AL Studio — сервер квиз-игры', status: 'ok' }));
   app.get('/health', async (req, res) => {

@@ -1,0 +1,1596 @@
+/* AL Studio — «Большой театр». Основа обоих сайтов: токены, база, общие компоненты, занавес.
+   Файл одинаковый на сайте ведущего и игрока (меняйте оба). Стили отдельных экранов — в своих файлах.
+   Стилизация иллюстративная: плоские цвета, золотой контур, объём через 3D и слои. См. DESIGN.md. */
+
+:root {
+  /* Палитра */
+  --night: #1a0910;
+  --night-2: #2a0f18;
+  --night-3: #3a1520;
+  --velvet: #8c1529;
+  --velvet-deep: #5c0c1b;
+  --velvet-light: #b3243d;
+  --gold: #d8ac4c;
+  --gold-light: #f3d98b;
+  --gold-deep: #8f6a22;
+  --ivory: #f7ecd4;
+  --paper-2: #ead9b6;
+  --ink: #2b1218;
+  --ink-soft: #6b4a3c;
+  --wood: #6b3f22;
+  --wood-light: #8e5a32;
+  --wood-dark: #4a2a16;
+  --light: #ffe9b0;
+
+  /* Цвета вариантов — драгоценные металлы и камни, в тон золоту и бархату, но не сливаются
+     с интерфейсом. Эмблемы: комедия, трагедия, арфа, полумаска (одинаковые на проекторе и телефонах) */
+  --copper: #c46a32;
+  --indigo: #3e63ad;
+  --patina: #2a8579;
+  --amethyst: #84479a;
+  --a0: var(--copper);
+  --a1: var(--indigo);
+  --a2: var(--patina);
+  --a3: var(--amethyst);
+  --rose: #c42a43;
+  --amber: #d99a1e;
+
+  --success: #2f9e5e;
+  --danger: #d23a3a;
+  --warning: var(--amber);
+
+  /* Роли (на тёмном зале). Внутри бумажных карточек роли переопределяются. */
+  --bg: var(--night);
+  --text: var(--ivory);
+  --muted: #d4bb94;
+  --surface: rgba(247, 236, 212, 0.06);
+  --surface-strong: rgba(247, 236, 212, 0.12);
+  --surface-solid: var(--night-2);
+  --border: rgba(216, 172, 76, 0.42);
+  --accent: var(--gold);
+  --accent-gradient: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 46%, #c09034 100%);
+
+  /* Материалы */
+  --fold: clamp(40px, 5.2vw, 92px);
+  --velvet-folds: repeating-linear-gradient(90deg,
+    var(--velvet-deep) 0,
+    var(--velvet) calc(var(--fold) * 0.22),
+    var(--velvet-light) calc(var(--fold) * 0.46),
+    var(--velvet) calc(var(--fold) * 0.7),
+    var(--velvet-deep) var(--fold));
+  --gold-leaf: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 42%, #b98a33 78%, var(--gold-deep) 100%);
+  --gold-frame: 0 0 0 1px var(--gold-deep), 0 0 0 3px var(--gold), 0 0 0 4px var(--gold-deep);
+  --programme-frame: inset 0 0 0 1px rgba(143, 106, 34, 0.55), inset 0 0 0 6px var(--ivory), inset 0 0 0 7px var(--gold), inset 0 0 0 9px var(--ivory), inset 0 0 0 10px rgba(143, 106, 34, 0.45);
+  --boards: repeating-linear-gradient(90deg, var(--wood) 0 76px, var(--wood-dark) 76px 78px, var(--wood-light) 78px 154px, var(--wood-dark) 154px 156px);
+
+  /* Шрифты */
+  --font: 'Lora', Georgia, 'Times New Roman', serif;
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+
+  /* Формы и тени */
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 18px 40px rgba(5, 1, 3, 0.55);
+  --shadow-lift: 0 4px 0 rgba(0, 0, 0, 0.3), 0 26px 50px rgba(5, 1, 3, 0.6);
+  --glow-gold: 0 0 0 3px rgba(243, 217, 139, 0.55), 0 0 26px rgba(243, 217, 139, 0.45);
+
+  /* Движение */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-curtain: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --t-micro: 160ms;
+  --t-element: 480ms;
+  --t-curtain: 1100ms;
+
+  --topbar-h: 76px;
+  --bar-h: 92px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---------- База ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--night);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--text);
+  background:
+    radial-gradient(70% 55% at 50% -8%, rgba(255, 233, 176, 0.16), transparent 70%),
+    radial-gradient(40% 60% at -6% 40%, rgba(140, 21, 41, 0.38), transparent 70%),
+    radial-gradient(40% 60% at 106% 40%, rgba(140, 21, 41, 0.38), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+h2,
+h3 {
+  font-weight: 700;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.display {
+  font-family: var(--font-display);
+}
+
+.kicker {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  color: var(--gold-light);
+  letter-spacing: 0.01em;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--gold-light);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+/* ---------- Логотип ---------- */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ivory);
+  text-decoration: none;
+}
+
+.brand-mark {
+  flex: none;
+  width: 44px;
+  height: 40px;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+  transition: transform var(--t-element) var(--ease-spring);
+}
+
+a.brand:hover .brand-mark {
+  transform: perspective(300px) rotateY(-14deg) scale(1.06);
+}
+
+.brand-word {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28em;
+  font-family: var(--font-display);
+  font-size: 25px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.brand-al {
+  font-weight: 900;
+  color: var(--gold-light);
+  letter-spacing: 0.02em;
+}
+
+.brand-studio {
+  font-style: italic;
+  font-weight: 700;
+  color: var(--ivory);
+}
+
+/* ---------- Шапка: ламбрекен над сценой ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: var(--topbar-h);
+  padding: 0 28px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.32), transparent 38%, rgba(0, 0, 0, 0.22)),
+    var(--velvet-folds);
+  border-bottom: 3px solid var(--gold);
+  box-shadow: 0 1px 0 var(--gold-deep), inset 0 -1px 0 var(--gold-light);
+}
+
+/* Фестоны ламбрекена с золотой каймой */
+.topbar::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 16px;
+  margin-top: 3px;
+  background: radial-gradient(ellipse 50% 100% at 50% 0, var(--velvet) 0 64%, var(--gold) 64% 78%, var(--gold-deep) 78% 82%, transparent 84%) 0 0 / 56px 16px repeat-x;
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.topbar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-style: italic;
+  font-weight: 700;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gold-light);
+}
+
+.topbar .btn-ghost {
+  background: rgba(26, 9, 16, 0.55);
+}
+
+/* ---------- Каркас ---------- */
+
+.container {
+  width: min(1120px, 100% - 48px);
+  margin-inline: auto;
+}
+
+.page-intro {
+  display: grid;
+  gap: 10px;
+  margin: 52px 0 32px;
+}
+
+.page-intro h1 {
+  font-size: clamp(40px, 5.4vw, 72px);
+  color: var(--ivory);
+}
+
+.page-intro p {
+  max-width: 720px;
+  font-size: 18px;
+}
+
+/* Сцены (лобби, игра, церемония) занимают весь экран */
+.stage {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.stage > main {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Кулисы по краям сцены */
+.stage {
+  --drape: clamp(14px, 2.2vw, 40px);
+}
+
+.stage::before,
+.stage::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 25;
+  width: var(--drape);
+  --fold: 18px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent 30%, transparent 75%, rgba(0, 0, 0, 0.45)),
+    var(--velvet-folds);
+  pointer-events: none;
+}
+
+.stage::before {
+  left: 0;
+  border-right: 2px solid var(--gold-deep);
+  box-shadow: 6px 0 16px rgba(0, 0, 0, 0.5);
+  transform-origin: 0 0;
+  animation: drape-breathe 9s ease-in-out infinite;
+}
+
+.stage::after {
+  right: 0;
+  border-left: 2px solid var(--gold-deep);
+  box-shadow: -6px 0 16px rgba(0, 0, 0, 0.5);
+  transform-origin: 100% 0;
+  animation: drape-breathe 9s ease-in-out -4.5s infinite;
+}
+
+/* ---------- Карточка-программка ---------- */
+
+.card,
+.programme {
+  --text: var(--ink);
+  --muted: var(--ink-soft);
+  --surface: rgba(43, 18, 24, 0.05);
+  --surface-strong: rgba(43, 18, 24, 0.1);
+  --border: rgba(143, 106, 34, 0.5);
+  position: relative;
+  color: var(--text);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #fff8e8 0%, transparent 60%),
+    var(--ivory);
+  border-radius: var(--radius);
+  box-shadow: var(--programme-frame), var(--shadow);
+}
+
+/* Уголки-орнаменты рамки */
+.card.has-corners::before,
+.programme::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: calc(var(--radius) - 3px);
+  background:
+    radial-gradient(circle at 0 0, var(--gold) 0 5px, transparent 5.5px),
+    radial-gradient(circle at 100% 0, var(--gold) 0 5px, transparent 5.5px),
+    radial-gradient(circle at 0 100%, var(--gold) 0 5px, transparent 5.5px),
+    radial-gradient(circle at 100% 100%, var(--gold) 0 5px, transparent 5.5px);
+  pointer-events: none;
+}
+
+/* Тёмная ложа — приподнятая тёмная поверхность с золотым контуром */
+.box {
+  position: relative;
+  color: var(--ivory);
+  background: linear-gradient(180deg, var(--night-3), var(--night-2));
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(243, 217, 139, 0.18), var(--shadow);
+}
+
+/* ---------- Кнопки: латунная табличка, бархат, ложа ---------- */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 11px 22px;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--ivory);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  isolation: isolate;
+  overflow: hidden;
+  transform: perspective(600px) translateY(0) rotateX(0deg);
+  transition:
+    transform var(--t-micro) var(--ease-out),
+    box-shadow 240ms var(--ease-out),
+    background-color 240ms ease,
+    border-color 240ms ease,
+    color 240ms ease,
+    opacity 240ms ease;
+}
+
+/* Блик, пробегающий по табличке при наведении */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 250, 230, 0.55) 46%, transparent 62%);
+  transform: translateX(-120%);
+  transition: transform 700ms var(--ease-out);
+  pointer-events: none;
+}
+
+.btn:hover:not(:disabled)::after {
+  transform: translateX(120%);
+}
+
+.btn:hover:not(:disabled) {
+  transform: perspective(600px) translateY(-2px) rotateX(9deg);
+}
+
+.btn:active:not(:disabled) {
+  transform: perspective(600px) translateY(2px) rotateX(-4deg) scale(0.98);
+  transition-duration: 90ms;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  filter: saturate(0.6);
+}
+
+.btn-primary {
+  color: var(--ink);
+  background: var(--gold-leaf);
+  border-color: var(--gold-deep);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 244, 210, 0.45),
+    inset 0 0 0 4px rgba(143, 106, 34, 0.6),
+    0 3px 0 var(--gold-deep),
+    0 12px 26px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 0 rgba(255, 244, 210, 0.6);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 244, 210, 0.55),
+    inset 0 0 0 4px rgba(143, 106, 34, 0.6),
+    0 5px 0 var(--gold-deep),
+    0 18px 34px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(243, 217, 139, 0.35);
+}
+
+.btn-velvet,
+.btn-secondary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 45%, rgba(0, 0, 0, 0.18)),
+    var(--velvet);
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 3px rgba(92, 12, 27, 0.6), 0 3px 0 var(--velvet-deep), 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+.btn-velvet:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--velvet-light);
+}
+
+.btn-ghost {
+  background: rgba(247, 236, 212, 0.05);
+  border-color: rgba(216, 172, 76, 0.55);
+  color: var(--ivory);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(247, 236, 212, 0.12);
+  border-color: var(--gold);
+}
+
+/* На бумаге кнопка-ложа становится тёмной гравировкой */
+.card .btn-ghost,
+.programme .btn-ghost,
+.modal .btn-ghost,
+.overlay-box .btn-ghost {
+  color: var(--ink);
+  background: transparent;
+  border-color: rgba(143, 106, 34, 0.6);
+}
+
+.card .btn-ghost:hover:not(:disabled),
+.programme .btn-ghost:hover:not(:disabled),
+.modal .btn-ghost:hover:not(:disabled),
+.overlay-box .btn-ghost:hover:not(:disabled) {
+  background: rgba(216, 172, 76, 0.16);
+  border-color: var(--gold-deep);
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, #e3534f, var(--danger) 55%, #a92626);
+  border-color: #7d1717;
+  box-shadow: inset 0 0 0 3px rgba(255, 220, 210, 0.25), 0 3px 0 #7d1717, 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+.btn-dashed {
+  background: transparent;
+  border: 2px dashed rgba(216, 172, 76, 0.6);
+  color: var(--gold-light);
+}
+
+.btn-dashed:hover:not(:disabled) {
+  border-color: var(--gold-light);
+  background: rgba(216, 172, 76, 0.08);
+}
+
+.btn-small {
+  min-height: 38px;
+  padding: 7px 15px;
+  font-size: 15px;
+}
+
+.btn-lg {
+  min-height: 58px;
+  padding: 14px 30px;
+  font-size: 20px;
+}
+
+.btn-xl {
+  min-height: 72px;
+  padding: 16px 46px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-icon {
+  width: 48px;
+  padding: 0;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid rgba(216, 172, 76, 0.55);
+  border-radius: 50%;
+  background: rgba(26, 9, 16, 0.5);
+  color: var(--gold-light);
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+  transition: transform var(--t-micro) var(--ease-out), background-color 200ms ease, border-color 200ms ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+  transform: perspective(300px) rotateY(18deg) scale(1.06);
+  border-color: var(--gold-light);
+  background: rgba(140, 21, 41, 0.5);
+}
+
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.card .icon-btn,
+.programme .icon-btn {
+  color: var(--ink);
+  background: rgba(216, 172, 76, 0.12);
+  border-color: rgba(143, 106, 34, 0.5);
+}
+
+.card .icon-btn:hover:not(:disabled),
+.programme .icon-btn:hover:not(:disabled) {
+  background: rgba(216, 172, 76, 0.3);
+  border-color: var(--gold-deep);
+}
+
+.icon-btn-spacer {
+  width: 40px;
+}
+
+/* ---------- Табличка-номерок и бейдж ---------- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 15px;
+  border: 1.5px solid rgba(216, 172, 76, 0.6);
+  border-radius: 999px;
+  background: rgba(26, 9, 16, 0.6);
+  color: var(--ivory);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.pill-gold {
+  color: var(--ink);
+  background: var(--gold-leaf);
+  border-color: var(--gold-deep);
+}
+
+.card .pill,
+.programme .pill {
+  color: var(--ink);
+  background: var(--paper-2);
+  border-color: rgba(143, 106, 34, 0.5);
+}
+
+/* ---------- Поля: строка билета ---------- */
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.input {
+  width: 100%;
+  min-height: 50px;
+  padding: 11px 16px;
+  border: 1.5px solid rgba(143, 106, 34, 0.45);
+  border-bottom: 3px solid var(--gold-deep);
+  border-radius: var(--radius-sm) var(--radius-sm) 6px 6px;
+  background: #fffaf0;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  transition: border-color 200ms ease, box-shadow 240ms var(--ease-out), background-color 200ms ease;
+}
+
+.input::placeholder {
+  color: rgba(107, 74, 60, 0.6);
+}
+
+.input:hover {
+  border-color: rgba(143, 106, 34, 0.75);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--gold);
+  border-bottom-color: var(--gold-deep);
+  background: #fffdf6;
+  box-shadow: 0 0 0 4px rgba(216, 172, 76, 0.35), 0 6px 18px rgba(216, 172, 76, 0.2);
+}
+
+.input-lg {
+  min-height: 60px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.input[aria-invalid='true'],
+.input.is-invalid {
+  border-color: var(--danger);
+  border-bottom-color: var(--danger);
+}
+
+/* ---------- Плашки сообщений ---------- */
+
+.banner,
+.status,
+.error-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 22px;
+  padding: 14px 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ivory);
+  background: linear-gradient(90deg, rgba(216, 172, 76, 0.16), rgba(216, 172, 76, 0.05));
+  border: 1.5px solid rgba(216, 172, 76, 0.5);
+  border-left-width: 5px;
+  animation: drop-in var(--t-element) var(--ease-out) both;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.status,
+.error-box {
+  background: linear-gradient(90deg, rgba(210, 58, 58, 0.22), rgba(210, 58, 58, 0.07));
+  border-color: rgba(230, 110, 100, 0.6);
+}
+
+.error-box {
+  display: block;
+}
+
+.error-box ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.form-error {
+  color: #ffb3a8;
+  font-weight: 600;
+}
+
+.card .form-error,
+.programme .form-error {
+  color: #b02a2a;
+}
+
+/* ---------- Нижняя панель: рампа ---------- */
+
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  margin-top: 36px;
+  padding: 16px 28px calc(14px + var(--safe-bottom));
+  background:
+    linear-gradient(180deg, rgba(255, 233, 176, 0.12), transparent 30%),
+    linear-gradient(180deg, var(--wood) 0%, var(--wood-dark) 100%);
+  border-top: 3px solid var(--gold);
+  box-shadow: 0 -1px 0 var(--gold-deep), 0 -16px 36px rgba(0, 0, 0, 0.45);
+}
+
+/* Огни рампы вдоль края сцены */
+.action-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 14px;
+  margin-bottom: 3px;
+  background: radial-gradient(circle at 50% 100%, var(--light) 0 3px, rgba(255, 233, 176, 0.5) 4px, rgba(255, 233, 176, 0) 12px) 0 0 / 46px 14px repeat-x;
+  pointer-events: none;
+  animation: footlights 4s ease-in-out infinite;
+}
+
+.action-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.action-bar-inner > .muted {
+  color: var(--paper-2);
+}
+
+.action-bar-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.stage .action-bar {
+  margin-top: 0;
+}
+
+.stage-bar .action-bar-inner {
+  min-height: calc(var(--bar-h) - 30px);
+}
+
+/* ---------- Портреты игроков ---------- */
+
+.avatar {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--night-3);
+  border: 3px solid var(--gold);
+  box-shadow: 0 0 0 1.5px var(--gold-deep), 0 6px 14px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: var(--gold-light);
+}
+
+.avatar-sm {
+  width: 40px;
+  height: 40px;
+  border-width: 2px;
+}
+
+.avatar-lg {
+  width: 96px;
+  height: 96px;
+  border-width: 4px;
+}
+
+.avatar-xl {
+  width: clamp(104px, 10vw, 156px);
+  height: clamp(104px, 10vw, 156px);
+  border-width: 5px;
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 0 0 7px rgba(216, 172, 76, 0.18), 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.avatar-placeholder {
+  background:
+    radial-gradient(circle at 35% 30%, var(--velvet-light), var(--velvet) 55%, var(--velvet-deep));
+  color: var(--gold-light);
+}
+
+/* ---------- Цвета вариантов ответа ---------- */
+
+.answer-0 { --tone: var(--a0); }
+.answer-1 { --tone: var(--a1); }
+.answer-2 { --tone: var(--a2); }
+.answer-3 { --tone: var(--a3); }
+
+/* ---------- Записки, диалог, оверлей ---------- */
+
+.toasts {
+  position: fixed;
+  right: 24px;
+  bottom: calc(var(--bar-h) + 24px);
+  z-index: 200;
+  display: grid;
+  gap: 12px;
+  max-width: min(420px, calc(100% - 48px));
+  perspective: 900px;
+}
+
+.toast {
+  padding: 14px 20px 14px 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: var(--ivory);
+  border-left: 6px solid var(--gold);
+  box-shadow: inset 0 0 0 1px rgba(143, 106, 34, 0.4), var(--shadow);
+  font-weight: 600;
+  transform-origin: 50% 0;
+  animation: note-in 520ms var(--ease-spring) both;
+}
+
+.toast-success {
+  border-left-color: var(--success);
+}
+
+.toast-error {
+  border-left-color: var(--danger);
+}
+
+.toast.is-leaving {
+  animation: note-out 320ms var(--ease-out) forwards;
+}
+
+.modal {
+  --text: var(--ink);
+  --muted: var(--ink-soft);
+  width: min(480px, calc(100% - 32px));
+  padding: 34px 32px 30px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow-lift);
+  transform-origin: 50% 0;
+}
+
+.modal[open] {
+  animation: programme-in 560ms var(--ease-spring) both;
+}
+
+.modal::backdrop {
+  background: radial-gradient(60% 60% at 50% 40%, rgba(26, 9, 16, 0.55), rgba(10, 3, 6, 0.86));
+  backdrop-filter: blur(3px);
+  animation: fade-in 300ms ease both;
+}
+
+.modal-title {
+  margin-bottom: 10px;
+  font-size: 28px;
+}
+
+.modal p {
+  overflow-wrap: anywhere;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(60% 60% at 50% 40%, rgba(42, 15, 24, 0.82), rgba(10, 3, 6, 0.94));
+  backdrop-filter: blur(4px);
+  animation: fade-in 260ms ease both;
+}
+
+.overlay-box {
+  --text: var(--ink);
+  --muted: var(--ink-soft);
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  max-width: 480px;
+  padding: 40px 36px;
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow-lift);
+  text-align: center;
+  font-size: 19px;
+  font-weight: 600;
+  animation: programme-in 560ms var(--ease-spring) both;
+}
+
+.overlay-icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  color: var(--ivory);
+  background: var(--danger);
+  box-shadow: var(--gold-frame);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 900;
+}
+
+/* Загрузка: золотое кольцо с бегущим бликом */
+.spinner {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 55%, var(--gold) 80%, var(--gold-light) 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  animation: spin 900ms linear infinite;
+}
+
+.spinner-sm {
+  width: 34px;
+  height: 34px;
+}
+
+.spinner-xs {
+  width: 18px;
+  height: 18px;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+}
+
+/* ---------- Декор сцены (для экранов) ---------- */
+
+/* Ряд огней рампы: <div class="footlights"></div> */
+.footlights {
+  height: 16px;
+  background: radial-gradient(circle at 50% 50%, var(--light) 0 3.5px, rgba(255, 233, 176, 0.45) 5px, rgba(255, 233, 176, 0) 12px) 0 0 / 44px 16px repeat-x;
+  animation: footlights 4s ease-in-out infinite;
+}
+
+/* Мягкий конус прожектора сверху: <div class="spotlight"></div> внутри position: relative */
+.spotlight {
+  position: absolute;
+  left: 50%;
+  top: -10%;
+  width: min(900px, 90%);
+  height: 120%;
+  transform: translateX(-50%);
+  background: radial-gradient(50% 100% at 50% 0%, rgba(255, 233, 176, 0.22), rgba(255, 233, 176, 0.06) 60%, transparent 75%);
+  -webkit-mask: linear-gradient(180deg, #000 60%, transparent);
+  mask: linear-gradient(180deg, #000 60%, transparent);
+  pointer-events: none;
+}
+
+/* Медальон с фигурой ответа */
+.medallion {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--tone, var(--gold));
+  background: radial-gradient(circle at 35% 30%, #fff8e6, var(--ivory) 45%, var(--paper-2));
+  box-shadow: var(--gold-frame), 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.medallion svg {
+  width: 58%;
+  height: 58%;
+}
+
+/* ---------- Занавес ---------- */
+
+/* Разметка — первой в <body>: две кулисы по 8 складок и ламбрекен:
+   <div class="curtain" aria-hidden="true"><div class="curtain-drape curtain-left"><i></i>×8</div>
+   <div class="curtain-drape curtain-right"><i></i>×8</div><div class="curtain-valance"></div></div>
+   При загрузке открывается сам; js/theatre.js закрывает его перед уходом со страницы.
+
+   Физика ткани: складки собираются гармошкой — каждая поворачивается в 3D (соседние в разные
+   стороны, грани от света темнеют) и сдвигается к краю. Все складки движутся синхронно, а сдвиг
+   чуть меньше, чем нужно для стыка, — соседние складки всегда немного перекрываются, просветов
+   между ними нет. Низ кулисы отстаёт от верха (наклон), при закрытии складки по инерции
+   проскакивают ровное положение и успокаиваются, вся кулиса покачивается. */
+.curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 1500px;
+  perspective-origin: 50% 35%;
+}
+
+/* Кулиса заходит за край экрана на 64px: при раскачивании её угол не открывает край сцены */
+.curtain-drape {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(50.8% + 64px);
+  transform-origin: 50% 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.curtain-left {
+  --dir: -1;
+  left: -64px;
+  animation: drape-open 1350ms var(--ease-curtain) 140ms both;
+}
+
+.curtain-right {
+  --dir: 1;
+  right: -64px;
+  animation: drape-open 1350ms var(--ease-curtain) 140ms both;
+}
+
+/* Складка: одна волна бархата — тень, блик, тень; сверху свет рампы, внизу тень.
+   Ширина чуть больше шага, по краям — тёмная кромка: стыки складок не просвечивают. */
+.curtain-drape > i {
+  --fold-w: 12.5%;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--fold-w) + 1%);
+  background:
+    linear-gradient(180deg, rgba(255, 214, 196, 0.1), transparent 30%, transparent 70%, rgba(0, 0, 0, 0.42)),
+    linear-gradient(90deg, rgba(20, 2, 8, 0.6), rgba(20, 2, 8, 0.12) 22%, rgba(255, 190, 190, 0.16) 48%, rgba(20, 2, 8, 0.1) 74%, rgba(20, 2, 8, 0.6)),
+    var(--velvet);
+  box-shadow: 1px 0 0 #3a0712, -1px 0 0 #3a0712;
+  will-change: transform;
+  animation: fold-gather 820ms cubic-bezier(.55, 0, .3, 1) 260ms both;
+}
+
+.curtain-left > i { left: calc(var(--i) * var(--fold-w)); }
+.curtain-right > i { right: calc(var(--i) * var(--fold-w)); }
+
+/* --i — номер складки от внешнего края (0) к ведущему (7); --s — в какую сторону она повёрнута */
+.curtain-drape > i:nth-child(1) { --i: 0; --s: 1; }
+.curtain-drape > i:nth-child(2) { --i: 1; --s: -1; }
+.curtain-drape > i:nth-child(3) { --i: 2; --s: 1; }
+.curtain-drape > i:nth-child(4) { --i: 3; --s: -1; }
+.curtain-drape > i:nth-child(5) { --i: 4; --s: 1; }
+.curtain-drape > i:nth-child(6) { --i: 5; --s: -1; }
+.curtain-drape > i:nth-child(7) { --i: 6; --s: 1; }
+.curtain-drape > i:nth-child(8) { --i: 7; --s: -1; }
+
+/* Тень на гранях, отвернувшихся от света, — густеет, когда складки собираются */
+.curtain-drape > i::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #12020a;
+  opacity: 0;
+  animation: fold-shade 820ms ease 260ms both;
+}
+
+.curtain-drape > i:nth-child(odd)::before {
+  --shade: 0.5;
+}
+
+.curtain-drape > i:nth-child(even)::before {
+  --shade: 0.12;
+}
+
+/* Золотая бахрома по низу */
+.curtain-drape > i::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30px;
+  background:
+    linear-gradient(var(--gold-light), var(--gold)) 0 0 / 100% 5px no-repeat,
+    linear-gradient(var(--gold-deep), var(--gold-deep)) 0 5px / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, var(--gold) 0 2px, var(--gold-deep) 2px 3px, transparent 3px 6px) 0 6px / 100% 24px no-repeat;
+}
+
+/* Тень, которую кулисы отбрасывают на сцену у ведущего края */
+.curtain-left > i:nth-child(8) {
+  box-shadow: -1px 0 0 #3a0712, 18px 0 30px -6px rgba(0, 0, 0, 0.55);
+}
+
+.curtain-right > i:nth-child(8) {
+  box-shadow: 1px 0 0 #3a0712, -18px 0 30px -6px rgba(0, 0, 0, 0.55);
+}
+
+/* Ламбрекен: бархатная полоса с фестонами и золотой каймой */
+.curtain-valance {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: clamp(54px, 10vh, 104px);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 60%),
+    var(--velvet-folds);
+  border-bottom: 4px solid var(--gold);
+  box-shadow: 0 1px 0 var(--gold-deep), 0 14px 26px rgba(0, 0, 0, 0.5);
+  animation: valance-up 1000ms cubic-bezier(.5, 0, .3, 1) 760ms both;
+}
+
+.curtain-valance::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 26px;
+  margin-top: 4px;
+  background: radial-gradient(ellipse 50% 100% at 50% 0, var(--velvet) 0 64%, var(--gold) 64% 78%, var(--gold-deep) 78% 82%, transparent 84%) 0 0 / 76px 26px repeat-x;
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.4));
+}
+
+/* Снова открыть (страница из кэша «Назад», смена большой сцены) */
+.curtain.is-reopening .curtain-drape { animation-name: drape-open-again; }
+.curtain.is-reopening .curtain-drape > i { animation-name: fold-gather-again; }
+.curtain.is-reopening .curtain-drape > i::before { animation-name: fold-shade-again; }
+.curtain.is-reopening .curtain-valance { animation-name: valance-up-again; }
+
+/* Закрыть перед уходом со страницы */
+.curtain.is-closing {
+  pointer-events: auto;
+}
+
+.curtain.is-closing .curtain-drape {
+  animation: drape-close 760ms cubic-bezier(.3, 0, .2, 1) both;
+}
+
+.curtain.is-closing .curtain-drape > i {
+  animation: fold-spread 600ms cubic-bezier(.3, 0, .25, 1) 180ms both;
+}
+
+.curtain.is-closing .curtain-drape > i::before {
+  animation: fold-unshade 600ms ease 180ms both;
+}
+
+.curtain.is-closing .curtain-valance {
+  animation: valance-down 520ms cubic-bezier(.3, 0, .2, 1.15) both;
+}
+
+/* Кулиса: сначала ткань отстаёт снизу и качается, потом собранная гармошка уезжает за портал */
+@keyframes drape-open {
+  0% { transform: none; }
+  16% { transform: skewX(calc(var(--dir) * -2.6deg)); }
+  40% { transform: skewX(calc(var(--dir) * 1.4deg)); }
+  56% { transform: translateX(0) skewX(calc(var(--dir) * -0.5deg)); }
+  100% { transform: translateX(calc(var(--dir) * 102%)) skewX(calc(var(--dir) * -3deg)); }
+}
+
+@keyframes drape-open-again {
+  0% { transform: none; }
+  16% { transform: skewX(calc(var(--dir) * -2.6deg)); }
+  40% { transform: skewX(calc(var(--dir) * 1.4deg)); }
+  56% { transform: translateX(0) skewX(calc(var(--dir) * -0.5deg)); }
+  100% { transform: translateX(calc(var(--dir) * 102%)) skewX(calc(var(--dir) * -3deg)); }
+}
+
+@keyframes drape-close {
+  0% { transform: translateX(calc(var(--dir) * 102%)) skewX(calc(var(--dir) * -3deg)); }
+  42% { transform: translateX(0) skewX(calc(var(--dir) * 3deg)); }
+  70% { transform: skewX(calc(var(--dir) * -1.2deg)); }
+  86% { transform: skewX(calc(var(--dir) * 0.5deg)); }
+  100% { transform: none; }
+}
+
+/* Складка собирается: поворот ±74° и сдвиг к краю. Точный стык — (i + ½) · (1 − cos 74°) ≈ 72 %
+   ширины складки; берём 70 %, и на всём пути соседние складки перекрываются, а не расходятся. */
+@keyframes fold-gather {
+  0% { transform: rotateY(calc(var(--s) * 9deg)); }
+  100% { transform: translateX(calc(var(--dir) * (var(--i) + 0.5) * 70%)) rotateY(calc(var(--s) * 74deg)); }
+}
+
+@keyframes fold-gather-again {
+  0% { transform: rotateY(calc(var(--s) * 9deg)); }
+  100% { transform: translateX(calc(var(--dir) * (var(--i) + 0.5) * 70%)) rotateY(calc(var(--s) * 74deg)); }
+}
+
+/* Складка расправляется, по инерции проскакивает ровное положение и успокаивается */
+@keyframes fold-spread {
+  0% { transform: translateX(calc(var(--dir) * (var(--i) + 0.5) * 70%)) rotateY(calc(var(--s) * 74deg)); }
+  76% { transform: rotateY(calc(var(--s) * -4deg)); }
+  100% { transform: rotateY(calc(var(--s) * 9deg)); }
+}
+
+@keyframes fold-shade {
+  from { opacity: 0.04; }
+  to { opacity: var(--shade); }
+}
+
+@keyframes fold-shade-again {
+  from { opacity: 0.04; }
+  to { opacity: var(--shade); }
+}
+
+@keyframes fold-unshade {
+  from { opacity: var(--shade); }
+  to { opacity: 0.04; }
+}
+
+/* Ламбрекен: штанкет чуть проседает, затем уходит вверх */
+@keyframes valance-up {
+  0% { transform: none; }
+  18% { transform: translateY(6px); }
+  100% { transform: translateY(calc(-100% - 40px)); }
+}
+
+@keyframes valance-up-again {
+  0% { transform: none; }
+  18% { transform: translateY(6px); }
+  100% { transform: translateY(calc(-100% - 40px)); }
+}
+
+@keyframes valance-down {
+  from { transform: translateY(calc(-100% - 40px)); }
+  to { transform: none; }
+}
+
+/* ---------- Общие анимации ---------- */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: perspective(900px) translateY(26px) rotateX(-24deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes drop-in {
+  from { opacity: 0; transform: perspective(900px) translateY(-24px) rotateX(22deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes programme-in {
+  0% { opacity: 0; transform: perspective(1000px) translateY(-40px) rotateX(38deg) scale(0.94); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes note-in {
+  0% { opacity: 0; transform: perspective(700px) translateY(-18px) rotateX(-70deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes note-out {
+  to { opacity: 0; transform: perspective(700px) translateX(40px) rotateY(-35deg); }
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.5); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Боковые кулисы чуть колышутся от движения воздуха на сцене */
+@keyframes drape-breathe {
+  0%, 100% { transform: skewX(0deg); }
+  50% { transform: skewX(0.9deg); }
+}
+
+@keyframes footlights {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+/* Пламя свечи / мерцание прожектора */
+@keyframes flicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  20% { opacity: 0.86; transform: scale(0.97, 1.03); }
+  45% { opacity: 1; transform: scale(1.02, 0.98); }
+  70% { opacity: 0.9; transform: scale(0.98, 1.02); }
+}
+
+/* Покачивание подвешенной таблички */
+@keyframes sway {
+  0%, 100% { transform: perspective(700px) rotateX(0deg) rotateZ(0deg); }
+  30% { transform: perspective(700px) rotateX(6deg) rotateZ(-1deg); }
+  70% { transform: perspective(700px) rotateX(-4deg) rotateZ(0.8deg); }
+}
+
+/* Поклон артиста */
+@keyframes bow {
+  0%, 100% { transform: none; }
+  40%, 55% { transform: perspective(600px) translateY(8px) rotateX(24deg); }
+}
+
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+
+.shake {
+  animation: shake 420ms ease both;
+}
+
+/* ---------- Без анимации по настройке системы ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+
+  .curtain .curtain-drape,
+  .curtain .curtain-drape > i,
+  .curtain .curtain-drape > i::before,
+  .curtain .curtain-valance {
+    animation: none !important;
+  }
+
+  .curtain .curtain-drape,
+  .curtain .curtain-valance {
+    opacity: 0;
+  }
+
+  .curtain.is-closing .curtain-drape,
+  .curtain.is-closing .curtain-valance {
+    opacity: 1;
+    transform: none;
+    transition: opacity 140ms ease !important;
+  }
+
+  .curtain.is-closing .curtain-valance {
+    display: none;
+  }
+}
+
+/* ---------- Ноутбук, планшет ---------- */
+
+@media (max-width: 900px) {
+  :root {
+    --topbar-h: 66px;
+  }
+
+  .topbar {
+    padding: 0 16px;
+    gap: 14px;
+  }
+
+  .topbar-title {
+    display: none;
+  }
+
+  .container {
+    width: calc(100% - 32px);
+  }
+
+  .action-bar {
+    padding: 12px 16px calc(12px + var(--safe-bottom));
+  }
+
+  .action-bar-inner > .muted {
+    display: none;
+  }
+
+  .action-bar-inner {
+    justify-content: flex-end;
+  }
+}
+
+/* ---------- Телефон ---------- */
+
+@media (max-width: 600px) {
+  :root {
+    --topbar-h: 58px;
+    --bar-h: 80px;
+  }
+
+  .brand-mark {
+    width: 36px;
+    height: 33px;
+  }
+
+  .brand-word {
+    font-size: 20px;
+  }
+
+  .topbar::after {
+    height: 11px;
+    background-size: 38px 11px;
+  }
+
+  .page-intro {
+    margin: 34px 0 22px;
+  }
+
+  .btn-lg {
+    min-height: 52px;
+    padding: 12px 22px;
+    font-size: 18px;
+  }
+
+  .btn-xl {
+    min-height: 60px;
+    padding: 12px 28px;
+    font-size: 22px;
+  }
+
+  .toasts {
+    left: 16px;
+    right: 16px;
+    bottom: calc(var(--bar-h) + 16px);
+    max-width: none;
+  }
+}
+
+/* ---------- Экран блокировки: «Вход закрыт» ---------- */
+
+.banned-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + var(--safe-top)) 18px calc(24px + var(--safe-bottom));
+  overflow-y: auto;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(255, 233, 176, 0.14), transparent 70%),
+    var(--velvet-folds),
+    var(--night);
+  animation: fade-in 420ms ease both;
+}
+
+.banned-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(26, 9, 16, 0.55), rgba(26, 9, 16, 0.82));
+  pointer-events: none;
+}
+
+.banned-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  width: min(520px, 100%);
+  padding: 34px 32px 30px;
+  text-align: center;
+  animation: programme-in 800ms var(--ease-out) 120ms backwards;
+}
+
+.banned-card:focus {
+  outline: none;
+}
+
+.banned-lock {
+  justify-self: center;
+  width: 72px;
+  height: 72px;
+  filter: drop-shadow(0 6px 10px rgba(43, 18, 24, 0.25));
+}
+
+.banned-card .kicker {
+  color: var(--velvet);
+  font-size: 19px;
+}
+
+.banned-card h1 {
+  font-size: clamp(32px, 7vw, 44px);
+  color: var(--ink);
+}
+
+.banned-facts {
+  display: grid;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 16px 18px;
+  border: 1.5px dashed rgba(143, 106, 34, 0.6);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 250, 240, 0.7);
+  text-align: left;
+}
+
+.banned-facts div {
+  display: grid;
+  gap: 2px;
+}
+
+.banned-facts dt {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.banned-facts dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.banned-contact {
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+
+.banned-contact a {
+  color: var(--velvet);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
