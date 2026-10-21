@@ -113,26 +113,27 @@ const officer = wp(world.finaleOfficer.group, V(0, 1.55, 0));
 const SHOTS = [
   { id: 'title', pos: starPos.clone().add(V(9, -3, 27)), target: starPos.clone().add(V(1, 0.5, 0)), shift: .2 },
   { id: 'city', pos: V(-104, 150, 178), target: V(4, 0, -4), shift: .13, drift: { pos: V(-66, 98, 118), dur: 28 } },
-  { id: 'driver', pos: driverHead.clone().add(V(-2.7, 0.22, 1.75)), target: driverHead.clone().add(V(0.15, -0.12, 0)), shift: .22, fov: 36 },
+  { id: 'driver', pos: driverHead.clone().add(V(-3.3, 0.18, 0.55)), target: driverHead.clone().add(V(0.2, -0.15, 0.05)), shift: .2, fov: 34 },
   { id: 'works', pos: workerPos.clone().add(V(-3.4, 1.65, 7.2)), target: workerPos.clone().add(V(0, 1.05, 0)), shift: .19 },
   { id: 'avenue', pos: V(388, 17, 168), target: V(405, 2, -60), shift: .16 },
-  { id: 'campus', pos: V(-64, 7.5, 342), target: V(-34, 1.4, 309), shift: .2 },
-  { id: 'signal', pos: headS.clone().add(V(-5.2, -0.7, 9.4)), target: headS.clone(), shift: .2 },
+  { id: 'campus', pos: V(-56, 5.5, 333), target: V(-32, 1.8, 309), shift: .2 },
+  { id: 'signal', pos: headS.clone().add(V(-3.4, -0.6, 6.2)), target: headS.clone(), shift: .2, fov: 36 },
   { id: 'camera', pos: lensS.p.clone().add(V(-2.4, 0.45, 3.9)), target: lensS.p.clone(), shift: .2, fov: 38 },
   { id: 'regulator', pos: regS.clone().add(V(-5.6, -2.5, 8.8)), target: regS.clone().add(V(0, -0.3, 0)), shift: .17 },
-  { id: 'pov', pos: lensS.p, target: null, pov: true, shift: -.12, fov: 50 },
-  { id: 'seconds', pos: V(-3, 27, 31), target: V(0, 0, -1), shift: -.19 },
+  { id: 'pov', pos: lensS.p, target: null, pov: true, shift: -.12, fov: 34 },
+  { id: 'seconds', pos: V(-4, 40, 44), target: V(-2, 0, 0), shift: -.17 },
   { id: 'benefits', pos: lensW.p.clone().add(V(-4.6, 0.7, -2.7)), target: lensW.p.clone(), shift: .2, fov: 38 },
   { id: 'edge', pos: V(9.4, 1.9, -4.4), target: edgeS.clone().add(V(0, 0.6, 0)), shift: -.2 },
   { id: 'sim', pos: V(0, 168, 9), target: V(0, 0, 0), shift: 0 },
-  { id: 'final', pos: officer.clone().add(V(-4.4, 0.15, 7.6)), target: officer.clone().add(V(0.7, -0.05, 0)), shift: .2 },
+  { id: 'final', pos: officer.clone().add(V(-6.2, 0.2, 5.9)), target: officer.clone().add(V(0.6, -0.15, 0)), shift: .2, fov: 36 },
 ];
 // the camera's point of view: inside the west-facing SmartCross camera, looking down the west approach
 {
   const pov = SHOTS[9];
   pov.pos = lensW.p.clone().addScaledVector(lensW.d, 0.3);
   // aim down the incoming (eastbound) lanes of the west approach, centred on the queue
-  pov.target = V(-150, 0, 3.5);
+  pov.target = V(-120, 0, 3.5);
+  pov.fov = 34;
   pov.approach = lensW.d.clone().negate();   // fly in from behind the housing, through the lens
 }
 
@@ -232,10 +233,10 @@ function leaveShot(i) {
 const povState = { a: 0 };
 const scoreState = { a: 0 };
 const SCORES = [
-  { pos: V(-34, 5, 3.5), title: 'Запад', value: '59', color: '#e2483d' },
-  { pos: V(34, 5, -3.5), title: 'Восток', value: '27', color: '#f2a516' },
-  { pos: V(-3.5, 5, -34), title: 'Север', value: '11', color: '#19a75a' },
-  { pos: V(3.5, 5, 34), title: 'Юг', value: '3', color: '#19a75a' },
+  { pos: V(-19, 4, 3.5), title: 'Запад', value: '59', color: '#e2483d' },
+  { pos: V(16, 4, -3.5), title: 'Восток', value: '27', color: '#f2a516' },
+  { pos: V(-3.5, 4, -24), title: 'Север', value: '11', color: '#19a75a' },
+  { pos: V(3.5, 4, 22), title: 'Юг', value: '3', color: '#19a75a' },
 ];
 function drawScores() {
   const a = scoreState.a;

@@ -553,13 +553,14 @@ export async function buildWorld(scene, progress = () => {}) {
   st.forEach((s, i) => addWalker(() => createPerson({ seed: 200 + i, kind: 'student', gender: i % 2 ? 'm' : 'f', walking: true }), s[0], s[1], R(1.0, 1.4)));
   // the officer and a SmartCross post on the pavement by the crosswalk (finale)
   const finaleOfficer = createOfficer({ seed: 77, pose: 'stand' });
-  finaleOfficer.group.position.set(15.2, .15, -9.4);
-  finaleOfficer.group.rotation.y = .35;
+  // on the north arm's east pavement, next to the zebra; the departing northbound lanes in front stay clear
+  finaleOfficer.group.position.set(9.9, .15, -15.6);
+  finaleOfficer.group.rotation.y = -0.72;   // faces the camera on the crossing
   root.add(finaleOfficer.group);
   animated.push({ update: finaleOfficer.update, group: finaleOfficer.group, radius: 120 });
   const post = createCameraPost();
-  post.group.position.set(17.2, .15, -10.6);
-  post.group.rotation.y = .5;
+  post.group.position.set(10.9, .15, -17.7);
+  post.group.rotation.y = -0.9;    // looks toward the junction
   root.add(post.group);
   animated.push({ update: (t, dt) => post.smartCam?.update?.(t, dt), group: post.group, radius: 120 });
   progress(.9, 'Люди');
@@ -642,7 +643,7 @@ export async function buildWorld(scene, progress = () => {}) {
 
   /* ---------- per-frame ---------- */
   const tmp = new THREE.Vector3();
-  const CULL = 950;
+  const CULL = 760;
   world.update = (t, dt, camera) => {
     for (const c of chunks) {
       const dx = camera.position.x - c.x, dz = camera.position.z - c.z;
