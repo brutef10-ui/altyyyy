@@ -15,9 +15,13 @@
     "loadtest": "node scripts/loadtest.js"
   },
   "dependencies": {
+    "argon2": "^0.45.1",
+    "cookie": "^1.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.1",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
