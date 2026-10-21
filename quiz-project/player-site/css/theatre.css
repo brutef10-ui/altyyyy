@@ -633,7 +633,6 @@ a.brand:hover .brand-mark {
   color: var(--ivory);
   font-weight: 700;
   font-size: 16px;
-  font-variant-numeric: tabular-nums;
 }
 
 .pill-gold {

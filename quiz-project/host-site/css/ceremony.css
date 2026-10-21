@@ -162,7 +162,6 @@
   color: var(--paper-2);
   font-size: clamp(17px, 1.5vw, 22px);
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
   animation: fade-in 700ms ease 1100ms backwards;
 }
 

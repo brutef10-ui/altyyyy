@@ -650,10 +650,6 @@ textarea.input {
   animation: fade-in 700ms ease 1100ms backwards;
 }
 
-#summary {
-  font-variant-numeric: tabular-nums;
-}
-
 /* ---------- Анимации ---------- */
 
 @keyframes page-drop {

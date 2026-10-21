@@ -698,7 +698,6 @@ body::after {
   background: var(--gold-leaf);
   color: var(--ink);
   font-weight: 800;
-  font-variant-numeric: tabular-nums;
   box-shadow: inset 0 0 0 2px rgba(255, 244, 210, 0.45), 0 0 0 1px var(--gold-deep), 0 3px 8px rgba(0, 0, 0, 0.35);
 }
 
@@ -1722,7 +1721,6 @@ body[data-mood='timeout'] .result-points {
   color: var(--ink-soft);
   font-size: 17px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
 /* Правильный вариант — камень в оправе */
@@ -2165,7 +2163,6 @@ body[data-mood='timeout'] .result-points {
 }
 
 .view-final .view-text {
-  font-variant-numeric: tabular-nums;
   animation: rise-in 600ms var(--ease-out) 820ms backwards;
 }
 
