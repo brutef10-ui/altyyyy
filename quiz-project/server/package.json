@@ -18,7 +18,8 @@
     "backup": "node scripts/backup.js",
     "restore-check": "node scripts/restore-check.js",
     "restore": "node scripts/restore.js",
-    "google-drive-auth": "node scripts/google-drive-auth.js"
+    "google-drive-auth": "node scripts/google-drive-auth.js",
+    "loadtest:rooms": "node scripts/loadtest-rooms.js"
   },
   "dependencies": {
     "argon2": "^0.45.1",
