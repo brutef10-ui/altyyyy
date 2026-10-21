@@ -321,6 +321,38 @@ a.brand:hover .brand-mark {
   min-height: 0;
 }
 
+/* Кулисы по краям сцены */
+.stage {
+  --drape: clamp(14px, 2.2vw, 40px);
+}
+
+.stage::before,
+.stage::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 25;
+  width: var(--drape);
+  --fold: 18px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.4), transparent 30%, transparent 75%, rgba(0, 0, 0, 0.45)),
+    var(--velvet-folds);
+  pointer-events: none;
+}
+
+.stage::before {
+  left: 0;
+  border-right: 2px solid var(--gold-deep);
+  box-shadow: 6px 0 16px rgba(0, 0, 0, 0.5);
+}
+
+.stage::after {
+  right: 0;
+  border-left: 2px solid var(--gold-deep);
+  box-shadow: -6px 0 16px rgba(0, 0, 0, 0.5);
+}
+
 /* ---------- Карточка-программка ---------- */
 
 .card,
@@ -1280,6 +1312,10 @@ a.brand:hover .brand-mark {
   .topbar {
     padding: 0 16px;
     gap: 14px;
+  }
+
+  .topbar-title {
+    display: none;
   }
 
   .container {

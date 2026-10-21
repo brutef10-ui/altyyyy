@@ -1,0 +1,479 @@
+/* AL Studio — лобби на проекторе: «Скоро начало». Код комнаты — на световой афише с бегущими
+   лампочками, игроки рассаживаются в бархатные кресла зала. Основа — theatre.css. */
+
+.lobby {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 28px;
+  padding: 34px calc(var(--drape) + 24px) 18px;
+}
+
+/* ---------- Световая афиша ---------- */
+
+.join-panel.card {
+  --text: var(--ivory);
+  --muted: var(--muted);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 30px 46px 32px;
+  border-radius: 22px;
+  color: var(--ivory);
+  background:
+    radial-gradient(80% 120% at 30% 0%, rgba(255, 233, 176, 0.12), transparent 70%),
+    linear-gradient(180deg, var(--night-3), var(--night-2));
+  box-shadow:
+    inset 0 0 0 3px var(--gold),
+    inset 0 0 0 5px var(--gold-deep),
+    inset 0 0 0 26px var(--night-2),
+    inset 0 0 0 28px rgba(216, 172, 76, 0.45),
+    var(--shadow-lift);
+  transform-origin: 50% 0;
+  animation: sign-drop 1000ms var(--ease-out) 420ms backwards;
+}
+
+/* Лампочки по контуру: два слоя мигают по очереди — огни «бегут» */
+.join-panel.card::before,
+.join-panel.card::after {
+  content: '';
+  position: absolute;
+  inset: 13px;
+  border-radius: 12px;
+  --bulb: radial-gradient(circle, #fffbe6 0 2.5px, var(--light) 3.5px, rgba(255, 233, 176, 0.35) 5px, transparent 7px);
+  background:
+    var(--bulb) 0 0 / 28px 14px repeat-x,
+    var(--bulb) 0 100% / 28px 14px repeat-x,
+    var(--bulb) 0 0 / 14px 28px repeat-y,
+    var(--bulb) 100% 0 / 14px 28px repeat-y;
+  pointer-events: none;
+}
+
+.join-panel.card::after {
+  background-position: 14px 0, 14px 100%, 0 14px, 100% 14px;
+  animation: bulbs 1.1s steps(1, end) infinite;
+}
+
+.join-panel.card::before {
+  animation: bulbs 1.1s steps(1, end) -0.55s infinite;
+}
+
+.join-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 34px;
+  min-width: 0;
+}
+
+.join-kicker,
+.room-code {
+  flex: 1 1 100%;
+}
+
+.join-kicker {
+  font-size: 24px;
+}
+
+.join-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: clamp(19px, 1.7vw, 26px);
+  font-weight: 600;
+}
+
+.join-step strong {
+  overflow-wrap: anywhere;
+  color: var(--gold-light);
+}
+
+.step-num {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--ink);
+  background: radial-gradient(circle at 35% 30%, #fff4d2, var(--gold) 55%, #b98a33);
+  box-shadow: 0 0 0 2px var(--gold-deep), 0 4px 10px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-display);
+  font-weight: 900;
+}
+
+/* Код комнаты — огромные золотые буквы афиши */
+.room-code {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold-light);
+  font-family: var(--font-display);
+  font-size: clamp(70px, 8.6vw, 140px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums lining-nums;
+  text-align: left;
+  text-shadow: 0 4px 0 var(--gold-deep), 0 10px 0 rgba(0, 0, 0, 0.45), 0 0 46px rgba(255, 233, 176, 0.45);
+  cursor: copy;
+  animation: code-light 1200ms var(--ease-out) 900ms backwards;
+}
+
+.room-code:hover {
+  color: #fff3c9;
+}
+
+/* Без QR (нет связи с библиотекой) афиша выравнивается по центру */
+.join-panel:has(.qr[hidden]) .join-text {
+  justify-content: center;
+  text-align: center;
+}
+
+/* QR — в золочёной раме */
+.qr {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  flex: none;
+  justify-items: center;
+  gap: 10px;
+  animation: portrait-turn 900ms var(--ease-out) 1100ms backwards;
+}
+
+.qr svg {
+  width: clamp(150px, 14vw, 220px);
+  height: auto;
+  padding: 10px;
+  border: 6px solid var(--gold);
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--gold-deep), inset 0 0 0 2px var(--gold-deep), 0 16px 34px rgba(0, 0, 0, 0.5);
+}
+
+.qr-caption {
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-style: italic;
+}
+
+/* ---------- Зал: игроки занимают места ---------- */
+
+.players-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.players-head {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  margin-bottom: 20px;
+}
+
+.players-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 34px;
+}
+
+#lobby-hint {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-style: italic;
+}
+
+/* Счётчик — латунный номерок гардероба */
+.count-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 56px;
+  height: 56px;
+  padding: 0 14px;
+  border-radius: 12px 12px 28px 28px;
+  color: var(--ink);
+  background: var(--gold-leaf);
+  box-shadow: inset 0 0 0 2px rgba(255, 244, 210, 0.5), 0 0 0 2px var(--gold-deep), 0 6px 14px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-badge.bump {
+  animation: tag-flip 640ms var(--ease-out);
+}
+
+.player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  align-content: start;
+  gap: 22px 18px;
+  margin: 0;
+  padding: 8px 6px 24px;
+  overflow-y: auto;
+  list-style: none;
+  perspective: 1000px;
+}
+
+.player-chip.is-new {
+  animation: take-seat 760ms var(--ease-out) both;
+}
+
+.player-chip.is-leaving {
+  pointer-events: none;
+  animation: leave-seat 460ms cubic-bezier(.55, 0, .75, .2) forwards;
+}
+
+.player-chip.is-offline {
+  opacity: 0.42;
+  filter: grayscale(1);
+}
+
+/* Кресло: бархатная спинка с золотым кантом, портрет, табличка с именем */
+.player-button {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 18px 10px 14px;
+  border: 0;
+  border-radius: 30px 30px 10px 10px;
+  color: var(--ivory);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 40%, rgba(0, 0, 0, 0.25)),
+    var(--velvet-folds);
+  --fold: 24px;
+  box-shadow: inset 0 0 0 2px var(--gold), inset 0 0 0 4px var(--velvet-deep), 0 8px 0 var(--velvet-deep), 0 14px 22px rgba(0, 0, 0, 0.45);
+  font: inherit;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+  transition: transform 300ms var(--ease-out), box-shadow 300ms ease;
+}
+
+.player-button:hover {
+  transform: perspective(600px) translateY(-4px) rotateX(8deg);
+}
+
+.player-button .avatar {
+  width: 76px;
+  height: 76px;
+  border-width: 4px;
+}
+
+/* Пустой зал — ряд свободных кресел */
+.player-grid:empty::before {
+  content: '';
+  grid-column: 1 / -1;
+  height: 150px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 150'%3E%3Cpath d='M30 112V44q0-28 45-28t45 28v68z' fill='%238c1529' fill-opacity='.35' stroke='%23d8ac4c' stroke-opacity='.35' stroke-width='2'/%3E%3Crect x='22' y='104' width='106' height='22' rx='8' fill='%235c0c1b' fill-opacity='.5' stroke='%23d8ac4c' stroke-opacity='.3' stroke-width='2'/%3E%3C/svg%3E") 0 0 / 150px 150px repeat-x;
+  opacity: 0.8;
+  animation: fade-in 900ms ease 1200ms backwards;
+}
+
+.player-name {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 10px;
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--gold-leaf);
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 210, 0.5), 0 0 0 1px var(--gold-deep);
+  font-weight: 800;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-number {
+  color: rgba(247, 236, 212, 0.65);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.player-kick {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--gold);
+  font-size: 13px;
+  opacity: 0;
+  transform: scale(0.5) rotate(-90deg);
+  transition: opacity 200ms ease, transform 320ms var(--ease-spring);
+}
+
+.player-button:hover .player-kick,
+.player-button:focus-visible .player-kick {
+  opacity: 1;
+  transform: none;
+}
+
+/* «Старт» — свет на сцене: табличка мягко дышит, пока есть кого звать */
+#start:not(:disabled) {
+  animation: cta-breathe 2.6s ease-in-out infinite;
+}
+
+#start:not(:disabled):hover {
+  animation: none;
+}
+
+/* ---------- Анимации ---------- */
+
+@keyframes sign-drop {
+  0% { opacity: 0; transform: perspective(1400px) translateY(-120px) rotateX(40deg); }
+  60% { opacity: 1; transform: perspective(1400px) translateY(8px) rotateX(-5deg); }
+  80% { transform: perspective(1400px) rotateX(2deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes bulbs {
+  0% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes code-light {
+  0% { opacity: 0; transform: scale(0.92); }
+  30% { opacity: 1; }
+  45% { opacity: 0.45; }
+  60% { opacity: 1; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes portrait-turn {
+  from { opacity: 0; transform: perspective(700px) rotateY(-80deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes tag-flip {
+  0% { transform: perspective(300px) rotateX(0deg); }
+  45% { transform: perspective(300px) rotateX(-90deg) scale(1.12); }
+  46% { transform: perspective(300px) rotateX(90deg) scale(1.12); }
+  100% { transform: perspective(300px) rotateX(0deg); }
+}
+
+@keyframes take-seat {
+  0% { opacity: 0; transform: perspective(900px) translateY(-70px) rotateX(55deg) scale(0.85); }
+  60% { opacity: 1; transform: perspective(900px) translateY(6px) rotateX(-6deg); }
+  80% { transform: perspective(900px) translateY(-2px) rotateX(2deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes leave-seat {
+  to { opacity: 0; transform: perspective(900px) translateY(50px) rotateX(-70deg) scale(0.8); }
+}
+
+@keyframes cta-breathe {
+  0%, 100% { transform: perspective(600px) scale(1); }
+  50% { transform: perspective(600px) scale(1.045); }
+}
+
+/* ---------- Небольшие экраны ---------- */
+
+@media (max-width: 900px) {
+  .lobby {
+    padding: 18px calc(var(--drape) + 12px) 12px;
+    gap: 20px;
+  }
+
+  .join-panel.card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 30px 32px;
+  }
+}
+
+@media (max-width: 600px) {
+  .lobby {
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .join-panel.card {
+    align-items: center;
+    padding: 28px 24px;
+    text-align: center;
+  }
+
+  .join-step {
+    display: block;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  .join-step .step-num {
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .join-step strong {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+
+  .step-num {
+    width: 32px;
+    height: 32px;
+  }
+
+  .room-code {
+    font-size: clamp(52px, 17vw, 78px);
+    text-align: center;
+  }
+
+  .qr svg {
+    width: 150px;
+  }
+
+  .players-head {
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+
+  .players-head h2 {
+    font-size: 26px;
+  }
+
+  .count-badge {
+    min-width: 46px;
+    height: 46px;
+    font-size: 22px;
+  }
+
+  .player-grid {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 16px 12px;
+    overflow: visible;
+  }
+
+  .player-button .avatar-lg {
+    width: 72px;
+    height: 72px;
+  }
+
+  .player-name {
+    font-size: 15px;
+  }
+
+  #start {
+    min-height: 56px;
+    font-size: 22px;
+  }
+}

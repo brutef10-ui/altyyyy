@@ -15,6 +15,7 @@ const players = new Map(); // id → { data, node }
 let socket = null;
 let roomCode = '';
 let starting = false;
+let seatCounter = 0; // номер места в зале — по порядку прихода
 
 // ---------- Игроки ----------
 
@@ -24,6 +25,7 @@ function playerChip(player) {
       avatar(player.avatar, player.nickname, 'avatar avatar-lg'),
       h('span', { class: 'player-name', text: player.nickname }),
       h('span', { class: 'player-kick', 'aria-hidden': 'true', text: '✕' }),
+      h('span', { class: 'seat-number', 'aria-hidden': 'true', text: `Место ${++seatCounter}` }),
     ),
   );
   node.addEventListener('animationend', () => node.classList.remove('is-new'), { once: true });
