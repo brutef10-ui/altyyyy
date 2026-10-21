@@ -70,6 +70,8 @@ export function loadConfig(overrides = {}) {
     dataFile: path.resolve(SERVER_ROOT, env.DATA_FILE || 'data/quizzes.json'),
     imageGcMinAgeMs: 48 * 60 * 60_000,
     imageGcIntervalMs: 60 * 60_000,
+    // Сколько мегабайт картинок к вопросам может хранить один аккаунт.
+    imageQuotaMb: integer(env.IMAGE_QUOTA_MB, 50, { min: 1, max: 1024 }),
     trustProxy: trustProxy(env.TRUST_PROXY),
     hostReconnectMs: integer(env.HOST_RECONNECT_MS, 15_000, { min: 1_000, max: 300_000 }),
     // Игрок, у которого погас экран или пропала сеть в лобби, остаётся в комнате 10 минут.

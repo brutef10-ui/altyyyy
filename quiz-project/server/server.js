@@ -123,9 +123,31 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
   if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
   else if (config.trustProxy) app.set('trust proxy', config.trustProxy);
 
-  // Заголовки безопасности. CSP включается отдельно, когда проверены все страницы обоих сайтов.
+  // Заголовки безопасности. CSP: скрипты только с нашего сайта (без встроенных и eval), стили — свои и
+  // Google Fonts, картинки — свои, data: (фото игроков) и blob: (превью), соединения — только с этим сервером
+  // (HTTP и WebSocket), сайт нельзя встроить во фрейм.
+  const sameHostSockets = (req) => {
+    const host = String(req.get('host') || '').replace(/[^A-Za-z0-9.:[\]-]/g, '');
+    return host ? `${req.secure ? 'wss' : 'ws'}://${host}` : "'self'";
+  };
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        mediaSrc: ["'self'", 'blob:'],
+        connectSrc: ["'self'", sameHostSockets],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        ...(config.production ? { upgradeInsecureRequests: [] } : {}),
+      },
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: 'same-site' },
     frameguard: { action: 'deny' },
@@ -336,7 +358,7 @@ export async function startServer(overrides = {}) {
   identity.bans.start();
 
   const store = new PgQuizStore(db);
-  const images = new PgImageStore(db, { maxBytes: QUIZ_LIMITS.imageMaxBytes });
+  const images = new PgImageStore(db, { maxBytes: QUIZ_LIMITS.imageMaxBytes, quotaBytes: config.imageQuotaMb * 1024 * 1024 });
   const quizService = new QuizService(store, { images });
   const rooms = new RoomManager({ maxRooms: config.maxRooms, maxPlayersPerRoom: config.maxPlayersPerRoom });
   const roomLimiter = new RateLimiter({ windowMs: 60_000, max: 30 });

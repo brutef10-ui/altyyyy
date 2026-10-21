@@ -8,10 +8,12 @@ import { IMAGE_ID_PATTERN } from '../validate.js';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class PgImageStore {
-  constructor(db, { maxBytes = 1024 * 1024, maxPerOwner = 500 } = {}) {
+  // quotaBytes — сколько места в БД могут занять картинки одного аккаунта (база на Render небольшая).
+  constructor(db, { maxBytes = 1024 * 1024, maxPerOwner = 500, quotaBytes = 50 * 1024 * 1024 } = {}) {
     this.db = db;
     this.maxBytes = maxBytes;
     this.maxPerOwner = maxPerOwner;
+    this.quotaBytes = quotaBytes;
   }
 
   async init() {}
@@ -24,9 +26,9 @@ export class PgImageStore {
   async save(ownerId, buffer, type) {
     checkImageBuffer(buffer, type, this.maxBytes);
     if (!UUID.test(ownerId)) throw new AppError('Войдите в аккаунт, чтобы продолжить.', { status: 401, code: 'UNAUTHORIZED' });
-    const { n } = await this.db.one('SELECT count(*)::int AS n FROM images WHERE account_id = $1', [ownerId]);
-    if (n >= this.maxPerOwner) {
-      throw new AppError('Слишком много картинок. Удалите ненужные игры.', { status: 409, code: 'TOO_MANY_IMAGES' });
+    const { n, total } = await this.db.one('SELECT count(*)::int AS n, COALESCE(sum(size), 0)::bigint AS total FROM images WHERE account_id = $1', [ownerId]);
+    if (n >= this.maxPerOwner || Number(total) + buffer.length > this.quotaBytes) {
+      throw new AppError('Слишком много картинок. Удалите ненужные игры — неиспользуемые картинки удаляются сами через двое суток.', { status: 409, code: 'TOO_MANY_IMAGES' });
     }
     const id = randomBytes(16).toString('hex');
     const row = await this.db.one(

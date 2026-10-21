@@ -3,7 +3,9 @@ import { closeRoom, openHostRoom, request } from './socket.js';
 import { avatar, confirmDialog, formatCode, h, plural, toast } from './ui.js';
 import { curtain } from './theatre.js';
 
-const QR_LIBRARY = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
+// qrcode-generator 1.4.4 (MIT, Kazuhiko Arase) лежит в проекте, а не на CDN: не зависит от внешнего сервиса
+// и позволяет строгую политику безопасности (CSP: скрипты только с нашего сайта).
+const QR_LIBRARY = 'js/vendor/qrcode.js';
 
 const playersList = document.getElementById('players');
 const playerCount = document.getElementById('player-count');
@@ -105,7 +107,7 @@ function renderJoinInfo(snapshot) {
 function loadQrLibrary() {
   if (window.qrcode) return Promise.resolve(window.qrcode);
   return new Promise((resolve, reject) => {
-    const script = h('script', { src: QR_LIBRARY, async: true, crossorigin: 'anonymous' });
+    const script = h('script', { src: QR_LIBRARY, async: true });
     script.onload = () => resolve(window.qrcode);
     script.onerror = reject;
     document.head.append(script);

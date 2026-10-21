@@ -553,7 +553,7 @@ const FAN_SLATS = 11;
 function answerFan(icon, index = null) {
   return h('div', { class: 'fan', 'aria-hidden': 'true' },
     h('div', { class: 'fan-slats' },
-      Array.from({ length: FAN_SLATS }, (_, i) => h('span', { class: 'fan-slat', style: `--i: ${i - (FAN_SLATS - 1) / 2}` })),
+      Array.from({ length: FAN_SLATS }, (_, i) => h('span', { class: 'fan-slat', style: { '--i': String(i - (FAN_SLATS - 1) / 2) } })),
     ),
     h('span', { class: `fan-emblem${index === null ? ' is-text' : ` answer-${index}`}` }, icon),
     h('span', { class: 'fan-pivot' }),
@@ -718,7 +718,7 @@ function medal(rank) {
 function podiumList(podium) {
   const me = playerState.get().nickname;
   return (podium || []).map((row, index) =>
-    h('li', { class: row.nickname === me ? 'is-me' : null, style: `animation-delay: ${index * 90}ms` },
+    h('li', { class: row.nickname === me ? 'is-me' : null, style: { animationDelay: `${index * 90}ms` } },
       h('span', { class: `podium-rank podium-rank-${MEDAL_TONES[row.rank - 1] || 'plain'}`, text: row.rank }),
       h('span', { class: 'podium-name', text: row.nickname }),
       h('span', { class: 'podium-score', text: formatScore(row.score) }),
@@ -739,14 +739,14 @@ function launchConfetti() {
   // Лепестки роз и позолота.
   const colors = ['var(--velvet-light)', 'var(--gold)', 'var(--rose)', 'var(--gold-light)', 'var(--velvet)', '#fff3d6'];
   layer.replaceChildren(...Array.from({ length: 36 }, (_, i) => h('span', {
-    style: [
-      `--x: ${Math.round(Math.random() * 100)}%`,
-      `--drift: ${Math.round((Math.random() - 0.5) * 120)}px`,
-      `--spin: ${Math.round(360 + Math.random() * 540)}deg`,
-      `--delay: ${Math.round(Math.random() * 600)}ms`,
-      `--fall: ${(2.2 + Math.random() * 1.6).toFixed(2)}s`,
-      `--color: ${colors[i % colors.length]}`,
-    ].join(';'),
+    style: {
+      '--x': `${Math.round(Math.random() * 100)}%`,
+      '--drift': `${Math.round((Math.random() - 0.5) * 120)}px`,
+      '--spin': `${Math.round(360 + Math.random() * 540)}deg`,
+      '--delay': `${Math.round(Math.random() * 600)}ms`,
+      '--fall': `${(2.2 + Math.random() * 1.6).toFixed(2)}s`,
+      '--color': colors[i % colors.length],
+    },
   })));
   clearTimeout(launchConfetti.timer);
   launchConfetti.timer = setTimeout(() => layer.replaceChildren(), 4800);
