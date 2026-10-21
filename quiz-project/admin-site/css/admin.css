@@ -64,9 +64,12 @@
 }
 
 .stat {
-  display: grid;
-  gap: 4px;
-  padding: 14px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 10px 16px;
   border: 1.5px solid rgba(216, 172, 76, 0.35);
   border-radius: var(--radius-sm);
   background: linear-gradient(180deg, var(--night-3), var(--night-2));
@@ -80,7 +83,7 @@
 .stat dd {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 900;
   color: var(--gold-light);
 }
@@ -306,10 +309,31 @@
   justify-items: start;
 }
 
+.cell-sub {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}
+
+.ledger-table .col-actions .btn {
+  white-space: nowrap;
+}
+
+.ledger-table th.num {
+  white-space: normal;
+  min-width: 150px;
+}
+
 .row-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+@media (min-width: 901px) {
+  .row-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .ledger-empty {

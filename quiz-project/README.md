@@ -7,6 +7,7 @@
 | `server/` | Node.js + Express + Socket.IO + PostgreSQL. Вся игровая логика, таймер и подсчёт очков, аккаунты ведущих, REST API для сохранённых игр | 3000 |
 | `host-site/` | Сайт ведущего: вход и регистрация, список игр, редактор, лобби, экран игры, итоги | 5500 |
 | `player-site/` | Сайт игрока: код комнаты → селфи → ник → игра | 5501 |
+| `admin-site/` | Админ-консоль: аккаунты, гости, блокировки, журнал аудита. Отдаёт сам сервер по адресу `/admin/` и только администратору | — |
 
 Сайты ничего не знают друг о друге и общаются только с сервером. Клиентам сервер не доверяет: правильные ответы, время и очки знает только он.
 
@@ -50,6 +51,9 @@ quiz-project/
 │   ├── css/theatre.css      # общая основа «Большой театр»: токены, кнопки, занавес
 │   ├── css/login.css  account.css  home.css  editor.css  lobby.css  game.css  ceremony.css   # стили экранов
 │   └── js/ config.js auth.js api.js codes.js session.js socket.js ui.js theatre.js login.js account.js home.js editor.js lobby.js game.js results.js
+├── admin-site/             # админ-консоль (сервер отдаёт её только администратору: /admin/)
+│   ├── index.html  css/admin.css  css/theatre.css
+│   └── js/ admin.js card.js actions.js api.js dom.js format.js theatre.js
 ├── player-site/
 │   ├── index.html  photo.html  name.html  play.html
 │   ├── css/theatre.css  css/style.css   # общая основа + экраны игрока
@@ -288,6 +292,10 @@ node scripts/loadtest.js https://ваш-сервер 150   # то же прот�
 | POST | `/api/auth/recover` | все | восстановление `{ login, code, newPassword }`: резервный код или код от администратора; все сессии отзываются, выдаётся новый резервный код |
 | POST | `/api/admin/accounts/:id/recovery-code` | администратор | одноразовый код восстановления (показывается один раз, запись в аудит) |
 | GET | `/api/admin/diagnostics/ip` | администратор | как сервер видит IP клиента за прокси |
+| GET | `/api/admin/overview` | администратор | сводка: аккаунты, гости, блокировки, входы за сутки |
+| GET | `/api/admin/accounts`, `/api/admin/visitors` | администратор | «Зарегистрированные» / «Незарегистрированные»: `q` (логин, ник, IP), `sort`, `limit`, `offset` |
+| GET | `/api/admin/accounts/:id`, `/api/admin/visitors/:id` | администратор | карточка (просмотр пишется в аудит) |
+| GET | `/api/admin/events`, `/api/admin/audit` | администратор | журнал событий (`accountId` / `visitorId`, `before`) и журнал аудита |
 | GET | `/api/admin/bans?status=active\|all` | администратор | действующие блокировки / вся история |
 | POST | `/api/admin/bans` | администратор | блокировка `{ accountId?, visitorId?, ip?, reason, durationMinutes \| forever }` |
 | POST | `/api/admin/bans/:id/lift` | администратор | снять блокировку (запись остаётся в истории) |
