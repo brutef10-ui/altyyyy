@@ -454,6 +454,21 @@ body {
   </div>
 </div>
 
+<script>
+// If the 3D scene never starts (no internet for the CDN, no WebGL, a sandboxed preview), say so instead of spinning forever.
+(function () {
+  var shown = false;
+  function fail(msg) {
+    if (shown || window.__sc) return;
+    shown = true;
+    var t = document.getElementById('loaderText');
+    if (t) t.innerHTML = msg;
+  }
+  var reason = 'Не удалось запустить 3D-сцену.<br>Нужны интернет (Three.js загружается с CDN) и браузер с WebGL:<br>Chrome, Edge, Firefox или Safari на компьютере.';
+  window.addEventListener('error', function () { setTimeout(function () { fail(reason); }, 1500); });
+  setTimeout(function () { fail(reason); }, 30000);
+})();
+</script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script type="module">
