@@ -3,6 +3,7 @@
 import { api, flash, goTo, NICKNAME_MAX, nicknameError, normalizeNickname, playerState } from './session.js';
 import { showError } from './ui.js';
 import { curtain } from './theatre.js';
+import { banFromError, showBanned } from './banned.js';
 
 // ---------- Шаг 1: код комнаты ----------
 
@@ -43,6 +44,10 @@ function initCodeStep() {
       playerState.patch({ code, title: room.title });
       curtain.go('photo.html');
     } catch (err) {
+      if (banFromError(err)) {
+        showBanned(banFromError(err));
+        return;
+      }
       showError(error, err.message);
       submit.textContent = 'Войти';
       submit.disabled = false;
@@ -57,6 +62,17 @@ function initCodeStep() {
   if (message) showError(error, message);
   input.focus();
   linkHostSite();
+  checkBan();
+}
+
+// Заблокированному сразу показываем причину и срок (вход по коду сервер всё равно не пропустит).
+async function checkBan() {
+  try {
+    const session = await api('/api/auth/session');
+    if (session.ban) showBanned(session.ban, { contact: session.adminContact });
+  } catch {
+    /* не страшно: сервер проверит при входе */
+  }
 }
 
 // «Создать свою игру» ведёт на сайт ведущего: по умолчанию он рядом (/host/), иначе — адрес из настроек сервера.

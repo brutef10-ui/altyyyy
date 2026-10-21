@@ -3,6 +3,7 @@
 // дополнительно несут CSRF-токен. Без входа сервер отвечает 401 — тогда открываем страницу входа.
 import { SERVER_URL } from './config.js';
 import { csrfToken, goToLogin, loadSession } from './auth.js';
+import { showBanned } from './banned.js';
 
 const TOKEN_KEY = 'alstudio.host.token';
 const TOKEN_PATTERN = /^[a-f0-9]{64}$/;
@@ -89,6 +90,7 @@ async function request(path, { method = 'GET', body, auth = true, headers = {} }
   if (response.status === 204) return null;
   const data = await response.json().catch(() => null);
   if (response.status === 401 && auth) goToLogin();
+  if (data?.code === 'BANNED') showBanned(data.details);
   if (!response.ok) {
     throw new ApiError(data?.error || `Ошибка сервера (${response.status})`, {
       status: response.status,
@@ -109,6 +111,7 @@ async function uploadImage(blob) {
   const response = await send('/api/images', { method: 'POST', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
   const data = await response.json().catch(() => null);
   if (response.status === 401) goToLogin();
+  if (data?.code === 'BANNED') showBanned(data.details);
   if (!response.ok) throw new ApiError(data?.error || `Не удалось загрузить картинку (${response.status})`, { status: response.status, code: data?.code });
   return data;
 }

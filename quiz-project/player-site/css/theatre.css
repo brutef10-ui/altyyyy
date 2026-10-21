@@ -1494,3 +1494,103 @@ a.brand:hover .brand-mark {
     max-width: none;
   }
 }
+
+/* ---------- Экран блокировки: «Вход закрыт» ---------- */
+
+.banned-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + var(--safe-top)) 18px calc(24px + var(--safe-bottom));
+  overflow-y: auto;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(255, 233, 176, 0.14), transparent 70%),
+    var(--velvet-folds),
+    var(--night);
+  animation: fade-in 420ms ease both;
+}
+
+.banned-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(26, 9, 16, 0.55), rgba(26, 9, 16, 0.82));
+  pointer-events: none;
+}
+
+.banned-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  width: min(520px, 100%);
+  padding: 34px 32px 30px;
+  text-align: center;
+  animation: programme-in 800ms var(--ease-out) 120ms backwards;
+}
+
+.banned-card:focus {
+  outline: none;
+}
+
+.banned-lock {
+  justify-self: center;
+  width: 72px;
+  height: 72px;
+  filter: drop-shadow(0 6px 10px rgba(43, 18, 24, 0.25));
+}
+
+.banned-card .kicker {
+  color: var(--velvet);
+  font-size: 19px;
+}
+
+.banned-card h1 {
+  font-size: clamp(32px, 7vw, 44px);
+  color: var(--ink);
+}
+
+.banned-facts {
+  display: grid;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 16px 18px;
+  border: 1.5px dashed rgba(143, 106, 34, 0.6);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 250, 240, 0.7);
+  text-align: left;
+}
+
+.banned-facts div {
+  display: grid;
+  gap: 2px;
+}
+
+.banned-facts dt {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.banned-facts dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.banned-contact {
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+
+.banned-contact a {
+  color: var(--velvet);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}

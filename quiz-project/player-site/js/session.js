@@ -55,10 +55,11 @@ export function goTo(page, message) {
 }
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, code = null } = {}) {
+  constructor(message, { status = 0, code = null, details = null } = {}) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -75,7 +76,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new ApiError(data?.error || `Ошибка сервера (${response.status})`, { status: response.status, code: data?.code });
+    throw new ApiError(data?.error || `Ошибка сервера (${response.status})`, { status: response.status, code: data?.code, details: data?.details });
   }
   return data;
 }

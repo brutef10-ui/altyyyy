@@ -3,6 +3,7 @@ import { SERVER_URL } from './config.js';
 import { csrfToken, loadSession, safeNext, setAccount } from './auth.js';
 import { api } from './api.js';
 import { contactNode, copyCode, downloadCode, renderCode } from './codes.js';
+import { banFromError, showBanned } from './banned.js';
 import { curtain, sceneChange } from './theatre.js';
 
 const LOGIN_PATTERN = /^[A-Za-z][A-Za-z0-9_.-]{2,31}$/;
@@ -35,7 +36,7 @@ async function post(path, body) {
     await loadSession({ force: true });
     throw new Error('Страница устарела — попробуйте ещё раз.');
   }
-  if (!response.ok) throw Object.assign(new Error(data?.error || `Ошибка сервера (${response.status})`), { code: data?.code });
+  if (!response.ok) throw Object.assign(new Error(data?.error || `Ошибка сервера (${response.status})`), { code: data?.code, details: data?.details });
   return data;
 }
 
@@ -101,6 +102,10 @@ $('form-login').addEventListener('submit', async (event) => {
     curtain.go(next, { replace: true });
   } catch (err) {
     done();
+    if (banFromError(err)) {
+      showBanned(banFromError(err));
+      return;
+    }
     showError(error, err.message);
     $('login-password').select();
   }
@@ -140,6 +145,10 @@ $('form-register').addEventListener('submit', async (event) => {
     showBackupCode(account, backupCode);
   } catch (err) {
     done();
+    if (banFromError(err)) {
+      showBanned(banFromError(err));
+      return;
+    }
     showError(error, err.message);
   }
 });
@@ -177,19 +186,24 @@ $('form-recover').addEventListener('submit', async (event) => {
   showError(error, '');
   const done = busy($('recover-submit'), 'Проверяем код…');
   try {
-    const { account, backupCode } = await post('/api/auth/recover', { login, code, newPassword: password });
+    const { account, backupCode, ban } = await post('/api/auth/recover', { login, code, newPassword: password });
     setAccount(account);
     for (const id of ['recover-code', 'recover-password', 'recover-password2']) $(id).value = '';
-    showBackupCode(account, backupCode, { recovered: true });
+    // Пароль сменён, но аккаунт заблокирован: сначала новый код, потом экран блокировки.
+    showBackupCode(account ?? { login }, backupCode, { recovered: true, ban });
   } catch (err) {
     done();
+    if (banFromError(err)) {
+      showBanned(banFromError(err));
+      return;
+    }
     showError(error, err.message);
   }
 });
 
 // ---------- Резервный код (показывается один раз) ----------
 
-function showBackupCode(account, code, { recovered = false } = {}) {
+function showBackupCode(account, code, { recovered = false, ban = null } = {}) {
   const step = $('backup-step');
   if (recovered) {
     $('backup-kicker').textContent = 'Пароль изменён';
@@ -211,6 +225,10 @@ function showBackupCode(account, code, { recovered = false } = {}) {
     $('backup-continue').disabled = true;
     // Код больше не нужен на странице — убираем его до ухода.
     $('backup-code').textContent = '';
+    if (ban) {
+      showBanned(ban);
+      return;
+    }
     await checkLegacyGames();
     curtain.go(next, { replace: true });
   };
@@ -232,6 +250,10 @@ async function checkLegacyGames() {
 async function init() {
   try {
     const session = await loadSession();
+    if (session.ban) {
+      showBanned(session.ban, { contact: session.adminContact });
+      return;
+    }
     if (session.account) {
       curtain.go(next, { replace: true });
       return;

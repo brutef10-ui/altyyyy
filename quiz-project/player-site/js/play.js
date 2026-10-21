@@ -6,6 +6,7 @@ import { goTo, playerState } from './session.js';
 import { connectPlayer, request } from './socket.js';
 import { ANSWER_SHAPES, formatScore, h, pencilIcon, plural, shapeIcon, stageIcon, vibrate } from './ui.js';
 import { curtain, EASE_OUT, prefersReducedMotion, replay } from './theatre.js';
+import { banFromError, showBanned } from './banned.js';
 
 const state = playerState.get();
 const $ = (id) => document.getElementById(id);
@@ -524,6 +525,10 @@ async function submitAnswer(value) {
   } catch (error) {
     if (!stillThisQuestion()) return;
     switch (error.code) {
+      case 'BANNED':
+        stopForGood();
+        showBanned(banFromError(error));
+        break;
       case 'ALREADY_ANSWERED':
         accepted();
         break;
@@ -846,6 +851,10 @@ async function enterRoom() {
 
 function handleJoinError(error) {
   switch (error.code) {
+    case 'BANNED':
+      stopForGood();
+      showBanned(banFromError(error));
+      return;
     case 'NICKNAME_TAKEN':
     case 'BAD_NICKNAME':
       stopForGood();
@@ -985,8 +994,14 @@ function bindEvents() {
     showBanner();
     if (reason === 'io server disconnect') socket.connect(); // сервер закрыл соединение — Socket.IO сам не вернётся
   });
-  socket.on('connect_error', () => {
+  socket.on('connect_error', (error) => {
     if (finished) return;
+    const ban = banFromError(error);
+    if (ban) {
+      stopForGood();
+      showBanned(ban);
+      return;
+    }
     showBanner();
     if (!socket.active) scheduleRetry({ code: 'DISCONNECTED' });
   });
@@ -1016,6 +1031,13 @@ function bindEvents() {
       icon: reason === 'replaced' ? 'phone' : 'curtain-closed',
       actions: [homeButton()],
     });
+  });
+
+  // Блокировка посреди игры: сервер уже убрал игрока из комнаты.
+  socket.on('access:banned', (ban) => {
+    stopForGood();
+    playerState.leaveRoom();
+    showBanned(ban);
   });
 
   socket.on('player:kicked', ({ message }) => {

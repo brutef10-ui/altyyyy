@@ -12,6 +12,7 @@
 import { SERVER_URL } from './config.js';
 import { getHostToken } from './api.js';
 import { goToLogin } from './auth.js';
+import { banFromError, showBanned } from './banned.js';
 import { flash, hostSession, launchRequest } from './session.js';
 import { hideOverlay, showOverlay } from './ui.js';
 import { curtain } from './theatre.js';
@@ -84,6 +85,10 @@ export async function request(socket, event, payload = {}, timeoutMs = 10_000) {
   if (!response?.ok) {
     // Сессия истекла или отозвана (выход на другом устройстве, смена пароля): войти заново.
     if (response?.code === 'UNAUTHORIZED') goToLogin();
+    if (response?.code === 'BANNED') {
+      stop();
+      showBanned(response.ban);
+    }
     throw Object.assign(new Error(response?.error || 'Ошибка сервера'), { code: response?.code || 'UNKNOWN' });
   }
   return response;
@@ -220,7 +225,10 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
       onReady(snapshot, session);
     } catch (error) {
       if (current !== generation || stopped) return;
-      if (error.code === 'UNAUTHORIZED') {
+      if (error.code === 'BANNED') {
+        socket.disconnect();
+        hideOverlay();
+      } else if (error.code === 'UNAUTHORIZED') {
         // Сессия истекла или из неё вышли в другой вкладке: войти заново и вернуться сюда.
         stop();
         socket.disconnect();
@@ -246,8 +254,24 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
 
   socket.on('connect', attachAndRender);
 
-  socket.on('connect_error', () => {
+  socket.on('connect_error', (error) => {
+    const ban = banFromError(error);
+    if (ban) {
+      // Заблокированного сервер не пускает — переподключаться бессмысленно.
+      stop();
+      socket.disconnect();
+      hideOverlay();
+      showBanned(ban);
+      return;
+    }
     if (!stopped && !retryTimer) showOverlay('Нет связи с сервером. Пробуем переподключиться…');
+  });
+  // Блокировка во время игры: сервер закрыл комнату и отключил ведущего.
+  socket.on('access:banned', (ban) => {
+    stop();
+    socket.disconnect();
+    hideOverlay();
+    showBanned(ban);
   });
   socket.on('disconnect', (reason) => {
     generation += 1; // ответ на запрос по старому соединению уже не важен
@@ -268,7 +292,8 @@ export async function openHostRoom({ page, allowCreate = false, onReady }) {
   });
 
   socket.on('room:closed', ({ message, reason }) => {
-    if (closingOnPurpose) return;
+    // Комнату закрыла блокировка ведущего: следом придёт access:banned с причиной и сроком.
+    if (closingOnPurpose || reason === 'host-banned') return;
     stop();
     if (reason === 'replaced') {
       socket.disconnect();

@@ -57,7 +57,7 @@ export function request(socket, event, payload = {}, { timeoutMs = 8000 } = {}) 
         return;
       }
       if (!response?.ok) {
-        reject(failure(response?.error || 'Ошибка сервера', response?.code || 'UNKNOWN'));
+        reject(Object.assign(failure(response?.error || 'Ошибка сервера', response?.code || 'UNKNOWN'), { ban: response?.ban }));
         return;
       }
       resolve(response);
