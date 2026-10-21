@@ -3,7 +3,7 @@
 import { adminApi } from './api.js';
 import { banDialog, issueCode, liftDialog } from './actions.js';
 import { h, toast } from './dom.js';
-import { BAN_STATUS, EVENT_LABELS, ago, banTerm, deviceLabel, deviceType, fmtDate, shortId } from './format.js';
+import { BAN_STATUS, EVENT_LABELS, SHARING_LEVELS, ago, banTerm, deviceLabel, deviceType, fmtDate, shortId } from './format.js';
 
 let current = null; // { dialog, kind, id, onChange }
 
@@ -115,6 +115,37 @@ function eventsSection(params, { accountView = false } = {}) {
   return section('Журнал событий', h('div', {}, list, more));
 }
 
+// Подсказки о шаринге — только если администратор их включил. Ничего не блокируют.
+function sharingSection(card) {
+  if (!card.sharingEnabled) return null;
+  const { sharing, account } = card;
+  if (!sharing) return section('Подсказки о шаринге', empty('За последние 30 дней активности не было — оценка не считалась.'));
+  const toggle = h('button', {
+    class: 'btn btn-small btn-ghost',
+    type: 'button',
+    text: sharing.hidden ? 'Вернуть в список подозрительных' : 'Скрыть из списка подозрительных',
+    onclick: async () => {
+      try {
+        await adminApi.setSharingHidden(account.id, !sharing.hidden);
+        toast(sharing.hidden ? 'Аккаунт снова в списке' : 'Аккаунт скрыт из списка подозрительных');
+        refresh();
+      } catch (error) {
+        toast(error.message, 'error');
+      }
+    },
+  });
+  return section('Подсказки о шаринге', h('div', { class: 'hint-card' },
+    h('div', { class: 'hint-card-head' },
+      h('span', { class: `pill hint-pill hint-${sharing.level}`, text: `${sharing.score} · ${SHARING_LEVELS[sharing.level]}` }),
+      sharing.hidden ? h('span', { class: 'pill pill-muted', text: 'скрыт из списка' }) : null),
+    sharing.reasons.length
+      ? h('ul', { class: 'plain-list hint-reasons' }, sharing.reasons.map((reason) => h('li', {}, reason.text, h('span', { class: 'muted', text: ` (+${reason.weight})` }))))
+      : empty('Признаков совместного использования нет.'),
+    h('p', { class: 'muted small', text: 'Это подсказка, а не доказательство: сервер ничего не делает по ней сам.' }),
+    sharing.level !== 'green' || sharing.hidden ? toggle : null,
+  ));
+}
+
 function accountCard(card) {
   const { account } = card;
   const activeBan = card.bans.find((ban) => ban.status === 'active' && ban.accountId === account.id) ?? null;
@@ -143,6 +174,7 @@ function accountCard(card) {
         ['Активных сессий', String(account.activeSessions)],
         ['До регистрации', card.beforeRegistration.events ? `${card.beforeRegistration.events} событий с ${fmtDate(card.beforeRegistration.firstAt)}` : 'нет гостевой истории'],
       ])),
+      sharingSection(card),
       bansSection(card.bans),
       section('Устройства аккаунта (visitor_id)', table([
         { title: 'ID', value: (row) => h('button', { class: 'link-btn', type: 'button', text: row.shortId, title: row.id, onclick: () => openCard('visitor', row.id) }) },

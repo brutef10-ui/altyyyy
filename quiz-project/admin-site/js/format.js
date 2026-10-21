@@ -52,9 +52,13 @@ export const AUDIT_LABELS = {
   'account.view': 'Открыта карточка аккаунта',
   'visitor.view': 'Открыта карточка устройства',
   'settings.update': 'Изменены настройки',
+  'sharing.hide': 'Скрыт из подозрительных',
+  'sharing.unhide': 'Возвращён в подозрительные',
 };
 
 export const BAN_STATUS = { active: 'действует', expired: 'истекла', lifted: 'снята' };
+
+export const SHARING_LEVELS = { green: 'зелёный', yellow: 'жёлтый', red: 'красный' };
 
 export const shortId = (id) => (id ? String(id).slice(0, 8) : '—');
 

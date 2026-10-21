@@ -887,3 +887,161 @@
     padding: 10px 12px;
   }
 }
+
+/* ---------- Подсказки о шаринге ---------- */
+
+.hint-panel {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border: 1.5px dashed rgba(216, 172, 76, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(26, 9, 16, 0.45);
+}
+
+.hint-panel.is-on {
+  border-style: solid;
+}
+
+.hint-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hint-note {
+  max-width: 900px;
+  font-size: 14.5px;
+  color: var(--muted);
+}
+
+.hint-status {
+  color: var(--muted);
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--ivory);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.switch:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 30px;
+  border: 1.5px solid var(--gold-deep);
+  border-radius: 999px;
+  background: rgba(26, 9, 16, 0.8);
+  transition: background-color 200ms ease;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 260ms var(--ease-out), background-color 200ms ease;
+}
+
+.switch[aria-checked='true'] .switch-track {
+  background: var(--velvet);
+}
+
+.switch[aria-checked='true'] .switch-knob {
+  background: var(--gold-light);
+  transform: translateX(22px);
+}
+
+.switch:focus-visible .switch-track {
+  outline: 3px solid var(--gold-light);
+  outline-offset: 2px;
+}
+
+.hint-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hint-pill {
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+
+.hint-green,
+.programme .hint-green,
+.drawer .hint-green {
+  color: #fff;
+  background: var(--success);
+  border-color: #1f6b3f;
+}
+
+.hint-yellow,
+.programme .hint-yellow,
+.drawer .hint-yellow {
+  color: var(--ink);
+  background: var(--amber);
+  border-color: #9a6a10;
+}
+
+.hint-red,
+.programme .hint-red,
+.drawer .hint-red {
+  color: #fff;
+  background: var(--danger);
+  border-color: #8f2020;
+}
+
+.hint-card {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.hint-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hint-reasons li {
+  padding-left: 14px;
+  text-indent: -14px;
+}
+
+.hint-reasons li::before {
+  content: '• ';
+  color: var(--gold-deep);
+}
+
+/* Кнопки-«ложи» на светлой панели карточки — как на программке (theatre.css). */
+.drawer .btn-ghost {
+  color: var(--ink);
+  background: rgba(255, 250, 240, 0.85);
+  border-color: rgba(143, 106, 34, 0.55);
+}
+
+.drawer .btn-ghost:hover:not(:disabled) {
+  background: #fffaf0;
+  border-color: var(--gold-deep);
+}

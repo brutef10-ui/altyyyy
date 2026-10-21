@@ -4,7 +4,7 @@ import { adminApi } from './api.js';
 import { banDialog, issueCode, liftDialog } from './actions.js';
 import { openCard } from './card.js';
 import { h, toast } from './dom.js';
-import { AUDIT_LABELS, BAN_STATUS, ago, banTerm, counts, deviceLabel, fmtDate, shortId } from './format.js';
+import { AUDIT_LABELS, BAN_STATUS, SHARING_LEVELS, ago, counts, deviceLabel, fmtDate, shortId } from './format.js';
 import { curtain } from './theatre.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,7 +35,7 @@ const banPill = (ban) => (ban
  * Список с поиском, сортировкой и «Показать ещё».
  * load(params) → { items, hasMore }.
  */
-function listView({ root, columns, load, onOpen, searchPlaceholder, sorts = null, filters = null, emptyText }) {
+function listView({ root, columns, load, onOpen, searchPlaceholder, sorts = null, filters = null, emptyText, before = [], onPage = null }) {
   const search = h('input', { class: 'input toolbar-search', type: 'search', placeholder: searchPlaceholder, 'aria-label': searchPlaceholder, maxlength: 64 });
   const sort = sorts ? h('select', { class: 'input select toolbar-select', 'aria-label': 'Сортировка' }, sorts.map(([value, label]) => h('option', { value, text: label }))) : null;
   const filter = filters ? h('div', { class: 'segmented', role: 'group', 'aria-label': 'Фильтр' }) : null;
@@ -60,6 +60,7 @@ function listView({ root, columns, load, onOpen, searchPlaceholder, sorts = null
   const more = h('button', { class: 'btn btn-ghost btn-small', type: 'button', text: 'Показать ещё', hidden: true });
   const status = h('p', { class: 'muted ledger-status', 'aria-live': 'polite' });
   root.replaceChildren(
+    ...before,
     h('div', { class: 'toolbar' }, search, sort, filter),
     h('div', { class: 'ledger programme' }, h('div', { class: 'ledger-scroll' }, table), emptyNote),
     h('div', { class: 'ledger-foot' }, status, more),
@@ -75,6 +76,7 @@ function listView({ root, columns, load, onOpen, searchPlaceholder, sorts = null
     try {
       const page = await load({ q: search.value.trim(), sort: sort?.value, filter: filterValue, offset, limit: 50 });
       if (current !== generation) return;
+      onPage?.(page);
       if (reset) body.replaceChildren();
       body.append(...page.items.map((item) => row(item, onOpen)));
       offset += page.items.length;
@@ -108,13 +110,83 @@ const refreshAll = () => {
   for (const refresh of Object.values(refreshers)) refresh?.();
 };
 
-function accountsTab() {
+// Метка подсказки о шаринге: цвет, оценка, причины во всплывающей подсказке.
+function sharingPill(sharing) {
+  if (!sharing) return h('span', { class: 'muted small', text: 'нет активности' });
+  const title = sharing.reasons.length ? sharing.reasons.map((reason) => `• ${reason.text} (+${reason.weight})`).join('\n') : 'Признаков совместного использования нет';
+  return h('span', { class: 'hint-cell' },
+    h('span', { class: `pill hint-pill hint-${sharing.level}`, title, text: `${sharing.score} · ${SHARING_LEVELS[sharing.level]}` }),
+    sharing.hidden ? h('span', { class: 'pill pill-muted', text: 'скрыт' }) : null);
+}
+
+// Переключатель подсказок: хранится на сервере, по умолчанию выключен.
+function sharingControls(enabled, onToggle) {
+  const toggle = h('button', {
+    class: 'switch',
+    type: 'button',
+    role: 'switch',
+    'aria-checked': String(enabled),
+    onclick: async () => {
+      toggle.disabled = true;
+      try {
+        await adminApi.setSharing(!enabled);
+        toast(!enabled ? 'Подсказки включены' : 'Подсказки выключены');
+        onToggle();
+      } catch (error) {
+        toast(error.message, 'error');
+        toggle.disabled = false;
+      }
+    },
+  }, h('span', { class: 'switch-track', 'aria-hidden': 'true' }, h('span', { class: 'switch-knob' })), h('span', { text: 'Показывать подозрительные аккаунты' }));
+  const note = h('p', { class: 'hint-note' }, enabled
+    ? 'Подсказки ничего не блокируют и пользователям не показываются — это только повод присмотреться. Оценка считается по журналу за 30 дней, когда вы открываете список.'
+    : 'Выключено: оценка не считается. Журналы заходов при этом пишутся как обычно.');
+  const status = h('p', { class: 'hint-status muted small', 'aria-live': 'polite' });
+  const recompute = enabled ? h('button', {
+    class: 'btn btn-ghost btn-small',
+    type: 'button',
+    text: 'Пересчитать',
+    onclick: async (event) => {
+      event.currentTarget.disabled = true;
+      try {
+        const result = await adminApi.recomputeSharing();
+        toast(`Пересчитано: ${result.analyzed} аккаунтов, подозрительных — ${result.flagged}`);
+        onToggle();
+      } catch (error) {
+        toast(error.message, 'error');
+        event.currentTarget.disabled = false;
+      }
+    },
+  }) : null;
+  const panel = h('div', { class: `hint-panel${enabled ? ' is-on' : ''}` }, h('div', { class: 'hint-row' }, toggle, recompute), note, status);
+  return {
+    panel,
+    showStatus(info) {
+      status.textContent = info
+        ? `Проанализировано аккаунтов: ${info.analyzed}${info.limited ? ' (ограничено — самые активные)' : ''} · ${fmtDate(info.computedAt)} · ${info.durationMs} мс. GeoIP: GeoLite (MaxMind), локальная база.`
+        : '';
+    },
+  };
+}
+
+async function accountsTab() {
+  let enabled = false;
+  try {
+    enabled = (await adminApi.settings()).sharingHints;
+  } catch (error) {
+    toast(error.message, 'error');
+  }
+  const controls = sharingControls(enabled, () => accountsTab());
+  const hintColumn = { title: 'Подсказка о шаринге', value: (item) => sharingPill(item.sharing) };
   const view = listView({
     root: $('panel-accounts'),
+    before: [controls.panel],
+    onPage: (page) => controls.showStatus(page.sharing),
     searchPlaceholder: 'Логин, ник или IP',
     sorts: [['last_login', 'Сначала недавно входившие'], ['created', 'Сначала новые аккаунты']],
+    filters: enabled ? [['all', 'Все'], ['suspicious', 'Подозрительные']] : null,
     emptyText: 'Аккаунтов не найдено',
-    load: (params) => adminApi.accounts(params),
+    load: (params) => adminApi.accounts({ ...params, filter: undefined, suspicious: params.filter === 'suspicious' ? 1 : undefined }),
     onOpen: (item) => openCard('account', item.id, { onChange: refreshAll }),
     columns: [
       { title: 'Логин', className: 'col-main', value: (item) => h('div', { class: 'cell-main' },
@@ -129,6 +201,7 @@ function accountsTab() {
       { title: 'Разных IP и устройств: всего · 24 ч · 7 дн', className: 'num', value: (item) => h('div', { class: 'cell-stack' },
         h('span', {}, h('span', { class: 'cell-sub', text: 'IP ' }), counts(item.ips)),
         h('span', {}, h('span', { class: 'cell-sub', text: 'устр. ' }), counts(item.devices))) },
+      ...(enabled ? [hintColumn] : []),
       { title: 'Действия', className: 'col-actions', value: (item) => (item.role === 'admin' ? '—' : h('div', { class: 'row-actions' },
         h('button', { class: 'btn btn-small btn-ghost', type: 'button', text: 'Выдать одноразовый код', onclick: () => issueCode(item) }),
         h('button', { class: 'btn btn-small btn-danger', type: 'button', text: 'Заблокировать', onclick: async () => { if (await banDialog({ account: item, ip: item.lastIp })) refreshAll(); } }),

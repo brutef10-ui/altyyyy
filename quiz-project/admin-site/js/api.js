@@ -64,4 +64,8 @@ export const adminApi = {
   liftBan: (id, reason) => call(`/api/admin/bans/${encodeURIComponent(id)}/lift`, { method: 'POST', body: { reason } }),
   issueCode: (accountId) => call(`/api/admin/accounts/${encodeURIComponent(accountId)}/recovery-code`, { method: 'POST' }),
   logout: () => call('/api/auth/logout', { method: 'POST' }),
+  settings: () => call('/api/admin/settings'),
+  setSharing: (enabled) => call('/api/admin/settings/sharing', { method: 'POST', body: { enabled } }),
+  recomputeSharing: () => call('/api/admin/sharing/recompute', { method: 'POST' }),
+  setSharingHidden: (id, hidden) => call(`/api/admin/accounts/${encodeURIComponent(id)}/sharing-hidden`, { method: 'POST', body: { hidden } }),
 };
