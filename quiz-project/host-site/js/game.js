@@ -2,11 +2,12 @@
 // Таймеры здесь только показывают время — когда открыть варианты и закончить вопрос, решает сервер.
 //
 // Ход вопроса: phase «reading» (только вопрос и картинка) → «answering» (варианты или ввод текста) → results.
-// Раскладку экрана задают атрибуты #game: data-phase, data-type и класс has-image (см. style.css).
+// Раскладку экрана задают атрибуты #game: data-phase, data-type и класс has-image (см. css/game.css).
+// Новый вопрос — смена декораций «поворотный круг» (theatre.js), чтение → ответы — плавная перестройка (FLIP).
 import { imageUrl } from './api.js';
 import { openHostRoom, request } from './socket.js';
 import { avatar, formatCode, formatScore, h, plural, shapeIcon, toast } from './ui.js';
-import { curtain } from './theatre.js';
+import { curtain, sceneIn } from './theatre.js';
 
 const RING_LENGTH = 2 * Math.PI * 54;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -113,6 +114,9 @@ function showQuestionBase(question) {
   gameView.dataset.type = question.type;
   counter.textContent = `Вопрос ${question.index + 1} из ${question.totalQuestions}`;
   questionText.textContent = question.text;
+  // Длинный вопрос — кегль меньше, чтобы табличка не закрывала сцену.
+  const length = [...question.text].length;
+  questionBanner.dataset.length = length > 150 ? 'xl' : length > 90 ? 'long' : '';
   questionTag.hidden = question.type !== 'text';
   setImage(question.image);
 }
@@ -139,13 +143,18 @@ function renderQuestion(question) {
   if (fromReading) {
     // Чтение закончилось: на месте открываем варианты, без перерисовки всей страницы.
     changeLayout(() => showAnswering(question));
+    updateProgress(question);
   } else {
+    // Новый вопрос — смена декораций: сцена выезжает поворотным кругом,
+    // а табличка с вопросом опускается с колосников.
+    const wasHidden = gameView.hidden;
     showQuestionBase(question);
     restartAnimation(questionBanner, 'enter');
     if (question.phase === 'reading') showReading(question);
     else showAnswering(question);
+    updateProgress(question);
+    if (!wasHidden) sceneIn(gameView, 'turntable');
   }
-  updateProgress(question);
 }
 
 function showReading(question) {
@@ -173,6 +182,7 @@ function showAnswering(question) {
 function renderTiles(question, { animate = true } = {}) {
   const answers = question.answers || [];
   answersGrid.className = `answer-grid answers-${answers.length}`;
+  answersGrid.classList.toggle('has-long-answers', answers.some((text) => [...text].length > 28));
   answersGrid.replaceChildren(...answers.map((text, index) =>
     h('div', { class: `answer-tile answer-${index}${animate ? '' : ' no-enter'}`, style: { animationDelay: `${120 + index * 90}ms` } },
       shapeIcon(index, 'shape tile-shape'),
@@ -345,7 +355,7 @@ function renderResults(results, question = current) {
 
   restartAnimation(resultsPanel, 'enter');
   if (results.isLast) {
-    setNextButton('К награждению 🏆', 'Это был последний вопрос — места объявим на церемонии');
+    setNextButton('К награждению →', 'Это был последний вопрос — места объявим на церемонии');
   } else {
     setNextButton('Следующий вопрос →', 'Пробел или → — следующий вопрос');
   }

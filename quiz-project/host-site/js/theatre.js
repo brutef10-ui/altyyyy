@@ -187,6 +187,16 @@ export async function sceneChange(element, update, kind = 'turntable') {
 }
 
 /**
+ * Только выезд новой сцены — когда содержимое уже обновлено и ждать ухода старой нельзя
+ * (например, следующий вопрос: таймеры идут с первой секунды).
+ */
+export function sceneIn(element, kind = 'turntable') {
+  const scene = prefersReducedMotion() ? FADE : (SCENES[kind] || SCENES.turntable);
+  if (!element.animate) return Promise.resolve();
+  return element.animate(scene.in, { duration: scene.inMs, easing: EASE_OUT }).finished.catch(() => {});
+}
+
+/**
  * Ступенчатое появление: каждая часть выходит на сцену чуть позже предыдущей.
  * kind: 'rise' — поднимается из люка с наклоном, 'drop' — опускается сверху, 'flip' — переворачивается как табличка.
  */

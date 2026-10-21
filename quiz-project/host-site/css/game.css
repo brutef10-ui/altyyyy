@@ -1,0 +1,1392 @@
+/* AL Studio — экран игры на проекторе: сцена в золочёном портале. Вопрос — табличка на шнурах,
+   опускается с колосников; таймер — золотой циферблат; варианты — камни в оправе на деревянном
+   основании; итоги — верный ответ под прожектором, остальные гаснут. Основа — theatre.css.
+
+   Раскладку задают атрибуты #game:
+     data-phase — reading (только вопрос) | answering (варианты и таймер) | results;
+     data-type  — choice | text; класс has-image — у вопроса есть картинка. */
+
+.line-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- Шапка: номер вопроса, код, счётчик ответов ---------- */
+
+.game-meta {
+  display: flex;
+  gap: 10px;
+}
+
+#q-counter {
+  font-family: var(--font-display);
+  color: var(--gold-light);
+}
+
+.answers-counter {
+  display: grid;
+  justify-items: end;
+  line-height: 1;
+  color: var(--ivory);
+}
+
+.answers-counter span {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--gold-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.answers-counter small {
+  color: var(--paper-2);
+  font-size: 14px;
+}
+
+.bump {
+  animation: bump 380ms var(--ease-spring);
+}
+
+/* ---------- Сцена ---------- */
+
+.game {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-areas: 'banner' 'middle' 'bottom';
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 40%);
+  gap: 20px;
+  padding: 34px calc(var(--drape) + 26px) 18px;
+}
+
+/* Прожектор сверху и пол сцены из досок в перспективе */
+.game::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -40px;
+  z-index: -1;
+  width: min(1100px, 92%);
+  height: 70%;
+  background: radial-gradient(50% 100% at 50% 0%, rgba(255, 233, 176, 0.2), rgba(255, 233, 176, 0.05) 60%, transparent 78%);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.game::after {
+  content: '';
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: -6px;
+  z-index: -2;
+  height: 46%;
+  background:
+    linear-gradient(180deg, rgba(26, 9, 16, 0.95), rgba(26, 9, 16, 0.35) 45%, rgba(26, 9, 16, 0.55)),
+    var(--boards);
+  transform: perspective(700px) rotateX(58deg);
+  transform-origin: 50% 100%;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* Вопрос с вводом текста: внизу не плитки, а компактная панель */
+.game[data-type='text'] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* С картинкой плитки чуть ниже, чтобы картинка была крупнее */
+.game.has-image[data-phase='answering'][data-type='choice'] {
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 35%);
+}
+
+/* Результаты: вопрос компактнее, больше места статистике и лидерам */
+.game[data-phase='results'][data-type='choice'] {
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 30%);
+}
+
+/* Чтение: картинка занимает всё свободное место, внизу — полоса ожидания */
+.game[data-phase='reading'] {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* Чтение без картинки: вопрос и полоса ожидания по центру сцены */
+.game[data-phase='reading']:not(.has-image) {
+  grid-template-areas: 'banner' 'bottom';
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 44px;
+  padding-bottom: 7vh;
+}
+
+.game[data-phase='reading']:not(.has-image) .game-middle {
+  display: none;
+}
+
+/* Что видно на каждом этапе */
+.game:not([data-phase='answering']) .timer,
+.game:not(.has-image) .question-media,
+.game[data-phase='results'] .question-media,
+.game:not([data-phase='results']) .results-panel,
+.game:not([data-phase='reading']) .reading,
+.game[data-phase='reading'] .answer-grid,
+.game[data-type='text'] .answer-grid,
+.game:not([data-phase='answering'][data-type='text']) .text-wait,
+.game:not([data-phase='results'][data-type='text']) .text-answer {
+  display: none;
+}
+
+/* ---------- Вопрос — табличка на шнурах ---------- */
+
+.question-banner {
+  position: relative;
+  grid-area: banner;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  width: min(1240px, 100%);
+  min-height: 128px;
+  justify-self: center;
+  padding: 28px 44px;
+  border-radius: 16px;
+  color: var(--ink);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #fffaf0 0%, transparent 70%),
+    var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow-lift);
+  text-align: center;
+  transform-origin: 50% -40px;
+}
+
+/* Шнуры к колосникам */
+.question-banner::before {
+  content: '';
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  bottom: 100%;
+  height: 40px;
+  border-inline: 3px solid var(--gold-deep);
+  pointer-events: none;
+}
+
+.question-banner::after {
+  content: '';
+  position: absolute;
+  left: calc(16% - 6px);
+  right: calc(16% - 6px);
+  top: -6px;
+  height: 12px;
+  background:
+    radial-gradient(circle, var(--gold-light) 0 3px, var(--gold-deep) 3.5px 5px, transparent 5.5px) 0 0 / 12px 12px no-repeat,
+    radial-gradient(circle, var(--gold-light) 0 3px, var(--gold-deep) 3.5px 5px, transparent 5.5px) 100% 0 / 12px 12px no-repeat;
+  pointer-events: none;
+}
+
+.game[data-phase='reading']:not(.has-image) .question-banner {
+  min-height: min(36vh, 320px);
+  padding: 40px 56px;
+}
+
+.question-banner h1 {
+  font-size: clamp(30px, 3.6vw, 60px);
+  font-weight: 900;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+/* Длинный вопрос (data-length ставит game.js) — кегль меньше */
+.question-banner[data-length='long'] h1 {
+  font-size: clamp(26px, 2.9vw, 48px);
+}
+
+.question-banner[data-length='xl'] h1 {
+  font-size: clamp(22px, 2.3vw, 38px);
+}
+
+.question-banner.enter {
+  animation: fly-in 1000ms var(--ease-out) both;
+}
+
+.game[data-phase='results'] .question-banner {
+  min-height: 0;
+  padding: 16px 36px;
+}
+
+.game[data-phase='results'] .question-banner h1 {
+  font-size: clamp(22px, 2.3vw, 38px);
+}
+
+.game[data-phase='results'] .question-tag {
+  display: none;
+}
+
+/* Подсказка «пишут своими словами» — бархатная ленточка */
+.question-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  color: var(--gold-light);
+  background: var(--velvet);
+  box-shadow: 0 0 0 1.5px var(--gold), 0 0 0 3px var(--velvet-deep);
+  font-size: clamp(14px, 1.1vw, 18px);
+  font-weight: 700;
+}
+
+.question-tag svg {
+  width: 1.2em;
+  height: 1.2em;
+}
+
+/* ---------- Середина: таймер, картинка, счётчик ---------- */
+
+.game-middle {
+  grid-area: middle;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  min-height: 0;
+}
+
+.game-middle > * {
+  grid-row: 1;
+}
+
+.game-bottom {
+  grid-area: bottom;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.game-bottom > * {
+  grid-area: 1 / 1;
+  min-height: 0;
+}
+
+/* Картинка — в золочёной раме */
+.question-media {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+}
+
+.game[data-phase='reading'] .question-media {
+  grid-column: 1 / -1;
+  animation: frame-in 900ms var(--ease-out) 250ms backwards;
+}
+
+.question-media img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border: 8px solid var(--gold);
+  border-radius: 4px;
+  background: var(--night-2);
+  box-shadow: 0 0 0 2px var(--gold-deep), inset 0 0 0 2px var(--gold-deep), 0 0 0 10px rgba(216, 172, 76, 0.14), var(--shadow-lift);
+}
+
+/* Крупный счётчик ответов справа от картинки — латунный медальон */
+.answers-live {
+  grid-column: 3;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  width: clamp(130px, 20vh, 220px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: var(--ink);
+  background: radial-gradient(circle at 35% 30%, #fff4d2, var(--gold) 58%, #b98a33);
+  box-shadow: 0 0 0 3px var(--gold-deep), 0 0 0 10px rgba(216, 172, 76, 0.16), var(--shadow-lift);
+  animation: medal-in 700ms var(--ease-spring) 200ms backwards;
+}
+
+.game:not(.has-image) .answers-live,
+.game:not([data-phase='answering']) .answers-live {
+  display: none;
+}
+
+.answers-live b {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 7vh, 78px);
+  font-weight: 900;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.answers-live span {
+  color: var(--ink-soft);
+  font-size: clamp(15px, 1.3vw, 20px);
+  font-weight: 700;
+}
+
+/* ---------- Время подумать ---------- */
+
+.reading {
+  display: grid;
+  gap: 16px;
+  justify-self: center;
+  align-self: center;
+  width: min(880px, 100%);
+  padding: 2px 0 6px;
+  animation: rise-in 700ms var(--ease-out) 400ms backwards;
+}
+
+.reading-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 18px;
+  color: var(--paper-2);
+  font-size: clamp(18px, 1.6vw, 25px);
+  font-weight: 600;
+}
+
+.reading-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--gold-light);
+  font-family: var(--font-display);
+  font-size: 1.15em;
+  font-style: italic;
+  font-weight: 700;
+}
+
+.reading-kicker svg {
+  width: 1.1em;
+  height: 1.1em;
+  animation: hourglass 3s var(--ease-curtain) infinite;
+}
+
+.reading-label b {
+  color: var(--ivory);
+  font-family: var(--font-display);
+  font-size: 1.4em;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Догорающий фитиль */
+.reading-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #120509, var(--night-3));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 0 1.5px rgba(216, 172, 76, 0.45);
+}
+
+.reading-fill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold) 55%, var(--gold-light));
+  box-shadow: 0 0 22px rgba(243, 217, 139, 0.45);
+  transform-origin: left center;
+}
+
+.reading-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 250, 230, 0.6), transparent) no-repeat;
+  background-size: 30% 100%;
+  animation: reading-shine 1.8s linear infinite;
+}
+
+/* ---------- Таймер — золотой циферблат ---------- */
+
+.timer {
+  position: relative;
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  width: clamp(140px, 21vh, 230px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--night-3) 0 60%, transparent 61%),
+    repeating-conic-gradient(from -1deg, rgba(243, 217, 139, 0.6) 0 2deg, transparent 2deg 30deg),
+    var(--night-2);
+  box-shadow: 0 0 0 4px var(--gold-deep), 0 0 0 9px var(--gold), 0 0 0 11px var(--gold-deep), var(--shadow-lift);
+}
+
+.game.has-image .timer {
+  grid-column: 1;
+}
+
+.timer.enter {
+  animation: dial-in 760ms var(--ease-spring) both;
+}
+
+/* Свечение циферблата в последние секунды (мерцание — только прозрачность) */
+.timer::before {
+  content: '';
+  position: absolute;
+  inset: -26px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(210, 58, 58, 0.55), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.timer.is-urgent::before {
+  animation: urgent-glow 500ms ease-in-out infinite alternate;
+}
+
+.timer svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-track {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 9;
+}
+
+.timer-progress {
+  fill: none;
+  stroke: var(--gold-light);
+  stroke-width: 9;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(243, 217, 139, 0.6));
+  transition: stroke 300ms ease;
+}
+
+.timer-value {
+  position: relative;
+  color: var(--gold-light);
+  font-family: var(--font-display);
+  font-size: clamp(50px, 8.5vh, 92px);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer.is-urgent .timer-progress {
+  stroke: #ff6b5a;
+}
+
+.timer.is-urgent .timer-value {
+  color: #ffb4a8;
+  animation: tremble 160ms linear infinite;
+}
+
+/* ---------- Варианты — камни в золотой оправе ---------- */
+
+.answer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 22px 24px;
+  min-height: 0;
+  padding: 4px 6px 12px;
+  perspective: 1400px;
+}
+
+.answer-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 0;
+  padding: 16px 30px 16px 20px;
+  border-radius: 16px;
+  color: #fff;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(330deg, rgba(0, 0, 0, 0.3), transparent 50%),
+    var(--tone);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 240, 200, 0.35),
+    0 0 0 4px var(--gold),
+    0 0 0 6px var(--gold-deep),
+    0 10px 0 6px var(--wood-dark),
+    0 20px 30px 6px rgba(0, 0, 0, 0.45);
+  font-size: clamp(22px, 2.4vw, 40px);
+  font-weight: 800;
+  line-height: 1.18;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transform-origin: 50% 100%;
+  animation: tile-rise 760ms var(--ease-out) backwards;
+  transition: opacity 600ms ease, transform 600ms var(--ease-out), box-shadow 600ms ease;
+}
+
+.answer-tile.no-enter {
+  animation: none;
+}
+
+/* Фигура в золотом медальоне */
+.tile-shape {
+  flex: none;
+  width: clamp(54px, 5vw, 86px);
+  height: clamp(54px, 5vw, 86px);
+  padding: clamp(12px, 1.1vw, 19px);
+  border-radius: 50%;
+  color: var(--tone);
+  background: radial-gradient(circle at 35% 30%, #fffaf0, var(--ivory) 45%, var(--paper-2));
+  box-shadow: 0 0 0 3px var(--gold-deep), 0 0 0 6px var(--gold), 0 6px 12px rgba(0, 0, 0, 0.35);
+  overflow: visible;
+}
+
+.tile-text {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+/* Длинные варианты — кегль меньше */
+.has-long-answers .answer-tile {
+  font-size: clamp(18px, 1.7vw, 30px);
+}
+
+/* Число ответов — латунная табличка */
+.tile-count {
+  flex: none;
+  min-width: 70px;
+  padding: 4px 14px;
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--gold-leaf);
+  box-shadow: inset 0 0 0 2px rgba(255, 244, 210, 0.45), 0 0 0 1.5px var(--gold-deep);
+  font-family: var(--font-display);
+  font-weight: 900;
+  text-align: center;
+  text-shadow: none;
+  font-variant-numeric: tabular-nums;
+  animation: pop-in 520ms var(--ease-spring) 300ms backwards;
+}
+
+/* Итоги: неверные гаснут, верный — под лучом прожектора с золотой печатью */
+.answer-tile.is-dimmed {
+  opacity: 0.28;
+  transform: scale(0.96);
+}
+
+.answer-tile.is-correct {
+  transform: scale(1.03);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 240, 200, 0.5),
+    0 0 0 4px var(--gold-light),
+    0 0 0 6px var(--gold-deep),
+    0 10px 0 6px var(--wood-dark),
+    0 0 0 16px rgba(255, 233, 176, 0.22),
+    0 0 70px 18px rgba(255, 233, 176, 0.38);
+}
+
+.answer-tile.is-correct::after {
+  content: '✓';
+  position: absolute;
+  top: -18px;
+  right: -14px;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--velvet-deep);
+  background: radial-gradient(circle at 35% 30%, #fff4d2, var(--gold) 55%, #b98a33);
+  box-shadow: 0 0 0 3px var(--gold-deep), 0 8px 16px rgba(0, 0, 0, 0.45);
+  font-size: 28px;
+  font-weight: 900;
+  text-shadow: none;
+  animation: seal-in 700ms var(--ease-spring) 250ms backwards;
+}
+
+/* ---------- Ввод ответа: игроки пишут ---------- */
+
+.text-wait {
+  display: flex;
+  align-items: center;
+  justify-self: center;
+  align-self: center;
+  gap: clamp(18px, 2vw, 30px);
+  width: min(1040px, 100%);
+  padding: clamp(18px, 2vw, 30px) clamp(20px, 2.6vw, 38px);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--ivory);
+  box-shadow: var(--programme-frame), var(--shadow-lift);
+}
+
+.text-wait.enter {
+  animation: rise-in 700ms var(--ease-out) 150ms both;
+}
+
+.text-wait-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: clamp(68px, 6vw, 100px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: var(--gold-light);
+  background: radial-gradient(circle at 35% 30%, var(--velvet-light), var(--velvet) 58%, var(--velvet-deep));
+  box-shadow: 0 0 0 3px var(--gold), 0 0 0 5px var(--velvet-deep);
+}
+
+.text-wait-icon svg {
+  width: 52%;
+  height: 52%;
+  animation: writing 1.8s ease-in-out infinite;
+}
+
+.text-wait-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.text-wait-title {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.3vw, 38px);
+  font-weight: 900;
+  line-height: 1.12;
+}
+
+.text-wait-body .muted {
+  font-size: clamp(15px, 1.2vw, 19px);
+  font-weight: 600;
+}
+
+/* Чернильные капли «пишут…» */
+.typing-dots {
+  display: inline-flex;
+  flex: none;
+  gap: 9px;
+  margin-left: auto;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.typing-dots i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--velvet);
+  animation: typing 1.2s ease-in-out infinite;
+}
+
+.typing-dots i:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.3s; }
+
+/* Правильный ответ — золотая табличка под прожектором */
+.text-answer {
+  display: grid;
+  justify-items: center;
+  justify-self: center;
+  align-self: center;
+  gap: 6px;
+  width: min(1100px, 100%);
+  padding: clamp(16px, 1.8vw, 26px) clamp(20px, 3vw, 44px);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--gold-leaf);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 244, 210, 0.5),
+    inset 0 0 0 5px rgba(143, 106, 34, 0.55),
+    0 0 0 2px var(--gold-deep),
+    0 0 0 14px rgba(255, 233, 176, 0.14),
+    0 0 70px rgba(255, 233, 176, 0.35),
+    var(--shadow-lift);
+  text-align: center;
+  transform-origin: 50% 0;
+}
+
+.text-answer.enter {
+  animation: sign-flip 900ms var(--ease-out) both;
+}
+
+.text-answer-label {
+  color: var(--velvet-deep);
+  font-size: clamp(14px, 1.15vw, 18px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.text-answer-main {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4.6vw, 72px);
+  font-weight: 900;
+  line-height: 1.06;
+  overflow-wrap: anywhere;
+}
+
+.text-answer-also {
+  font-size: clamp(16px, 1.4vw, 22px);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.text-answer-also .muted {
+  color: rgba(43, 18, 24, 0.7);
+}
+
+/* ---------- Итоги вопроса ---------- */
+
+.results-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.results-panel.enter {
+  animation: fade-in 500ms ease both;
+}
+
+/* Столбики — колонны цвета камня с золотой капителью */
+.bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(16px, 3vw, 48px);
+  min-height: 0;
+  padding: 8px 12px 0;
+  border-bottom: 3px solid var(--gold-deep);
+}
+
+.bar {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  gap: 8px;
+  width: clamp(64px, 7vw, 116px);
+  height: 100%;
+}
+
+.bar-value {
+  color: var(--ivory);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  animation: fade-in 500ms ease 600ms backwards;
+}
+
+.bar-fill {
+  position: relative;
+  align-self: end;
+  width: 100%;
+  height: max(var(--fill), 10px);
+  border-radius: 6px 6px 0 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 3px, transparent 3px 14px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 40%, rgba(0, 0, 0, 0.22)),
+    var(--tone);
+  box-shadow: 0 -5px 0 var(--gold), 0 -7px 0 var(--gold-deep);
+  transform-origin: bottom;
+  animation: column-rise 900ms var(--ease-out) both;
+}
+
+.bar.is-correct .bar-fill {
+  box-shadow: 0 -5px 0 var(--gold-light), 0 -7px 0 var(--gold-deep), 0 0 0 3px var(--gold-light), 0 0 36px rgba(255, 233, 176, 0.5);
+}
+
+.bar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  color: var(--tone);
+  font-size: 24px;
+}
+
+.bar-label b {
+  color: var(--gold-light);
+}
+
+.bar-shape {
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
+}
+
+/* Верно / Неверно / Без ответа (вопрос с вводом текста) */
+.bars-stats .bar {
+  width: clamp(88px, 8vw, 136px);
+}
+
+.bar-stat.stat-correct { --tone: var(--success); }
+.bar-stat.stat-wrong { --tone: var(--danger); }
+.bar-stat.stat-none { --tone: #7a6058; }
+
+.bar-stat .bar-label {
+  flex-direction: column;
+  gap: 2px;
+  color: var(--paper-2);
+  font-size: clamp(15px, 1.2vw, 19px);
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.bar-stat .bar-icon {
+  color: var(--tone);
+  font-size: 1.45em;
+  line-height: 1;
+}
+
+/* Лидеры — список в программке */
+.leaderboard {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 20px 24px;
+  transform-origin: 50% 0;
+  animation: programme-in 700ms var(--ease-out) 300ms backwards;
+}
+
+.leaderboard h3 {
+  margin-bottom: 12px;
+  color: var(--velvet);
+  font-size: 26px;
+  font-style: italic;
+}
+
+.leader-list {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.leader-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--paper-2);
+  font-size: clamp(18px, 1.6vw, 24px);
+  font-weight: 700;
+  animation: row-in 560ms var(--ease-out) backwards;
+}
+
+.leader-rank {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--ivory);
+  background: var(--velvet);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.leader-row:first-child .leader-rank {
+  color: #4a3008;
+  background: radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 60%, #a87a2a);
+}
+
+.leader-row .avatar-sm {
+  width: 36px;
+  height: 36px;
+}
+
+.leader-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leader-delta {
+  color: #1d7a4d;
+  font-size: 0.8em;
+}
+
+.leader-score {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* После последнего вопроса вместо лидеров — анонс церемонии */
+.finale-teaser {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 20px 28px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.finale-teaser::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180%;
+  aspect-ratio: 1;
+  background: repeating-conic-gradient(from 0deg, rgba(216, 172, 76, 0.16) 0deg 8deg, transparent 8deg 20deg);
+  -webkit-mask-image: radial-gradient(circle, #000 10%, transparent 60%);
+  mask-image: radial-gradient(circle, #000 10%, transparent 60%);
+  transform: translate(-50%, -50%);
+  animation: rays-spin 50s linear infinite;
+  pointer-events: none;
+}
+
+.finale-teaser > * {
+  position: relative;
+}
+
+.finale-teaser.enter {
+  animation: programme-in 800ms var(--ease-out) 200ms both;
+}
+
+.finale-trophy {
+  width: clamp(60px, 6vw, 96px);
+  color: var(--gold);
+  filter: drop-shadow(0 6px 14px rgba(143, 106, 34, 0.45));
+  animation: trophy-float 3.2s ease-in-out infinite;
+}
+
+.finale-trophy svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.trophy-cup {
+  fill: currentColor;
+}
+
+.trophy-handles {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.trophy-shine {
+  fill: none;
+  stroke: var(--gold-light);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.finale-teaser h3 {
+  font-size: clamp(22px, 2.2vw, 34px);
+}
+
+.finale-teaser p {
+  max-width: 460px;
+  font-size: clamp(16px, 1.3vw, 20px);
+  font-weight: 600;
+}
+
+/* Итоги: плитки — компактная строка под статистикой */
+.game[data-phase='results'] .answer-tile {
+  gap: 16px;
+  padding: 8px 22px 8px 12px;
+  font-size: clamp(16px, 1.6vw, 28px);
+}
+
+.game[data-phase='results'] .tile-text {
+  -webkit-line-clamp: 2;
+}
+
+.game[data-phase='results'] .tile-shape {
+  width: clamp(40px, 3.4vw, 60px);
+  height: clamp(40px, 3.4vw, 60px);
+  padding: clamp(9px, 0.8vw, 13px);
+}
+
+/* Невысокий экран (проектор 1280×720) */
+@media (max-height: 760px) and (min-width: 601px) {
+  .finale-teaser p {
+    display: none;
+  }
+
+  .finale-trophy {
+    width: 52px;
+  }
+
+  .game {
+    gap: 16px;
+    padding-top: 26px;
+  }
+}
+
+/* ---------- Анимации ---------- */
+
+@keyframes bump {
+  50% { transform: scale(1.25); }
+}
+
+/* Задник опускается с колосников и покачивается на шнурах */
+@keyframes fly-in {
+  0% { opacity: 0; transform: perspective(1200px) translateY(-140%) rotateX(28deg); }
+  55% { opacity: 1; transform: perspective(1200px) translateY(3%) rotateX(-6deg); }
+  75% { transform: perspective(1200px) translateY(-1%) rotateX(2.5deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes frame-in {
+  0% { opacity: 0; transform: perspective(1000px) translateY(-30px) rotateX(20deg) scale(0.95); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes medal-in {
+  0% { opacity: 0; transform: perspective(600px) rotateY(180deg) scale(0.6); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes dial-in {
+  0% { opacity: 0; transform: perspective(600px) rotateY(-120deg) scale(0.6); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes urgent-glow {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+@keyframes tremble {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1.5px, 1px); }
+  50% { transform: translate(1px, -1px); }
+  75% { transform: translate(1.5px, 1px); }
+}
+
+@keyframes reading-shine {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+
+@keyframes hourglass {
+  0%, 70% { transform: rotate(0deg); }
+  100% { transform: rotate(180deg); }
+}
+
+/* Камень поднимается из люка */
+@keyframes tile-rise {
+  0% { opacity: 0; transform: perspective(900px) translateY(50px) rotateX(-80deg); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes seal-in {
+  0% { opacity: 0; transform: scale(2.2) rotate(-30deg); }
+  60% { opacity: 1; transform: scale(0.9) rotate(6deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes writing {
+  0%, 100% { transform: none; }
+  25% { transform: translate(-3px, 2px) rotate(-8deg); }
+  75% { transform: translate(3px, -1px) rotate(6deg); }
+}
+
+@keyframes typing {
+  0%, 60%, 100% { opacity: 0.25; transform: none; }
+  30% { opacity: 1; transform: translateY(-6px); }
+}
+
+@keyframes sign-flip {
+  0% { opacity: 0; transform: perspective(1000px) rotateX(-95deg); }
+  60% { opacity: 1; transform: perspective(1000px) rotateX(10deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes column-rise {
+  from { transform: scaleY(0); }
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: perspective(700px) translateX(30px) rotateY(-30deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes rays-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes trophy-float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-8px) rotate(3deg); }
+}
+
+/* ---------- Небольшие экраны (ноутбук, планшет) ---------- */
+
+@media (max-width: 900px) {
+  .game-meta .pill:last-child {
+    display: none;
+  }
+
+  .game {
+    padding: 22px calc(var(--drape) + 12px) 14px;
+  }
+
+  .results-panel {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+}
+
+/* ---------- Телефон: ведущий ведёт игру прямо со смартфона ---------- */
+
+@media (max-width: 600px) {
+  /* На телефоне сцена прокручивается, панель с кнопками остаётся внизу */
+  .stage {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .page-game .brand-word {
+    display: none;
+  }
+
+  .page-game .game-meta .pill {
+    white-space: nowrap;
+  }
+
+  .answers-counter span {
+    font-size: 26px;
+  }
+
+  .game,
+  .game[data-phase],
+  .game[data-type='text'],
+  .game[data-phase='results'][data-type='choice'],
+  .game.has-image[data-phase='answering'][data-type='choice'] {
+    grid-template-rows: auto;
+    grid-auto-rows: auto;
+    gap: 16px;
+  }
+
+  /* На результатах сначала правильный ответ, затем статистика и лидеры */
+  .game[data-phase='results'] {
+    grid-template-areas: 'banner' 'bottom' 'middle';
+  }
+
+  .game[data-phase='reading']:not(.has-image) {
+    gap: 24px;
+    padding-bottom: 16px;
+  }
+
+  .game::after {
+    display: none;
+  }
+
+  .question-banner {
+    min-height: 0;
+    margin-top: 10px;
+    padding: 18px 16px;
+  }
+
+  .game[data-phase='reading']:not(.has-image) .question-banner {
+    min-height: 24vh;
+    padding: 24px 18px;
+  }
+
+  .question-banner h1 {
+    font-size: 21px;
+  }
+
+  .game[data-phase='reading'] .question-banner h1 {
+    font-size: 25px;
+  }
+
+  .question-tag {
+    font-size: 13px;
+  }
+
+  .game-middle {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 14px;
+  }
+
+  .game-bottom {
+    grid-template-rows: auto;
+  }
+
+  .question-media {
+    height: auto;
+  }
+
+  .question-media img {
+    max-height: 190px;
+    border-width: 5px;
+  }
+
+  .game[data-phase='reading'] .question-media img {
+    max-height: 46vh;
+  }
+
+  .answers-live {
+    display: none;
+  }
+
+  .reading {
+    gap: 10px;
+  }
+
+  .reading-label {
+    justify-content: center;
+    font-size: 16px;
+    text-align: center;
+  }
+
+  .text-wait {
+    flex-direction: column;
+    gap: 10px;
+    padding: 20px 16px;
+    text-align: center;
+  }
+
+  .typing-dots {
+    margin: 0;
+    padding: 10px 14px;
+  }
+
+  .text-wait-title {
+    font-size: 20px;
+  }
+
+  .text-answer-main {
+    font-size: 30px;
+  }
+
+  .finale-teaser {
+    padding: 22px 18px;
+  }
+
+  .finale-teaser h3 {
+    font-size: 22px;
+  }
+
+  .timer {
+    width: 108px;
+    box-shadow: 0 0 0 3px var(--gold-deep), 0 0 0 6px var(--gold), 0 0 0 7.5px var(--gold-deep), var(--shadow);
+  }
+
+  .timer-value {
+    font-size: 40px;
+  }
+
+  .answer-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    gap: 16px;
+  }
+
+  .answer-tile {
+    min-height: 62px;
+    padding: 10px 16px 10px 12px;
+    gap: 12px;
+    font-size: 18px;
+  }
+
+  .tile-shape {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
+
+  .tile-count {
+    min-width: 42px;
+    padding: 2px 10px;
+  }
+
+  .answer-tile.is-correct::after {
+    top: -12px;
+    right: -8px;
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+
+  .results-panel {
+    gap: 16px;
+    height: auto;
+    overflow: visible;
+  }
+
+  .bars {
+    height: 160px;
+  }
+
+  .bar-value {
+    font-size: 20px;
+  }
+
+  .bar-label {
+    font-size: 18px;
+  }
+
+  .bar-shape {
+    width: 22px;
+    height: 22px;
+  }
+
+  .leaderboard {
+    padding: 16px;
+  }
+
+  .leaderboard h3 {
+    font-size: 20px;
+  }
+
+  .leader-row {
+    gap: 10px;
+    padding: 6px 10px;
+    font-size: 16px;
+  }
+
+  .leader-rank {
+    width: 30px;
+    height: 30px;
+    font-size: 15px;
+  }
+
+  .action-bar-inner {
+    flex-wrap: wrap;
+  }
+
+  #next {
+    flex: 1;
+  }
+}
