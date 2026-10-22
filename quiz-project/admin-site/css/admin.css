@@ -924,8 +924,7 @@
 }
 
 @media (max-width: 600px) {
-  .admin-chip,
-  .topbar-actions a.btn {
+  .admin-chip {
     display: none;
   }
 

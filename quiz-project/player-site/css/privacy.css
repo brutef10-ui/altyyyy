@@ -13,13 +13,15 @@
   padding: 44px 0 72px;
 }
 
+/* Карточка появляется сразу в окончательном размере (без анимации раскрытия).
+   Колонка minmax(0, 1fr): длинное слово не растягивает карточку шире экрана. */
 .privacy-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   max-width: 820px;
   margin-inline: auto;
   padding: 34px 38px 40px;
-  animation: programme-in 800ms var(--ease-out) 560ms backwards;
 }
 
 .privacy-card .kicker {
@@ -28,14 +30,23 @@
 }
 
 .privacy-card h1 {
-  font-size: clamp(32px, 5vw, 48px);
+  font-size: clamp(26px, 7.5vw, 48px);
   color: var(--ink);
 }
 
 .privacy-card h2 {
   margin-top: 18px;
-  font-size: 24px;
+  font-size: clamp(19px, 5.5vw, 24px);
   color: var(--ink);
+  scroll-margin-top: calc(var(--topbar-h) + 16px);
+}
+
+.privacy-card h1,
+.privacy-card h2,
+.privacy-card h3,
+.privacy-card .kicker {
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .privacy-card h3 {
@@ -78,5 +89,9 @@
 
   .privacy-card {
     padding: 24px 18px 30px;
+  }
+
+  .privacy-card .kicker {
+    font-size: 17px;
   }
 }

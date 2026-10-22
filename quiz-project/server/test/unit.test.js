@@ -172,7 +172,7 @@ test('ответ вручную: нормализация и опечатки', 
   assert.equal(isTextAnswerCorrect('', ['Юпитер']), false);
 });
 
-test('квиз v2: типы вопросов, время чтения, картинка', () => {
+test('квиз v2: типы вопросов, время чтения; поле картинки отбрасывается', () => {
   const ok = validateQuiz({
     title: 'v2',
     questions: [
@@ -181,7 +181,7 @@ test('квиз v2: типы вопросов, время чтения, карт�
     ],
   });
   assert.equal(ok.ok, true, ok.errors?.join('; '));
-  assert.deepEqual(ok.value.questions[0], { type: 'text', text: 'Q1', image: 'a'.repeat(32), timeLimit: 20, readTime: 8, accepted: ['да', 'ага'] });
+  assert.deepEqual(ok.value.questions[0], { type: 'text', text: 'Q1', timeLimit: 20, readTime: 8, accepted: ['да', 'ага'] }, 'картинки к вопросам отключены');
   assert.equal(ok.value.questions[1].type, 'choice', 'старые игры — вопросы с вариантами');
   assert.equal(ok.value.questions[1].readTime, 5, 'время чтения по умолчанию');
 
@@ -194,5 +194,4 @@ test('квиз v2: типы вопросов, время чтения, карт�
   assert.ok(bad.errors.some((e) => e.includes('правильных ответа')));
   assert.ok(bad.errors.some((e) => e.includes('неизвестный тип')));
   assert.ok(bad.errors.some((e) => e.includes('время на чтение')));
-  assert.ok(bad.errors.some((e) => e.includes('картинка')));
 });

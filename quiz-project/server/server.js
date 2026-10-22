@@ -190,12 +190,10 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
   });
 
   // ---------- Картинки к вопросам ----------
-  // Загружает только ведущий; смотрят все (картинка показывается на проекторе и на телефонах).
-  app.post('/api/images', hostCors, requireOwner, identity.rejectBanned, identity.csrf, express.raw({ type: IMAGE_TYPES, limit: QUIZ_LIMITS.imageMaxBytes }), async (req, res) => {
-    const type = String(req.get('content-type') || '').split(';')[0].trim().toLowerCase();
-    if (!Buffer.isBuffer(req.body)) throw new AppError('Картинка должна быть в формате JPEG, PNG или WebP', { status: 415, code: 'BAD_IMAGE' });
-    const image = await images.save(req.owner.id, req.body, type);
-    res.status(201).json({ id: image.id, url: `/api/images/${image.id}` });
+  // Добавлять картинки к вопросам больше нельзя (они нагружали сервер и базу): загрузка закрыта для всех.
+  // Уже загруженные картинки ни одна игра не показывает; уборка удаляет их, когда на них не ссылается ни одна игра.
+  app.post('/api/images', hostCors, () => {
+    throw new AppError('Картинки к вопросам отключены', { status: 410, code: 'IMAGES_DISABLED' });
   });
   app.options('/api/images', hostCors);
 

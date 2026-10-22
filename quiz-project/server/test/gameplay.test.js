@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { io as connect } from 'socket.io-client';
 import { hostBrowser, startTestServer } from './helpers.js';
 
@@ -205,44 +205,44 @@ test('после последнего вопроса места скрыты, ц
   await close();
 });
 
-test('картинки: загрузка, раздача, проверка формата и ссылок', async () => {
+test('картинки к вопросам отключены: загрузка закрыта, у старых игр картинка не показывается', async () => {
   const hostToken = await hostBrowser(server);
-  const upload = (body, type) => hostToken.fetch('/api/images', { method: 'POST', headers: { 'Content-Type': type }, body, raw: true });
+  const upload = () => hostToken.fetch('/api/images', { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpegBytes(), raw: true });
+  assert.equal((await fetch(`${server.url}/api/images`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpegBytes() })).status, 410);
+  const refused = await upload();
+  assert.equal(refused.status, 410);
+  assert.equal((await refused.json()).code, 'IMAGES_DISABLED');
+  assert.equal((await server.db.one('SELECT count(*)::int AS n FROM images')).n, 0, 'в базу ничего не попало');
 
-  assert.equal((await fetch(`${server.url}/api/images`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpegBytes() })).status, 401);
-  assert.equal((await upload(Buffer.from('<svg/>'), 'image/svg+xml')).status, 415);
-  assert.equal((await upload(Buffer.from('not a jpeg at all, sorry'), 'image/jpeg')).status, 415);
-  assert.equal((await upload(jpegBytes(1024 * 1024 + 10), 'image/jpeg')).status, 413);
+  // Поле image в новой игре просто отбрасывается.
+  const quiz = (image) => ({ title: 'С картинкой', questions: [{ type: 'choice', text: 'Кто на фото?', image, answers: ['A', 'B'], correct: 0, timeLimit: 10, readTime: 0 }] });
+  const saved = await hostToken.json('/api/quizzes', { method: 'POST', body: quiz('a'.repeat(32)) });
+  assert.equal(saved.status, 201);
+  assert.equal('image' in saved.data.quiz.questions[0], false);
 
-  const response = await upload(jpegBytes(), 'image/jpeg');
-  assert.equal(response.status, 201);
-  const { id, url } = await response.json();
-  assert.match(id, /^[a-f0-9]{32}$/);
+  // Игра, сохранённая раньше с картинкой: ни редактор, ни игра картинку не получают.
+  const oldId = randomUUID();
+  await server.db.query(
+    'INSERT INTO quizzes (id, account_id, title, data, created_at, updated_at) VALUES ($1, $2, $3, $4, now(), now())',
+    [oldId, hostToken.account.id, 'Старая с картинкой', quiz('b'.repeat(32))],
+  );
+  const old = await hostToken.json(`/api/quizzes/${oldId}`);
+  assert.equal(old.status, 200);
+  assert.equal('image' in old.data.quiz.questions[0], false);
 
-  const image = await fetch(server.url + url);
-  assert.equal(image.status, 200);
-  assert.equal(image.headers.get('content-type'), 'image/jpeg');
-  assert.match(image.headers.get('cache-control'), /immutable/);
-  assert.equal((await fetch(`${server.url}/api/images/${'0'.repeat(32)}`)).status, 404);
-
-  const quiz = (imageId) => ({ title: 'С картинкой', questions: [{ type: 'choice', text: 'Кто на фото?', image: imageId, answers: ['A', 'B'], correct: 0, timeLimit: 10, readTime: 0 }] });
-  const save = (body) => hostToken.fetch('/api/quizzes', { method: 'POST', body });
-  assert.equal((await save(quiz(id))).status, 201);
-  assert.equal((await save(quiz('f'.repeat(32)))).status, 422, 'несуществующая картинка');
-  assert.equal((await save(quiz('../../etc/passwd'))).status, 422, 'некорректный id');
-
-  const host = await client(hostToken);
-  assert.equal((await request(host, 'host:create', { quiz: quiz('e'.repeat(32)) })).code, 'IMAGE_MISSING');
-  const created = await request(host, 'host:create', { quiz: quiz(id) });
-  assert.equal(created.ok, true);
-  const anna = await client();
-  await request(anna, 'player:join', { code: created.code, nickname: 'Анна', photo: photo() });
-  const opened = once(anna, 'question', (q) => q.phase === 'answering');
-  await request(host, 'host:start');
-  assert.equal((await opened).image, id);
-  await request(host, 'host:close');
-  host.disconnect();
-  anna.disconnect();
+  for (const payload of [{ quizId: oldId }, { quiz: quiz('c'.repeat(32)) }]) {
+    const host = await client(hostToken);
+    const created = await request(host, 'host:create', payload);
+    assert.equal(created.ok, true, created.error);
+    const anna = await client();
+    await request(anna, 'player:join', { code: created.code, nickname: 'Анна', photo: photo() });
+    const opened = once(anna, 'question', (q) => q.phase === 'answering');
+    await request(host, 'host:start');
+    assert.equal((await opened).image, null);
+    await request(host, 'host:close');
+    host.disconnect();
+    anna.disconnect();
+  }
 });
 
 test('наплыв: 60 игроков из одной Wi-Fi сети входят и возвращаются после сбоя', async () => {

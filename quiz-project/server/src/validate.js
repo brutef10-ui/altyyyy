@@ -145,10 +145,7 @@ function validateQuestion(raw, index, errors) {
   if (!text) errors.push(`${label}: введите текст вопроса`);
   else if (charCount(text) > L.questionMax) errors.push(`${label}: текст длиннее ${L.questionMax} символов`);
 
-  const image = raw.image === undefined || raw.image === null || raw.image === '' ? null : raw.image;
-  if (image !== null && (typeof image !== 'string' || !IMAGE_ID_PATTERN.test(image))) {
-    errors.push(`${label}: некорректная картинка — загрузите её заново`);
-  }
+  // Картинки к вопросам отключены: поле image (у старых игр и черновиков) просто отбрасываем.
 
   const timeLimit = raw.timeLimit;
   if (!L.timeLimits.includes(timeLimit)) {
@@ -160,7 +157,7 @@ function validateQuestion(raw, index, errors) {
     errors.push(`${label}: время на чтение должно быть одним из значений: ${L.readTimes.join(', ')} сек.`);
   }
 
-  const question = { type, text, image, timeLimit, readTime };
+  const question = { type, text, timeLimit, readTime };
 
   if (type === 'text') {
     question.accepted = validateAnswerList(raw.accepted, { min: L.acceptedMin, max: L.acceptedMax, label, noun: 'правильных ответа' }, errors);

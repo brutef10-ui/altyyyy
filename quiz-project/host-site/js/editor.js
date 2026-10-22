@@ -1,6 +1,6 @@
-// Редактор игры: название, вопросы двух типов (варианты ответа / ввод ответа), картинки,
+// Редактор игры: название, вопросы двух типов (варианты ответа / ввод ответа),
 // время на чтение и на ответ.
-import { api, imageUrl } from './api.js';
+import { api } from './api.js';
 import { requireAccount } from './auth.js';
 import { editorDraft } from './session.js';
 import { launchGame } from './socket.js';
@@ -24,16 +24,6 @@ const LIMITS = {
 };
 
 const QUESTION_TYPES = ['choice', 'text'];
-const IMAGE_ID_PATTERN = /^[a-f0-9]{32}$/;
-
-// Картинки: исходный файл до 20 МБ, на сервер уходит JPEG (или PNG/WebP с прозрачностью) до ~950 КБ.
-const IMAGE = {
-  sourceMaxBytes: 20 * 1024 * 1024,
-  maxSide: 1280,
-  targetBytes: 950 * 1024,
-  quality: 0.82,
-  minQuality: 0.5,
-};
 
 const TEXT_HINT = 'Игрок пишет ответ сам. Регистр, «ё», знаки препинания и небольшие опечатки не важны.';
 
@@ -88,18 +78,11 @@ const ICONS = {
     ['circle', { cx: 12, cy: 13.5, r: 8 }],
     ['path', { d: 'M12 9.5v4l2.6 2.6M9.5 2.5h5' }],
   ],
-  image: [
-    ['rect', { x: 3, y: 4, width: 18, height: 16, rx: 3 }],
-    ['circle', { cx: 9, cy: 10, r: 2 }],
-    ['path', { d: 'm21 15.5-4.6-4.6a1.5 1.5 0 0 0-2.1 0L5.5 20' }],
-  ],
   check: [['path', { d: 'm5 12.5 4.5 4.5L19 7.5' }]],
   info: [
     ['circle', { cx: 12, cy: 12, r: 9.5 }],
     ['path', { d: 'M12 11v5.5M12 7.6v.1' }],
   ],
-  replace: [['path', { d: 'M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4' }]],
-  trash: [['path', { d: 'M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3' }]],
 };
 
 function icon(name, className = 'ui-icon') {
@@ -122,7 +105,6 @@ function icon(name, className = 'ui-icon') {
 const blankQuestion = () => ({
   type: 'choice',
   text: '',
-  image: null,
   timeLimit: LIMITS.defaultTimeLimit,
   readTime: LIMITS.defaultReadTime,
   answers: ['', '', '', ''],
@@ -135,7 +117,7 @@ const toStrings = (list, max) => (Array.isArray(list) ? list.slice(0, max).map((
 
 function normalizeQuestion(raw) {
   const q = raw && typeof raw === 'object' ? raw : {};
-  // Старые игры (без type/readTime/image) — это вопросы с вариантами, 5 секунд на чтение, без картинки.
+  // Старые игры (без type/readTime) — это вопросы с вариантами, 5 секунд на чтение. Картинки к вопросам отключены.
   const type = QUESTION_TYPES.includes(q.type) ? q.type : 'choice';
   let answers = toStrings(q.answers, LIMITS.answersMax);
   if (answers.length === 0) answers = ['', '', '', ''];
@@ -145,7 +127,6 @@ function normalizeQuestion(raw) {
   return {
     type,
     text: String(q.text ?? ''),
-    image: typeof q.image === 'string' && IMAGE_ID_PATTERN.test(q.image) ? q.image : null,
     timeLimit: LIMITS.timeLimits.includes(q.timeLimit) ? q.timeLimit : LIMITS.defaultTimeLimit,
     readTime: LIMITS.readTimes.includes(q.readTime) ? q.readTime : LIMITS.defaultReadTime,
     answers,
@@ -167,7 +148,7 @@ function serialize() {
   return {
     title: quiz.title.trim(),
     questions: quiz.questions.map((q) => {
-      const base = { type: q.type, text: q.text.trim(), image: q.image || null, timeLimit: q.timeLimit, readTime: q.readTime };
+      const base = { type: q.type, text: q.text.trim(), timeLimit: q.timeLimit, readTime: q.readTime };
       if (q.type === 'text') return { ...base, accepted: q.accepted.map((a) => a.trim()) };
       return { ...base, answers: q.answers.map((a) => a.trim()), correct: q.correct };
     }),
@@ -242,55 +223,6 @@ function typeSwitch(q, qi) {
   return h('div', { class: 'segmented', role: 'radiogroup', 'aria-label': `Тип вопроса ${qi + 1}` },
     option('choice', 'Варианты ответа', 'choice'),
     option('text', 'Ввод ответа', 'text'),
-  );
-}
-
-// ---------- Картинка вопроса ----------
-
-const uploads = new WeakMap(); // вопрос → { previewUrl } пока картинка загружается
-const localPreviews = new Map(); // id картинки → object URL уже загруженного файла (без повторного скачивания)
-const freshImages = new Set(); // только что загруженные — их превью появляется с анимацией
-
-function imageSlot(q, qi) {
-  const upload = uploads.get(q);
-  if (upload) {
-    return h('div', { class: 'image-slot image-preview is-uploading', 'aria-busy': 'true' },
-      upload.previewUrl ? h('img', { class: 'image-main', src: upload.previewUrl, alt: '', draggable: 'false' }) : null,
-      h('div', { class: 'image-progress', role: 'status' },
-        h('span', { class: 'spinner', 'aria-hidden': 'true' }),
-        h('span', { text: upload.previewUrl ? 'Загружаем…' : 'Готовим картинку…' }),
-      ),
-    );
-  }
-
-  if (!q.image) {
-    return h('button', {
-      class: 'image-slot image-add',
-      type: 'button',
-      dataset: { action: 'pick-image', q: qi },
-      'aria-label': `Добавить картинку к вопросу ${qi + 1}`,
-    },
-      icon('image', 'ui-icon image-add-icon'),
-      h('span', { class: 'image-add-text' },
-        h('span', { class: 'image-add-title', text: 'Добавить картинку' }),
-        h('small', { class: 'image-add-hint', text: 'или перетащите файл сюда' }),
-      ),
-    );
-  }
-
-  const src = localPreviews.get(q.image) || imageUrl(q.image);
-  const fresh = freshImages.delete(q.image);
-  const markBroken = (event) => event.target.closest('.image-slot')?.classList.add('is-broken');
-  return h('figure', { class: `image-slot image-preview${fresh ? ' is-fresh' : ''}` },
-    h('img', { class: 'image-backdrop', src, alt: '', 'aria-hidden': 'true', draggable: 'false', decoding: 'async' }),
-    h('img', { class: 'image-main', src, alt: `Картинка к вопросу ${qi + 1}`, draggable: 'false', decoding: 'async', onerror: markBroken }),
-    h('p', { class: 'image-broken', text: 'Картинка не загрузилась — замените её' }),
-    h('div', { class: 'image-actions' },
-      h('button', { class: 'btn btn-small image-action', type: 'button', dataset: { action: 'pick-image', q: qi }, 'aria-label': `Заменить картинку вопроса ${qi + 1}` },
-        icon('replace'), h('span', { text: 'Заменить' })),
-      h('button', { class: 'btn btn-small image-action', type: 'button', dataset: { action: 'remove-image', q: qi }, 'aria-label': `Убрать картинку из вопроса ${qi + 1}` },
-        icon('trash'), h('span', { text: 'Убрать' })),
-    ),
   );
 }
 
@@ -390,7 +322,6 @@ function questionCard(q, qi) {
         'aria-label': `Текст вопроса ${qi + 1}`,
         value: q.text,
       }),
-      imageSlot(q, qi),
     ),
     h('div', { class: 'question-answers' }, isText ? textEditor(q, qi) : choiceEditor(q, qi)),
     h('div', { class: 'question-foot' },
@@ -630,14 +561,6 @@ questionsList.addEventListener('click', (event) => {
       renderCard(qi, `[data-acc="${Math.min(i, question.accepted.length - 1)}"][data-field="accepted"]`);
       break;
     }
-    case 'pick-image':
-      pickImage(question);
-      break;
-    case 'remove-image':
-      question.image = null;
-      markDirty();
-      renderCard(qi, '[data-action="pick-image"]');
-      break;
     default:
   }
 });
@@ -659,7 +582,7 @@ let removing = false; // карточка уходит — повторное н
 async function removeQuestion(qi) {
   if (removing) return;
   const question = quiz.questions[qi];
-  const isEmpty = !question.text.trim() && !question.image
+  const isEmpty = !question.text.trim()
     && question.answers.every((a) => !a.trim()) && question.accepted.every((a) => !a.trim());
   if (!isEmpty) {
     const confirmed = await confirmDialog({ title: `Удалить вопрос ${qi + 1}?`, message: question.text.trim(), confirmText: 'Удалить', danger: true });
@@ -683,214 +606,6 @@ addQuestionButton.addEventListener('click', () => {
   animateQuestion = next;
   changeStructure(() => quiz.questions.push(next), `[data-q="${quiz.questions.length}"][data-field="text"]`);
 });
-
-// ---------- Загрузка картинок ----------
-
-const filePicker = h('input', { type: 'file', accept: 'image/*', hidden: true, tabindex: '-1', 'aria-hidden': 'true' });
-document.body.append(filePicker);
-let pickTarget = null; // вопрос (объект, а не номер — порядок может измениться, пока открыт выбор файла)
-
-function pickImage(question) {
-  if (uploads.has(question)) return;
-  pickTarget = question;
-  filePicker.value = '';
-  filePicker.click();
-}
-
-filePicker.addEventListener('change', () => {
-  const file = filePicker.files?.[0];
-  const question = pickTarget;
-  pickTarget = null;
-  filePicker.value = '';
-  if (file && question) attachImage(question, file);
-});
-
-class ImageError extends Error {}
-
-function decodeFailed() {
-  return new ImageError('Не удалось открыть картинку. Выберите файл JPG, PNG или WebP.');
-}
-
-/** Декодирует файл с учётом поворота из EXIF (фото с телефона не окажутся «на боку»). */
-async function decodeImage(file) {
-  if (typeof createImageBitmap === 'function') {
-    try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-      return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close?.() };
-    } catch {
-      // Старый браузер или формат, который createImageBitmap не умеет, — пробуем через <img>.
-    }
-  }
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.decoding = 'async';
-  try {
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = url;
-    });
-  } catch {
-    URL.revokeObjectURL(url);
-    throw decodeFailed();
-  }
-  return { source: img, width: img.naturalWidth, height: img.naturalHeight, release: () => URL.revokeObjectURL(url) };
-}
-
-const canvasToBlob = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
-
-function hasTransparency(context, width, height) {
-  const { data } = context.getImageData(0, 0, width, height);
-  for (let i = 3; i < data.length; i += 4) {
-    if (data[i] < 250) return true;
-  }
-  return false;
-}
-
-/**
- * Уменьшает картинку (длинная сторона ≤ 1280 px) и сжимает до ~950 КБ.
- * Перекодирование заодно убирает из фото метаданные (в том числе геолокацию).
- */
-async function prepareImage(file) {
-  const image = await decodeImage(file);
-  try {
-    if (!image.width || !image.height) throw decodeFailed();
-    const mayBeTransparent = /png|webp|gif|svg/i.test(file.type || '');
-    let scale = Math.min(1, IMAGE.maxSide / Math.max(image.width, image.height));
-
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const width = Math.max(1, Math.round(image.width * scale));
-      const height = Math.max(1, Math.round(image.height * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext('2d', { willReadFrequently: mayBeTransparent });
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
-      context.drawImage(image.source, 0, 0, width, height);
-
-      // Логотипы и стикеры с прозрачным фоном сохраняем без белой подложки, если влезают по размеру.
-      if (mayBeTransparent && hasTransparency(context, width, height)) {
-        const png = await canvasToBlob(canvas, 'image/png');
-        if (png && png.size <= IMAGE.targetBytes) return png;
-        const webp = await canvasToBlob(canvas, 'image/webp', 0.86);
-        if (webp && webp.type === 'image/webp' && webp.size <= IMAGE.targetBytes) return webp;
-        context.globalCompositeOperation = 'destination-over';
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, width, height);
-        context.globalCompositeOperation = 'source-over';
-      }
-
-      for (let quality = IMAGE.quality; quality >= IMAGE.minQuality - 0.001; quality -= 0.08) {
-        const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
-        if (!blob) throw decodeFailed();
-        if (blob.size <= IMAGE.targetBytes) return blob;
-      }
-      scale *= 0.75;
-    }
-    throw new ImageError('Картинку не получилось сжать до 1 МБ. Выберите другую.');
-  } finally {
-    image.release();
-  }
-}
-
-function updateImageSlot(question, { restoreFocus = false } = {}) {
-  const qi = quiz.questions.indexOf(question);
-  if (qi < 0) return;
-  const slot = questionsList.children[qi]?.querySelector('.image-slot');
-  if (!slot) return;
-  const hadFocus = slot.contains(document.activeElement);
-  const next = imageSlot(question, qi);
-  slot.replaceWith(next);
-  const focusLost = !document.activeElement || document.activeElement === document.body;
-  if (hadFocus || (restoreFocus && focusLost)) {
-    (next.matches('button') ? next : next.querySelector('button'))?.focus({ preventScroll: true });
-  }
-}
-
-async function attachImage(question, file) {
-  if (uploads.has(question)) return;
-  if (file.type && !file.type.startsWith('image/')) {
-    toast('Это не картинка. Выберите файл JPG, PNG или WebP.', 'error', 5000);
-    return;
-  }
-  if (file.size > IMAGE.sourceMaxBytes) {
-    toast('Файл больше 20 МБ — выберите картинку поменьше.', 'error', 5000);
-    return;
-  }
-  if (file.size === 0) {
-    toast('Файл пустой — выберите другую картинку.', 'error', 5000);
-    return;
-  }
-
-  const state = { previewUrl: null };
-  uploads.set(question, state);
-  updateImageSlot(question);
-  let uploaded = false;
-  try {
-    // Любая ошибка обработки (неизвестный формат, «испорченный» холст) — понятное сообщение вместо технического.
-    const blob = await prepareImage(file).catch((error) => {
-      throw error instanceof ImageError ? error : decodeFailed();
-    });
-    state.previewUrl = URL.createObjectURL(blob);
-    updateImageSlot(question);
-    const { id } = await api.uploadImage(blob);
-    if (typeof id !== 'string' || !IMAGE_ID_PATTERN.test(id)) throw new Error('Сервер вернул неожиданный ответ. Попробуйте ещё раз.');
-    localPreviews.set(id, state.previewUrl);
-    freshImages.add(id);
-    uploaded = true;
-    // Вопрос могли удалить, пока шла загрузка, — тогда картинка просто не нужна.
-    if (quiz.questions.includes(question)) {
-      question.image = id;
-      markDirty();
-    }
-  } catch (error) {
-    const message = error instanceof ImageError || error?.status ? error.message : `Не удалось загрузить картинку. ${error?.message || ''}`.trim();
-    toast(message, 'error', 6000);
-  } finally {
-    if (!uploaded && state.previewUrl) URL.revokeObjectURL(state.previewUrl);
-    uploads.delete(question);
-    updateImageSlot(question, { restoreFocus: true });
-  }
-}
-
-// Перетаскивание файла на место для картинки (на компьютере).
-const hasFiles = (event) => Array.from(event.dataTransfer?.types || []).includes('Files');
-const dropSlot = (event) => event.target.closest?.('.image-slot:not(.is-uploading)');
-
-questionsList.addEventListener('dragover', (event) => {
-  const slot = dropSlot(event);
-  if (!slot || !hasFiles(event)) return;
-  event.preventDefault();
-  event.dataTransfer.dropEffect = 'copy';
-  slot.classList.add('is-dragover');
-});
-
-questionsList.addEventListener('dragleave', (event) => {
-  const slot = dropSlot(event);
-  if (slot && !slot.contains(event.relatedTarget)) slot.classList.remove('is-dragover');
-});
-
-questionsList.addEventListener('drop', (event) => {
-  const slot = dropSlot(event);
-  if (!slot || !hasFiles(event)) return;
-  event.preventDefault();
-  slot.classList.remove('is-dragover');
-  const qi = Array.prototype.indexOf.call(questionsList.children, slot.closest('.question-card'));
-  const question = quiz.questions[qi];
-  const file = event.dataTransfer.files?.[0];
-  if (question && file) attachImage(question, file);
-});
-
-// Файл, брошенный мимо, не должен открываться в браузере вместо редактора.
-for (const type of ['dragover', 'drop']) {
-  window.addEventListener(type, (event) => {
-    if (hasFiles(event) && !dropSlot(event)) {
-      event.preventDefault();
-      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
-    }
-  });
-}
 
 // ---------- Сохранение и запуск ----------
 
@@ -921,11 +636,6 @@ function pruneEmptyAnswers() {
 }
 
 function checkBeforeSubmit() {
-  const uploading = quiz.questions.findIndex((q) => uploads.has(q));
-  if (uploading >= 0) {
-    toast(`Подождите, загружается картинка к вопросу ${uploading + 1}`, 'info');
-    return false;
-  }
   pruneEmptyAnswers();
   showErrors = true;
   const errors = highlightErrors();
@@ -958,8 +668,6 @@ async function save() {
     toast('Игра сохранена', 'success');
   } catch (error) {
     toast(error.details?.[0] || error.message, 'error', 6000);
-    // Картинка удалена с сервера (например, черновик пролежал больше 48 часов) — покажем, какая именно.
-    if (error.code === 'IMAGE_MISSING') document.querySelector('.image-slot.is-broken')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   } finally {
     saveButton.disabled = false;
   }

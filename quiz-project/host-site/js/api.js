@@ -106,18 +106,7 @@ export function imageUrl(id) {
   return id ? `${SERVER_URL}/api/images/${encodeURIComponent(id)}` : '';
 }
 
-/** Загружает картинку (Blob/File JPEG, PNG или WebP до 1 МБ). Возвращает { id, url }. */
-async function uploadImage(blob) {
-  const response = await send('/api/images', { method: 'POST', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
-  const data = await response.json().catch(() => null);
-  if (response.status === 401) goToLogin();
-  if (data?.code === 'BANNED') showBanned(data.details);
-  if (!response.ok) throw new ApiError(data?.error || `Не удалось загрузить картинку (${response.status})`, { status: response.status, code: data?.code });
-  return data;
-}
-
 export const api = {
-  uploadImage,
   getConfig: () => request('/api/config', { auth: false }),
   listQuizzes: async () => (await request('/api/quizzes')).quizzes,
   getQuiz: async (id) => (await request(`/api/quizzes/${encodeURIComponent(id)}`)).quiz,

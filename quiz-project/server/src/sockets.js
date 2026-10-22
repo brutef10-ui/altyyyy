@@ -14,7 +14,7 @@ import { ipFromSocket } from './identity/clientIp.js';
 import { PlayerRegistry } from './players.js';
 import { RateLimiter } from './rateLimit.js';
 import { STATES } from './game.js';
-import { isPlainObject, quizImageIds, validateNickname, validatePhoto, validateQuiz, validateRoomCode } from './validate.js';
+import { isPlainObject, validateNickname, validatePhoto, validateQuiz, validateRoomCode } from './validate.js';
 import { EVENT_TYPES } from './logs/events.js';
 import { publicBan } from './security/bans.js';
 
@@ -28,7 +28,7 @@ const CLOSE_MESSAGES = {
   shutdown: 'Сервер перезапускается. Игра завершена.',
 };
 
-export function registerSocketHandlers(io, { rooms, quizService, images, config, identity = null, events = null }) {
+export function registerSocketHandlers(io, { rooms, quizService, config, identity = null, events = null }) {
   // Как часто перепроверять сессию ведущего перед командами хода игры (start/next/reveal/kick/close).
   const HOST_RECHECK_MS = config.hostSessionRecheckMs ?? 15_000;
   const eventLimiter = new RateLimiter({ windowMs: 10_000, max: 60 }); // любые события одного сокета
@@ -139,14 +139,6 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
     identity?.checkBan(socket.identity);
   }
 
-  async function checkImagesExist(quiz) {
-    for (const id of quizImageIds(quiz)) {
-      if (!(await images.has(id))) {
-        throw new AppError('Одна из картинок не найдена на сервере — загрузите её заново в редакторе', { status: 422, code: 'IMAGE_MISSING' });
-      }
-    }
-  }
-
   // Поиск комнаты при входе игрока: неверные коды считаются попытками подбора.
   function findRoomForJoin(socket, code) {
     const ip = clientIp(socket);
@@ -231,7 +223,6 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
         if (!checked.ok) throw new AppError(checked.errors[0], { status: 422, code: 'INVALID_QUIZ', details: checked.errors });
         quiz = checked.value;
       }
-      await checkImagesExist(quiz);
 
       const room = rooms.create({ quiz, ownerId: owner.id, hostSocketId: socket.id, createNotifier });
       socket.data = { role: 'host', roomCode: room.code };

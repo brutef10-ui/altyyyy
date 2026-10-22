@@ -84,7 +84,7 @@ test('после входа администратора сервер ведёт
   assert.equal((await as('198.51.100.11').session()).home, null);
 });
 
-test('учётная запись администратора — только для консоли: игры, картинки, комнаты и страницы ведущего закрыты', async () => {
+test('учётная запись администратора — только для консоли: игры, комнаты и страницы ведущего закрыты', async () => {
   for (const path of ['/api/quizzes', '/api/legacy']) {
     const response = await admin.json(path);
     assert.equal(response.status, 403, path);
@@ -93,7 +93,7 @@ test('учётная запись администратора — только 
   const created = await admin.json('/api/quizzes', { method: 'POST', body: quiz });
   assert.equal(created.data.code, 'ADMIN_CONSOLE_ONLY');
   const upload = await admin.fetch('/api/images', { method: 'POST', raw: true, body: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]), headers: { 'Content-Type': 'image/jpeg' } });
-  assert.equal(upload.status, 403);
+  assert.equal(upload.status, 410, 'картинки к вопросам отключены для всех');
 
   const socket = await admin.socket();
   const room = await socket.timeout(3000).emitWithAck('host:create', { quiz });

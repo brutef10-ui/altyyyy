@@ -30,9 +30,9 @@ before(async () => {
   // Немного живых данных во всех таблицах.
   const host = new Browser(server, { headers: { 'X-Forwarded-For': '203.0.113.5' } });
   await host.register(uniqueLogin('Backup'), 'backup-password-1');
-  const upload = await host.fetch('/api/images', { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpeg(), raw: true });
-  const { id: imageId } = await upload.json();
-  await host.json('/api/quizzes', { method: 'POST', body: { title: 'Копия «с кавычками» и \\ слэшем', questions: [{ text: 'Q?\nвторая строка', image: imageId, answers: ['A', 'B'], correct: 0, timeLimit: 10, readTime: 0 }] } });
+  // Картинка, загруженная до отключения картинок к вопросам: таблица images по-прежнему входит в копию.
+  await server.db.query("INSERT INTO images (id, account_id, content_type, bytes, size) VALUES ($1, $2, 'image/jpeg', $3, 3000)", [randomBytes(16).toString('hex'), host.account.id, jpeg()]);
+  await host.json('/api/quizzes', { method: 'POST', body: { title: 'Копия «с кавычками» и \\ слэшем', questions: [{ text: 'Q?\nвторая строка', answers: ['A', 'B'], correct: 0, timeLimit: 10, readTime: 0 }] } });
   await server.db.query("INSERT INTO bans (ip, reason, ends_at) VALUES ('198.51.100.1', 'Тест', now() + interval '1 day')");
   await server.db.query("INSERT INTO admin_audit (action, details) VALUES ('test.action', '{\"a\": [1, 2, {\"b\": null}]}')");
   await server.db.query("INSERT INTO settings (key, value) VALUES ('sharing_hints', '{\"enabled\": true}')");

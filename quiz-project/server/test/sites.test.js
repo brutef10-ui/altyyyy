@@ -53,12 +53,17 @@ test('политика конфиденциальности открыта бе�
   const response = await fetch(`${server.url}/privacy.html`);
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Политика конфиденциальности/);
+  assert.match(html, /Политика конфиден(&shy;)?циальности/);
   assert.match(html, /support\.alluminous@gmail\.com/);
   assert.match(html, /drive\.file/);
   assert.match(html, /180 дней/);
-  // Ссылки на неё — с главной игрока и со страницы входа ведущего.
-  assert.match(await (await fetch(`${server.url}/`)).text(), /href="privacy\.html"/);
+  // Согласие при входе в игру — отдельный пункт; фото не храним; без подробностей о хранении паролей.
+  assert.match(html, /id="consent"[^>]*>2\. Согласие при входе в игру/);
+  assert.match(html, /Входя в игру, вы соглашаетесь, что сервер сохраняет ник, IP-адрес, тип устройства и браузер/);
+  assert.match(html, /Фото игроков мы не храним/);
+  assert.doesNotMatch(html, /хэш|argon|картинк/i);
+  // Ссылки на неё — с главной игрока (на пункт о согласии) и со страницы входа ведущего.
+  assert.match(await (await fetch(`${server.url}/`)).text(), /href="privacy\.html#consent"/);
   assert.match(await (await fetch(`${server.url}/host/login.html`)).text(), /href="\.\.\/privacy\.html"/);
 });
 

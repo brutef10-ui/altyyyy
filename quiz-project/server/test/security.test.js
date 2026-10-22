@@ -118,27 +118,6 @@ test('на HTTPS cookie с префиксом __Host-, Secure, без Domain', a
   }
 });
 
-test('квота картинок на аккаунт по объёму', async () => {
-  const small = await startTestServer('quota', { imageQuotaMb: 1 });
-  try {
-    const owner = new Browser(small);
-    await owner.register(uniqueLogin('Quota'), 'quota-password-1');
-    const jpeg = (size) => {
-      const bytes = Buffer.alloc(size, 1);
-      bytes.set([0xff, 0xd8, 0xff, 0xe0]);
-      return bytes;
-    };
-    const upload = (size) => owner.fetch('/api/images', { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpeg(size), raw: true });
-    assert.equal((await upload(600 * 1024)).status, 201);
-    const second = await upload(600 * 1024);
-    assert.equal(second.status, 409, 'вторая картинка не помещается в 1 МБ');
-    assert.equal((await second.json()).code, 'TOO_MANY_IMAGES');
-    assert.equal((await upload(300 * 1024)).status, 201, 'маленькая помещается');
-  } finally {
-    await small.close();
-  }
-});
-
 test('ответы API не раскрывают хэши, токены и внутренние поля', async () => {
   const card = await admin.json(`/api/admin/accounts/${user.account.id}`);
   const text = JSON.stringify(card.data);

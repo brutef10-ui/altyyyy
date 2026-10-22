@@ -103,6 +103,8 @@ function toSummary(quiz) {
 function toPublic(quiz) {
   const copy = { ...quiz };
   delete copy.ownerId;
+  // Картинки к вопросам отключены: у игр, сохранённых раньше, поле image не отдаём.
+  if (Array.isArray(copy.questions)) copy.questions = copy.questions.map(({ image, ...question }) => question);
   return copy;
 }
 
@@ -119,16 +121,6 @@ export class QuizService {
     this.store = store;
     this.images = images;
     this.maxQuizzesPerOwner = maxQuizzesPerOwner;
-  }
-
-  // has() у файлового хранилища синхронный, у хранилища в БД — асинхронный; await подходит обоим.
-  async #checkImages(quiz) {
-    if (!this.images) return;
-    for (const id of quizImageIds(quiz)) {
-      if (!(await this.images.has(id))) {
-        throw new AppError('Одна из картинок не найдена на сервере — загрузите её заново', { status: 422, code: 'IMAGE_MISSING' });
-      }
-    }
   }
 
   /** id картинок всех сохранённых игр — чтобы не удалить используемые. */
@@ -156,7 +148,6 @@ export class QuizService {
 
   async create(ownerId, input) {
     const data = checkQuiz(input);
-    await this.#checkImages(data);
     const count = typeof this.store.countByOwner === 'function'
       ? await this.store.countByOwner(ownerId)
       : (await this.store.listByOwner(ownerId)).length;
@@ -171,7 +162,6 @@ export class QuizService {
   async update(ownerId, id, input) {
     await this.#findOwned(ownerId, id);
     const data = checkQuiz(input);
-    await this.#checkImages(data);
     const updated = await this.store.update(id, { ...data, updatedAt: new Date().toISOString() });
     if (!updated) throw notFound('Игра не найдена');
     return toPublic(updated);
