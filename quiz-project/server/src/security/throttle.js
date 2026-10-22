@@ -15,6 +15,8 @@ export const RULES = Object.freeze({
   recoverIp: { max: 10, windowSec: 15 * 60, blockSec: 30 * 60 },
   recoverAccountIp: { max: 5, windowSec: 60 * 60, blockSec: 60 * 60 },
   recoverAccount: { max: 20, windowSec: 60 * 60, blockSec: 60 * 60 },
+  // Попытки прикрепить чек об оплате (неудачные — неподходящий файл).
+  receiptUpload: { max: 10, windowSec: 60 * 60, blockSec: 60 * 60 },
   // Изменяющие действия администратора.
   adminOps: { max: 300, windowSec: 10 * 60, blockSec: 5 * 60 },
 });

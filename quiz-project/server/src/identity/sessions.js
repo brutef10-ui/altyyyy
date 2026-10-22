@@ -29,11 +29,11 @@ export class SessionService {
     return { id: row.id, token };
   }
 
-  /** Действующая сессия по токену: { id, accountId, visitorId, account: { id, login, role } } или null. */
+  /** Действующая сессия по токену: { id, accountId, visitorId, account: { id, login, role, paid } } или null. */
   async resolve(token, { ip = null, userAgent = null } = {}) {
     if (!isToken(token)) return null;
     const row = await this.db.one(
-      `SELECT s.id, s.account_id, s.visitor_id, s.last_seen_at, a.login, a.role
+      `SELECT s.id, s.account_id, s.visitor_id, s.last_seen_at, a.login, a.role, a.access_granted_at IS NOT NULL AS paid
          FROM sessions s JOIN accounts a ON a.id = s.account_id
         WHERE s.token_hash = $1 AND s.revoked_at IS NULL
           AND s.expires_at > now() AND s.absolute_expires_at > now()`,
@@ -53,7 +53,7 @@ export class SessionService {
       id: row.id,
       accountId: row.account_id,
       visitorId: row.visitor_id,
-      account: { id: row.account_id, login: row.login, role: row.role },
+      account: { id: row.account_id, login: row.login, role: row.role, paid: row.paid },
     };
   }
 

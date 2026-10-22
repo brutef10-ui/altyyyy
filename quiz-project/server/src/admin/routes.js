@@ -6,7 +6,7 @@ import { AppError, notFound } from '../errors.js';
 import { forwardedChain } from '../identity/clientIp.js';
 import { RULES } from '../security/throttle.js';
 import { MIN_PREFIX, isUuid, parseIpTarget } from '../security/bans.js';
-import { AdminQueries } from './queries.js';
+import { AdminQueries, page } from './queries.js';
 import { parseUserAgent } from '../logs/userAgent.js';
 
 const MAX_BAN_MINUTES = 10 * 365 * 24 * 60;
@@ -71,7 +71,7 @@ function banView(row) {
   };
 }
 
-export function adminRouter({ db, identity, audit, config, sharing, backups = null }) {
+export function adminRouter({ db, identity, audit, config, sharing, backups = null, payments = null }) {
   const router = express.Router();
   router.use(express.json({ limit: '16kb' }), identity.requireAdmin, (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -98,7 +98,27 @@ export function adminRouter({ db, identity, audit, config, sharing, backups = nu
 
   router.get('/overview', async (req, res) => {
     const backup = backups ? { configured: true, ...(await backups.status()) } : { configured: false };
-    res.json({ ...(await queries.overview()), backup });
+    res.json({ ...(await queries.overview()), payments: payments ? await payments.count() : 0, backup });
+  });
+
+  // ---------- Оплаты: кто прикрепил чек; сам чек — 2 суток ----------
+
+  router.get('/payments', async (req, res) => {
+    res.json(await payments.list({ ...page(req.query), q: req.query.q }));
+  });
+
+  // Чек — персональные данные: открытие пишется в аудит. Отдаётся как файл, без выполнения чего-либо внутри.
+  router.get('/payments/:id/receipt', async (req, res) => {
+    const receipt = await payments.receipt(req.params.id);
+    await audit.record({ ...auditMeta(req), action: 'payment.receipt.view', targetType: 'account', targetId: receipt.accountId, details: { login: receipt.login } });
+    res.set({
+      'Content-Type': receipt.type,
+      'Content-Disposition': `inline; filename="receipt-${receipt.id.slice(0, 8)}.${receipt.type === 'application/pdf' ? 'pdf' : receipt.type.split('/')[1]}"`,
+      'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
+      'Cross-Origin-Resource-Policy': 'same-origin',
+      'Cache-Control': 'no-store',
+    });
+    res.send(receipt.bytes);
   });
 
   // Сделать резервную копию сейчас (не дожидаясь расписания).

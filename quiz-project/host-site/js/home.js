@@ -4,8 +4,23 @@ import { logout, requireAccount } from './auth.js';
 import { flash, hostSession } from './session.js';
 import { launchGame } from './socket.js';
 import { confirmDialog, formatDate, h, plural, stageIcon, toast } from './ui.js';
+import { openPaymentFlow, paymentInfo } from './payment.js';
 
 const list = document.getElementById('quiz-list');
+// Доступ к созданию своих игр (оплачен ли). Решает сервер; здесь — только какие кнопки показать.
+let payment = { required: false, canCreate: true };
+
+/** Создать игру: после оплаты — сразу редактор, без оплаты — сначала окно оплаты. */
+async function createGame(event) {
+  if (payment.canCreate) return;
+  event?.preventDefault();
+  if (await openPaymentFlow(payment)) {
+    payment = await paymentInfo({ force: true });
+    if (!list.querySelector('.quiz-card')) renderEmpty();
+  }
+}
+
+const playDemo = () => launchGame({ demo: true });
 const status = document.getElementById('status');
 
 function showStatus(message, { retry = false } = {}) {
@@ -20,10 +35,12 @@ function renderEmpty() {
       h('div', { class: 'empty-art', 'aria-hidden': 'true' }, document.querySelector('.brand-mark')?.cloneNode(true) ?? ''),
       h('p', { class: 'kicker', text: 'Сцена свободна' }),
       h('h2', { text: 'Пока нет сохранённых игр' }),
-      h('p', { class: 'muted', text: 'Создайте свой квиз или начните с демо-викторины, чтобы посмотреть, как всё работает.' }),
+      h('p', { class: 'muted', text: payment.canCreate
+        ? 'Создайте свой квиз или запустите демо-викторину, чтобы посмотреть, как всё работает.'
+        : `Запустите демо-викторину бесплатно. Свои игры — после оплаты доступа (${payment.amount} ${payment.currency}, один раз).` }),
       h('div', { class: 'empty-actions' },
-        h('a', { class: 'btn btn-primary', href: 'editor.html', text: '+ Создать игру' }),
-        h('a', { class: 'btn btn-ghost', href: 'editor.html?demo=1', text: 'Открыть демо' }),
+        h('a', { class: 'btn btn-primary', href: 'editor.html', text: payment.canCreate ? '+ Создать игру' : '+ Создать свою игру', onclick: createGame }),
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: playDemo }, stageIcon('play'), 'Играть в демо'),
       ),
     ),
   );
@@ -37,8 +54,8 @@ function quizCard(quiz) {
       h('p', { class: 'muted' }, `${quiz.questionCount} ${plural(quiz.questionCount, ['вопрос', 'вопроса', 'вопросов'])} · изменена ${formatDate(quiz.updatedAt)}`),
     ),
     h('div', { class: 'quiz-card-actions' },
-      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => launchGame({ quizId: quiz.id }) }, stageIcon('play'), 'Запустить'),
-      h('a', { class: 'btn btn-ghost', href: `editor.html?id=${encodeURIComponent(quiz.id)}`, text: 'Изменить' }),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: (event) => (payment.canCreate ? launchGame({ quizId: quiz.id }) : createGame(event)) }, stageIcon('play'), 'Запустить'),
+      h('a', { class: 'btn btn-ghost', href: `editor.html?id=${encodeURIComponent(quiz.id)}`, text: 'Изменить', onclick: createGame }),
       h('button', {
         class: 'btn btn-ghost btn-icon',
         type: 'button',
@@ -76,6 +93,7 @@ async function load() {
   status.hidden = true;
   list.setAttribute('aria-busy', 'true');
   try {
+    payment = await paymentInfo();
     const quizzes = await api.listQuizzes();
     if (quizzes.length === 0) renderEmpty();
     else list.replaceChildren(...quizzes.map(quizCard));
@@ -144,6 +162,13 @@ async function offerLegacyGames() {
 
 const message = flash.take();
 if (message) toast(message.message, message.type, 6000);
+document.getElementById('create-game').addEventListener('click', createGame);
 showAccount();
 showActiveGame();
-load();
+// #pay — сюда отправляет редактор, если доступ к созданию игр ещё не оплачен.
+load().then(() => {
+  if (location.hash === '#pay') {
+    history.replaceState(null, '', location.pathname);
+    createGame();
+  }
+});

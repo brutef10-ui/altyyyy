@@ -43,6 +43,7 @@ export const EVENT_LABELS = {
   quiz_create: 'Создана игра',
   room_create: 'Запущена комната',
   room_join: 'Вход в комнату',
+  payment_receipt: 'Оплата: прикреплён чек',
 };
 
 export const AUDIT_LABELS = {
@@ -59,6 +60,7 @@ export const AUDIT_LABELS = {
   'admin.device.removed': 'Консоль: устройство убрано',
   'admin.device.denied': 'Консоль: вход с чужого устройства отклонён',
   'admin.device.reset': 'Консоль: список устройств сброшен',
+  'payment.receipt.view': 'Открыт чек об оплате',
 };
 
 export const BAN_STATUS = { active: 'действует', expired: 'истекла', lifted: 'снята' };

@@ -346,3 +346,179 @@
     font-size: 15px;
   }
 }
+
+/* ---------- Оплата доступа к созданию игр ---------- */
+
+.payment-modal {
+  width: min(660px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+
+.payment-modal.is-busy {
+  cursor: progress;
+}
+
+.payment-modal .kicker {
+  margin-bottom: 4px;
+  color: var(--gold-deep);
+}
+
+.payment-step > p + p {
+  margin-top: 12px;
+}
+
+.payment-warning {
+  padding: 12px 14px;
+  border-left: 4px solid var(--velvet);
+  border-radius: var(--radius-sm);
+  background: rgba(140, 21, 41, 0.08);
+  color: var(--ink);
+}
+
+.payment-warning b {
+  color: var(--velvet);
+}
+
+.payment-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 6px;
+}
+
+.payment-qr {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin: 0;
+}
+
+.payment-qr img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px var(--gold), 0 10px 22px rgba(43, 18, 24, 0.28);
+}
+
+.payment-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.45;
+}
+
+.receipt-drop {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  margin-top: 18px;
+  padding: 16px 14px;
+  border: 2px dashed var(--gold-deep);
+  border-radius: var(--radius-sm);
+  background: rgba(216, 172, 76, 0.1);
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--t-element) ease, border-color var(--t-element) ease;
+}
+
+.receipt-drop:hover,
+.receipt-drop:focus-within {
+  border-color: var(--velvet);
+  background: rgba(216, 172, 76, 0.2);
+}
+
+.receipt-drop-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.receipt-drop small {
+  color: var(--ink-soft);
+}
+
+/* Поле выбора файла — под надписью: на него нажимают через подпись, фокус и чтение экрана сохраняются. */
+.receipt-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.receipt-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.receipt-preview img,
+.receipt-pdf {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--gold-deep);
+}
+
+.receipt-pdf {
+  display: grid;
+  place-items: center;
+  background: var(--velvet);
+  color: var(--ivory);
+  font-weight: 700;
+}
+
+.receipt-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.payment-privacy {
+  margin-top: 12px;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.payment-privacy a {
+  color: var(--velvet);
+  font-weight: 700;
+}
+
+.payment-step .form-error {
+  margin-top: 10px;
+  color: #b02a2a;
+}
+
+@media (max-width: 600px) {
+  .payment-modal {
+    padding: 24px 18px 20px;
+  }
+
+  .payment-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .payment-qr {
+    width: min(240px, 100%);
+    margin-inline: auto;
+  }
+
+  .payment-modal .modal-actions {
+    flex-wrap: wrap-reverse;
+  }
+
+  .payment-modal .modal-actions .btn {
+    flex: 1 1 auto;
+  }
+}

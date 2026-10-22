@@ -5,6 +5,7 @@
 //   (подсчёты в админ-консоли не ломаются). Через eventsDeleteDays записи удаляются.
 // * Посетители, которых не было eventsAnonymizeDays: так же обрезаются последний IP и user-agent.
 // * Журнал администратора и история блокировок — отдельный срок (auditRetentionDays, banHistoryRetentionDays).
+// * Факты оплаты (кто, когда, IP) — как журнал заходов. Сами чеки удаляются через 2 суток (payments.js).
 const BATCH = 5_000;
 
 export class Retention {
@@ -79,6 +80,23 @@ export class Retention {
        )`,
       [],
     );
-    return { anonymizedEvents, deletedEvents, anonymizedVisitors, deletedAudit, deletedBans, deletedCodes };
+    const anonymizedPayments = await this.#batched(
+      `WITH batch AS (
+         SELECT id FROM payments WHERE anonymized_at IS NULL AND created_at < now() - make_interval(days => $1) LIMIT $2
+       )
+       UPDATE payments p SET
+         ip = CASE WHEN p.ip IS NULL THEN NULL
+                   WHEN family(p.ip) = 4 THEN network(set_masklen(p.ip, 24))::inet
+                   ELSE network(set_masklen(p.ip, 48))::inet END,
+         user_agent = NULL,
+         anonymized_at = now()
+       FROM batch WHERE p.id = batch.id`,
+      [eventsAnonymizeDays],
+    );
+    const deletedPayments = await this.#batched(
+      'DELETE FROM payments WHERE id IN (SELECT id FROM payments WHERE created_at < now() - make_interval(days => $1) LIMIT $2)',
+      [eventsDeleteDays],
+    );
+    return { anonymizedEvents, deletedEvents, anonymizedVisitors, deletedAudit, deletedBans, deletedCodes, anonymizedPayments, deletedPayments };
   }
 }

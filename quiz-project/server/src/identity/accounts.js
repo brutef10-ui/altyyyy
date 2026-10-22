@@ -93,8 +93,8 @@ export class AccountService {
     const backup = this.#newBackupCode();
     try {
       const row = await runner.one(
-        `INSERT INTO accounts (login, login_normalized, password_hash, backup_code_hash, backup_code_created_at)
-         VALUES ($1, $2, $3, $4, now()) RETURNING id, login, role`,
+        `INSERT INTO accounts (login, login_normalized, password_hash, backup_code_hash, backup_code_created_at, access_granted_at)
+         VALUES ($1, $2, $3, $4, now(), NULL) RETURNING id, login, role`,
         [login, normalizeLogin(login), passwordHash, backup.hash],
       );
       return { account: publicAccount(row), backupCode: backup.code };

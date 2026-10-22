@@ -24,7 +24,7 @@ const STATE_PAGES = {
   final: 'results.html',
 };
 
-const FATAL_CODES = new Set(['ROOM_NOT_FOUND', 'NO_ROOM', 'INVALID_QUIZ', 'NOT_FOUND', 'UNAUTHORIZED', 'BAD_CODE']);
+const FATAL_CODES = new Set(['ROOM_NOT_FOUND', 'NO_ROOM', 'INVALID_QUIZ', 'NOT_FOUND', 'UNAUTHORIZED', 'BAD_CODE', 'PAYMENT_REQUIRED']);
 // Ошибки, после которых имеет смысл просто попробовать ещё раз.
 const TRANSIENT_CODES = new Set(['TIMEOUT', 'RATE_LIMIT', 'INTERNAL', 'UNKNOWN']);
 
@@ -105,9 +105,9 @@ export function goHome(message, type = 'info') {
   curtain.go('index.html');
 }
 
-/** Запуск игры: лобби создаст новую комнату с новым кодом. */
-export function launchGame({ quizId = null, quiz = null }) {
-  launchRequest.set({ quizId, quiz });
+/** Запуск игры: лобби создаст новую комнату с новым кодом. demo — демо-игра с сервера (без изменений). */
+export function launchGame({ quizId = null, quiz = null, demo = false }) {
+  launchRequest.set({ quizId, quiz, demo });
   hostSession.clear();
   curtain.go('lobby.html');
 }
@@ -123,7 +123,7 @@ async function attach(socket, allowCreate) {
   if (!launch) {
     throw Object.assign(new Error('Нет активной игры. Выберите игру и нажмите «Запустить».'), { code: 'NO_ROOM' });
   }
-  const created = await request(socket, 'host:create', launch.quiz ? { quiz: launch.quiz } : { quizId: launch.quizId });
+  const created = await request(socket, 'host:create', launch.demo ? { demo: true } : launch.quiz ? { quiz: launch.quiz } : { quizId: launch.quizId });
   const next = {
     code: created.code,
     hostKey: created.hostKey,

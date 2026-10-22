@@ -980,6 +980,22 @@
   gap: 10px;
 }
 
+/* Чек об оплате в окне просмотра */
+.receipt-modal {
+  width: min(720px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+
+.receipt-full {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 12px auto 0;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 2px var(--gold-deep);
+}
+
 .hint-title {
   font-weight: 700;
   color: var(--gold-light);

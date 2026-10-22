@@ -297,6 +297,70 @@ function auditDetails(entry) {
   return parts.join(' · ') || '—';
 }
 
+// ---------- Оплаты: кто прикрепил чек ----------
+
+// Чек: картинка — в окне поверх консоли, PDF — в новой вкладке. Открытие пишется в журнал аудита.
+function showReceipt(item) {
+  const url = adminApi.receiptUrl(item.id);
+  if (item.receipt.type === 'application/pdf') {
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+  const dialog = h('dialog', { class: 'modal receipt-modal', 'aria-label': `Чек ${item.login}` });
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+  };
+  dialog.append(
+    h('h2', { class: 'modal-title', text: `Чек: ${item.login}` }),
+    h('p', { class: 'muted', text: `${fmtDate(item.createdAt)} · IP ${item.ip ?? '—'} · ${deviceLabel(item)}` }),
+    h('img', { class: 'receipt-full', src: url, alt: `Чек об оплате от ${item.login}` }),
+    h('div', { class: 'modal-actions' },
+      h('a', { class: 'btn btn-ghost', href: url, target: '_blank', rel: 'noopener', text: 'Открыть отдельно' }),
+      h('button', { class: 'btn btn-primary', type: 'button', text: 'Закрыть', onclick: close })),
+  );
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    close();
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+function paymentsTab() {
+  const view = listView({
+    root: $('panel-payments'),
+    before: [h('div', { class: 'hint-panel is-on' },
+      h('p', { class: 'hint-title', text: 'Доступ открывается сразу, как ведущий прикрепит чек' }),
+      h('p', { class: 'hint-note', text: 'Проверьте чек: сумма, получатель и время. Если чек поддельный или чужой — заблокируйте аккаунт. Чеки хранятся 2 суток и удаляются сами; запись об оплате (логин, время, IP, браузер) остаётся.' }))],
+    searchPlaceholder: 'Логин или IP',
+    emptyText: 'Оплат пока нет',
+    load: (params) => adminApi.payments({ q: params.q, offset: params.offset, limit: params.limit }),
+    onOpen: (item) => openCard('account', item.accountId, { onChange: refreshAll }),
+    columns: [
+      { title: 'Логин', className: 'col-main', value: (item) => h('div', { class: 'cell-main' },
+        h('button', { class: 'link-btn cell-title', type: 'button', text: item.login, onclick: () => openCard('account', item.accountId, { onChange: refreshAll }) }),
+        banPill(item.ban)) },
+      { title: 'Когда', value: (item) => h('div', { class: 'cell-stack' },
+        h('span', { text: fmtDate(item.createdAt) }),
+        h('span', { class: 'cell-sub', text: ago(item.createdAt) })) },
+      { title: 'IP · браузер', value: (item) => h('div', { class: 'cell-stack' },
+        h('code', { text: item.ip ?? '—' }),
+        h('span', { class: 'cell-sub', text: deviceLabel(item) })) },
+      { title: 'Сумма', className: 'num', value: (item) => `${item.amount} ${item.currency}` },
+      { title: 'Чек', value: (item) => (item.receipt
+        ? h('button', { class: 'btn btn-small btn-ghost', type: 'button', text: item.receipt.type === 'application/pdf' ? 'Открыть PDF' : 'Посмотреть чек', onclick: () => showReceipt(item) })
+        : h('span', { class: 'cell-sub', text: 'удалён (прошло 2 суток)' })) },
+      { title: 'Действия', className: 'col-actions', value: (item) => h('div', { class: 'row-actions' },
+        h('button', { class: 'btn btn-small btn-danger', type: 'button', text: item.ban ? 'Ещё блокировка' : 'Заблокировать', onclick: async () => {
+          if (await banDialog({ account: { id: item.accountId, login: item.login }, visitor: item.visitorId ? { id: item.visitorId } : null, ip: item.ip })) refreshAll();
+        } })) },
+    ],
+  });
+  refreshers.payments = view.reload;
+  view.reload();
+}
+
 // ---------- Устройства, с которых можно входить в консоль ----------
 
 async function devicesTab() {
@@ -389,6 +453,7 @@ const TABS = {
   visitors: { init: visitorsTab },
   bans: { init: bansTab },
   audit: { init: auditTab },
+  payments: { init: paymentsTab },
   devices: { init: devicesTab },
 };
 const started = new Set();
@@ -453,6 +518,7 @@ async function loadOverview() {
     $('count-accounts').textContent = stats.accounts;
     $('count-visitors').textContent = stats.guests;
     $('count-bans').textContent = stats.active_bans;
+    $('count-payments').textContent = stats.payments;
   } catch (error) {
     toast(error.message, 'error');
   }

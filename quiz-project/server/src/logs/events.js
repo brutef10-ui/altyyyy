@@ -9,6 +9,7 @@ export const EVENT_TYPES = Object.freeze({
   roomJoin: 'room_join',
   roomCreate: 'room_create',
   quizCreate: 'quiz_create',
+  payment: 'payment_receipt',
 });
 
 const text = (value, max) => (typeof value === 'string' && value ? value.slice(0, max) : null);

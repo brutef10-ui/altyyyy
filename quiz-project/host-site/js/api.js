@@ -106,7 +106,18 @@ export function imageUrl(id) {
   return id ? `${SERVER_URL}/api/images/${encodeURIComponent(id)}` : '';
 }
 
+/** Чек об оплате (картинка или PDF). Сервер сразу открывает доступ к созданию игр. */
+async function uploadReceipt(blob) {
+  const response = await send('/api/payments/receipt', { method: 'POST', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
+  const data = await response.json().catch(() => null);
+  if (response.status === 401) goToLogin();
+  if (data?.code === 'BANNED') showBanned(data.details);
+  if (!response.ok) throw new ApiError(data?.error || `Не удалось отправить чек (${response.status})`, { status: response.status, code: data?.code });
+  return data;
+}
+
 export const api = {
+  uploadReceipt,
   getConfig: () => request('/api/config', { auth: false }),
   listQuizzes: async () => (await request('/api/quizzes')).quizzes,
   getQuiz: async (id) => (await request(`/api/quizzes/${encodeURIComponent(id)}`)).quiz,

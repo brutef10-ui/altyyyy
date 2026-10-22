@@ -11,7 +11,7 @@ import { EVENT_TYPES } from '../logs/events.js';
 
 const HOUR = 60 * 60;
 
-export function authRouter({ identity, config, events, audit = null }) {
+export function authRouter({ identity, config, events, audit = null, payments = null }) {
   const { accounts, sessions, throttle } = identity;
   const router = express.Router();
   router.use(express.json({ limit: '4kb' }), (req, res, next) => {
@@ -48,6 +48,7 @@ export function authRouter({ identity, config, events, audit = null }) {
     res.json({
       account: account ? { id: account.id, login: account.login, role: account.role } : null,
       home: homeFor(account),
+      payment: account && payments ? payments.info(account) : null,
       csrfToken: visitorId ? identity.csrfToken(visitorId) : null,
       adminContact: config.adminContact || null,
       ban: publicBan(ban),

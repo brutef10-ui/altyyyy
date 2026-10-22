@@ -24,6 +24,8 @@ export async function startTestServer(name, overrides = {}) {
     registrationsPerIpPerHour: 1_000,
     registrationsPerHour: 10_000,
     dataFile: `/nonexistent-${schema}/quizzes.json`,
+    // Оплата доступа проверяется в payments.test.js; остальным тестам она не мешает.
+    paymentRequired: false,
     ...overrides,
   });
   const close = server.close.bind(server);

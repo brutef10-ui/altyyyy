@@ -10,6 +10,8 @@
 // { ok: false, error, code }. Если клиент не передал callback, ошибка приходит событием «error».
 import { AppError, conflict, forbidden, notFound } from './errors.js';
 import { consoleOnlyError, isConsoleOnly, ownerFromSocket } from './auth.js';
+import { DEMO_QUIZ } from './demoQuiz.js';
+import { paymentRequired } from './payments.js';
 import { ipFromSocket } from './identity/clientIp.js';
 import { PlayerRegistry } from './players.js';
 import { RateLimiter } from './rateLimit.js';
@@ -28,7 +30,7 @@ const CLOSE_MESSAGES = {
   shutdown: 'Сервер перезапускается. Игра завершена.',
 };
 
-export function registerSocketHandlers(io, { rooms, quizService, config, identity = null, events = null }) {
+export function registerSocketHandlers(io, { rooms, quizService, config, identity = null, events = null, payments = null }) {
   // Как часто перепроверять сессию ведущего перед командами хода игры (start/next/reveal/kick/close).
   const HOST_RECHECK_MS = config.hostSessionRecheckMs ?? 15_000;
   const eventLimiter = new RateLimiter({ windowMs: 10_000, max: 60 }); // любые события одного сокета
@@ -215,7 +217,12 @@ export function registerSocketHandlers(io, { rooms, quizService, config, identit
       if (!createLimiter.take(owner.id)) throw new AppError('Слишком много новых комнат. Подождите минуту.', { status: 429, code: 'RATE_LIMIT' });
 
       let quiz;
-      if (payload.quizId !== undefined) {
+      if (payload.demo === true) {
+        // Демо запускает сервер сам — изменить его вопросы нельзя.
+        quiz = validateQuiz(structuredClone(DEMO_QUIZ)).value;
+      } else if (payments && !payments.canCreate(socket.identity?.account)) {
+        throw paymentRequired();
+      } else if (payload.quizId !== undefined) {
         const saved = await quizService.get(owner.id, payload.quizId);
         quiz = { title: saved.title, questions: saved.questions };
       } else {
@@ -228,7 +235,7 @@ export function registerSocketHandlers(io, { rooms, quizService, config, identit
       socket.data = { role: 'host', roomCode: room.code };
       events?.record(EVENT_TYPES.roomCreate, socket.identity, {
         roomCode: room.code,
-        details: { title: quiz.title, quizId: payload.quizId ?? null, questions: quiz.questions.length },
+        details: { title: quiz.title, quizId: payload.quizId ?? null, demo: payload.demo === true, questions: quiz.questions.length },
       });
       return { code: room.code, hostKey: room.hostKey, snapshot: hostSnapshot(room) };
     });

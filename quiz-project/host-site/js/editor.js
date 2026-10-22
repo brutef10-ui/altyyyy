@@ -2,6 +2,7 @@
 // время на чтение и на ответ.
 import { api } from './api.js';
 import { requireAccount } from './auth.js';
+import { paymentInfo } from './payment.js';
 import { editorDraft } from './session.js';
 import { launchGame } from './socket.js';
 import { ANSWER_SHAPES, confirmDialog, h, plural, shapeIcon, toast } from './ui.js';
@@ -26,19 +27,6 @@ const LIMITS = {
 const QUESTION_TYPES = ['choice', 'text'];
 
 const TEXT_HINT = 'Игрок пишет ответ сам. Регистр, «ё», знаки препинания и небольшие опечатки не важны.';
-
-const DEMO_QUIZ = {
-  title: 'Разминка: обо всём понемногу',
-  questions: [
-    { type: 'choice', text: 'Какая планета — самая большая в Солнечной системе?', answers: ['Марс', 'Юпитер', 'Сатурн', 'Нептун'], correct: 1, timeLimit: 20, readTime: 5 },
-    { type: 'text', text: 'Столица Франции?', accepted: ['Париж', 'Paris'], timeLimit: 20, readTime: 3 },
-    { type: 'choice', text: 'Сколько континентов на Земле?', answers: ['5', '6', '7', '8'], correct: 2, timeLimit: 15, readTime: 3 },
-    { type: 'choice', text: 'Кто написал роман в стихах «Евгений Онегин»?', answers: ['Лермонтов', 'Пушкин', 'Толстой', 'Гоголь'], correct: 1, timeLimit: 20, readTime: 5 },
-    { type: 'text', text: 'Сколько ног у паука?', accepted: ['8', 'восемь'], timeLimit: 15, readTime: 3 },
-    { type: 'choice', text: 'Байкал — самое глубокое озеро в мире?', answers: ['Да', 'Нет'], correct: 0, timeLimit: 10, readTime: 0 },
-    { type: 'choice', text: 'Какой химический элемент обозначается буквой O?', answers: ['Золото', 'Кислород', 'Осмий', 'Олово'], correct: 1, timeLimit: 20, readTime: 8 },
-  ],
-};
 
 const params = new URLSearchParams(location.search);
 let quizId = params.get('id');
@@ -667,6 +655,7 @@ async function save() {
     updateSummary();
     toast('Игра сохранена', 'success');
   } catch (error) {
+    if (error.code === 'PAYMENT_REQUIRED') location.replace('index.html#pay');
     toast(error.details?.[0] || error.message, 'error', 6000);
   } finally {
     saveButton.disabled = false;
@@ -726,10 +715,6 @@ async function init() {
       quiz = blankQuiz();
       document.getElementById('editor-heading').textContent = 'Новая игра';
     }
-  } else if (params.has('demo')) {
-    quiz = normalize(structuredClone(DEMO_QUIZ));
-    history.replaceState(null, '', 'editor.html');
-    markDirty();
   } else {
     const draft = editorDraft.get();
     if (draft) {
@@ -747,6 +732,10 @@ async function init() {
   if (!quiz.title) titleInput.focus();
 }
 
-// Создавать игры (и открывать демо) можно только после входа. Сервер всё равно проверит это сам.
+// Создавать игры можно только после входа и оплаты доступа. Сервер всё равно проверит это сам;
+// без оплаты редактор сразу ведёт на главную, где откроется окно оплаты.
 requireAccount();
+paymentInfo().then((info) => {
+  if (!info.canCreate) location.replace('index.html#pay');
+}).catch(() => {});
 init();

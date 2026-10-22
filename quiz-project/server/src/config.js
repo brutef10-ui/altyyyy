@@ -136,6 +136,13 @@ export function loadConfig(overrides = {}) {
     // С скольких устройств можно входить в админ-консоль; новое значение ADMIN_DEVICE_RESET один раз очищает список.
     adminMaxDevices: integer(env.ADMIN_MAX_DEVICES, 2, { min: 1, max: 5 }),
     adminDeviceReset: String(env.ADMIN_DEVICE_RESET || '').trim(),
+    // ---------- Оплата доступа к созданию игр ----------
+    // PAYMENT_REQUIRED=false — создавать игры можно без оплаты (как раньше).
+    paymentRequired: env.PAYMENT_REQUIRED !== 'false',
+    paymentAmount: integer(env.PAYMENT_AMOUNT, 100, { min: 1, max: 1_000_000 }),
+    paymentCurrency: String(env.PAYMENT_CURRENCY || 'сом').trim().slice(0, 16),
+    // Чек хранится не дольше стольких часов (по требованию — не больше 2 суток).
+    receiptRetentionHours: integer(env.RECEIPT_RETENTION_HOURS, 48, { min: 1, max: 48 }),
     ...overrides,
   };
 

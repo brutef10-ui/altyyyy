@@ -10,6 +10,8 @@ import { Server } from 'socket.io';
 
 import { loadConfig } from './src/config.js';
 import { AppError } from './src/errors.js';
+import { PaymentService, RECEIPT_CONTENT_TYPES, RECEIPT_MAX_BYTES } from './src/payments.js';
+import { RULES, throttled } from './src/security/throttle.js';
 import { deviceOwnerFromRequest, isConsoleOnly, requireOwner } from './src/auth.js';
 import { RateLimiter } from './src/rateLimit.js';
 import { QuizService } from './src/quizzes.js';
@@ -122,7 +124,7 @@ function withTimeout(promise, ms) {
   })]).finally(() => clearTimeout(timer));
 }
 
-function createApp({ config, db, identity, audit, events, sharing, backups, legacy, quizService, images, rooms, roomLimiter }) {
+function createApp({ config, db, identity, audit, events, sharing, backups, legacy, quizService, images, rooms, roomLimiter, payments }) {
   const app = express();
   app.disable('x-powered-by');
   // Express узнаёт HTTPS (для Secure-cookie) из X-Forwarded-Proto только от доверенных прокси.
@@ -212,10 +214,10 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
   });
 
   // ---------- Вход и аккаунт ----------
-  app.use('/api/auth', anyCors, authRouter({ identity, config, events, audit }));
+  app.use('/api/auth', anyCors, authRouter({ identity, config, events, audit, payments }));
 
   // ---------- Администратор ----------
-  app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config, sharing, backups }));
+  app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config, sharing, backups, payments }));
 
   // ---------- Перенос игр, созданных до появления аккаунтов ----------
   // Нужны и сессия (куда переносить), и старый токен браузера в Authorization (откуда).
@@ -245,12 +247,13 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
   quizzesApi.get('/:id', async (req, res) => {
     res.json({ quiz: await quizService.get(req.owner.id, req.params.id) });
   });
-  quizzesApi.post('/', async (req, res) => {
+  // Создавать и изменять свои игры — только после оплаты (смотреть и удалять — всегда).
+  quizzesApi.post('/', payments.requireAccess, async (req, res) => {
     const quiz = await quizService.create(req.owner.id, req.body);
     events.record(EVENT_TYPES.quizCreate, req.identity, { details: { quizId: quiz.id, title: quiz.title } });
     res.status(201).json({ quiz });
   });
-  quizzesApi.put('/:id', async (req, res) => {
+  quizzesApi.put('/:id', payments.requireAccess, async (req, res) => {
     res.json({ quiz: await quizService.update(req.owner.id, req.params.id, req.body) });
   });
   quizzesApi.delete('/:id', async (req, res) => {
@@ -258,6 +261,24 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
     res.status(204).end();
   });
   app.use('/api/quizzes', hostCors, quizzesApi);
+
+  // ---------- Оплата: чек об оплате открывает доступ к созданию игр ----------
+  app.post('/api/payments/receipt', hostCors, requireOwner, identity.rejectBanned, identity.csrf,
+    express.raw({ type: RECEIPT_CONTENT_TYPES, limit: RECEIPT_MAX_BYTES }), async (req, res) => {
+      res.set('Cache-Control', 'no-store');
+      const key = `receipt:acct:${req.identity.account.id}`;
+      await identity.throttle.check(key);
+      let payment;
+      try {
+        payment = await payments.submit(req.identity, req.body, req.get('content-type'));
+      } catch (error) {
+        if (error.code === 'BAD_RECEIPT' && (await identity.throttle.hit(key, RULES.receiptUpload))) throw throttled(RULES.receiptUpload.blockSec);
+        throw error;
+      }
+      events.record(EVENT_TYPES.payment, req.identity, { details: { paymentId: payment.id, amount: payments.amount, currency: payments.currency, size: req.body.length } });
+      res.status(201).json({ ok: true, payment: payments.info({ ...req.identity.account, paid: true }) });
+    });
+  app.options('/api/payments/receipt', hostCors);
 
   // ---------- Проверки для игрока перед входом ----------
   const roomsApi = express.Router();
@@ -368,6 +389,17 @@ export async function startServer(overrides = {}) {
   const store = new PgQuizStore(db);
   const images = new PgImageStore(db, { maxBytes: QUIZ_LIMITS.imageMaxBytes, quotaBytes: config.imageQuotaMb * 1024 * 1024 });
   const quizService = new QuizService(store, { images });
+  const payments = new PaymentService(db, {
+    required: config.paymentRequired,
+    amount: config.paymentAmount,
+    currency: config.paymentCurrency,
+    receiptRetentionHours: config.receiptRetentionHours,
+  });
+  // Чеки живут не дольше 2 суток: уборка каждые 10 минут (и сразу при старте).
+  const purgeReceipts = () => payments.purgeReceipts().catch((error) => console.error('[payments] удаление старых чеков:', error.message));
+  purgeReceipts();
+  const receiptsTimer = setInterval(purgeReceipts, 10 * 60_000);
+  receiptsTimer.unref();
   const rooms = new RoomManager({ maxRooms: config.maxRooms, maxPlayersPerRoom: config.maxPlayersPerRoom });
   const roomLimiter = new RateLimiter({ windowMs: 60_000, max: 30 });
 
@@ -419,7 +451,7 @@ export async function startServer(overrides = {}) {
     console.warn('[backup] выключены: задайте BACKUP_ENCRYPTION_KEY и GOOGLE_DRIVE_* (см. .env.example и docs/DEPLOY.md).');
   }
 
-  const app = createApp({ config, db, identity, audit, events, sharing, backups, legacy, quizService, images, rooms, roomLimiter });
+  const app = createApp({ config, db, identity, audit, events, sharing, backups, legacy, quizService, images, rooms, roomLimiter, payments });
   const server = http.createServer(app);
   const io = new Server(server, {
     cors: { origin: config.allOrigins, methods: ['GET', 'POST'], credentials: true },
@@ -456,7 +488,7 @@ export async function startServer(overrides = {}) {
     }
     next();
   });
-  const sockets = registerSocketHandlers(io, { rooms, quizService, images, config, identity, events });
+  const sockets = registerSocketHandlers(io, { rooms, quizService, config, identity, events, payments });
   // Новая блокировка действует сразу: заблокированные выходят из идущих игр.
   identity.bans.onChange(() => sockets.enforceBans());
 
@@ -488,6 +520,7 @@ export async function startServer(overrides = {}) {
         clearInterval(imageGc);
         clearInterval(maintenance);
         clearInterval(retentionTimer);
+        clearInterval(receiptsTimer);
         backups?.stop();
         clearTimeout(retentionFirst);
         await new Promise((resolve) => io.close(() => resolve()));
