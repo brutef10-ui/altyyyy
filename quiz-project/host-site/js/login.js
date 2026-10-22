@@ -12,6 +12,8 @@ const PRINTABLE_ASCII = /^[\x20-\x7E]*$/;
 const $ = (id) => document.getElementById(id);
 const card = document.querySelector('.login-card');
 const next = safeNext(new URLSearchParams(location.search).get('next'));
+// Адрес, который назвал сервер (администратору — админ-консоль), иначе — откуда пришли.
+const destination = (home) => (home ? `${SERVER_URL}${home}` : next);
 
 function showError(element, message) {
   element.textContent = message || '';
@@ -96,8 +98,12 @@ $('form-login').addEventListener('submit', async (event) => {
   showError(error, '');
   const done = busy($('login-submit'), 'Входим…');
   try {
-    const { account } = await post('/api/auth/login', { login, password });
+    const { account, home } = await post('/api/auth/login', { login, password });
     setAccount(account);
+    if (home) {
+      curtain.go(destination(home), { replace: true });
+      return;
+    }
     await checkLegacyGames();
     curtain.go(next, { replace: true });
   } catch (err) {
@@ -255,7 +261,7 @@ async function init() {
       return;
     }
     if (session.account) {
-      curtain.go(next, { replace: true });
+      curtain.go(destination(session.home), { replace: true });
       return;
     }
     if (session.adminContact) {

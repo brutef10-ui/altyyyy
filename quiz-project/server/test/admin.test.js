@@ -66,6 +66,24 @@ test('страница консоли: гостю — вход, пользова
   assert.equal((await admin.fetch('/admin/js/admin.js')).status, 200);
 });
 
+test('после входа администратора сервер ведёт сразу в админ-консоль, обычного пользователя — нет', async () => {
+  const fresh = as('192.0.2.7');
+  const adminLogin = await fresh.login(ADMIN_LOGIN, ADMIN_PASSWORD);
+  assert.equal(adminLogin.status, 200);
+  assert.equal(adminLogin.data.home, '/admin/');
+  assert.equal((await fresh.session()).home, '/admin/');
+
+  const user = as('198.51.100.9');
+  const login = uniqueLogin('Plain');
+  await user.register(login, 'plain-password-1');
+  assert.equal((await user.session()).home, null);
+  const other = as('198.51.100.10');
+  const userLogin = await other.login(login, 'plain-password-1');
+  assert.equal(userLogin.status, 200);
+  assert.equal(userLogin.data.home, null);
+  assert.equal((await as('198.51.100.11').session()).home, null);
+});
+
 test('гость в «Незарегистрированных»; после регистрации — в «Зарегистрированных» со своей историей', async () => {
   const { socket, code } = await hostRoom();
   const guest = as('203.0.113.10');

@@ -36,6 +36,10 @@ export function authRouter({ identity, config, events }) {
     return session;
   }
 
+  // Куда вести после входа решает сервер по роли из базы: администратора — сразу в админ-консоль.
+  // У администратора своя учётная запись только для консоли; игры ведущий создаёт под обычным аккаунтом.
+  const homeFor = (account) => (account?.role === 'admin' ? '/admin/' : null);
+
   const body = (req) => (req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {});
 
   // Текущее состояние: кто вошёл, CSRF-токен для изменяющих запросов и действующая блокировка (если есть).
@@ -43,6 +47,7 @@ export function authRouter({ identity, config, events }) {
     const { account, visitorId, ban } = req.identity;
     res.json({
       account: account ? { id: account.id, login: account.login, role: account.role } : null,
+      home: homeFor(account),
       csrfToken: visitorId ? identity.csrfToken(visitorId) : null,
       adminContact: config.adminContact || null,
       ban: publicBan(ban),
@@ -98,7 +103,7 @@ export function authRouter({ identity, config, events }) {
     if (ban) throw bannedError(ban, config.adminContact);
     await startSession(req, res, account);
     events?.record(EVENT_TYPES.login, req.identity, { account });
-    res.json({ account });
+    res.json({ account, home: homeFor(account) });
   });
 
   router.post('/logout', identity.csrf, async (req, res) => {
