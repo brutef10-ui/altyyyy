@@ -411,6 +411,12 @@
 
 /* ---------- Таймер — золотой циферблат ---------- */
 
+/* Кнопка ведущего: ширина по самой длинной надписи («Начать приём ответов», «Следующий вопрос →»),
+   чтобы при смене надписи кнопка не прыгала влево-вправо. */
+.page-game #next {
+  min-width: 15.5em;
+}
+
 .timer {
   position: relative;
   grid-column: 1 / -1;
@@ -1044,6 +1050,58 @@
   .game {
     gap: 16px;
     padding-top: 26px;
+  }
+
+  /* Невысокий экран (ноутбук, планшет боком): кегль вопроса и циферблат зависят и от высоты,
+     чтобы циферблат не наезжал на текст вопроса и на варианты. */
+  .question-banner h1 {
+    font-size: clamp(22px, min(3.6vw, 5vh), 60px);
+  }
+
+  .question-banner[data-length='long'] h1 {
+    font-size: clamp(20px, min(2.9vw, 4.3vh), 48px);
+  }
+
+  .question-banner[data-length='xl'] h1 {
+    font-size: clamp(18px, min(2.3vw, 3.6vh), 38px);
+  }
+
+  .timer {
+    width: clamp(72px, 15vh, 200px);
+  }
+
+  .timer-value {
+    font-size: clamp(28px, 6.2vh, 92px);
+  }
+
+  /* Таблица лидеров компактнее — на экран помещается больше строк */
+  .leaderboard {
+    padding: 12px 18px;
+  }
+
+  .leaderboard h3 {
+    margin-bottom: 6px;
+    font-size: clamp(19px, 3.4vh, 26px);
+  }
+
+  .leader-list {
+    gap: 4px;
+  }
+
+  .leader-row {
+    gap: 10px;
+    padding: 3px 10px;
+    font-size: clamp(15px, 2.9vh, 22px);
+  }
+
+  .leader-rank,
+  .leader-row .avatar-sm {
+    width: clamp(24px, 4.6vh, 36px);
+    height: clamp(24px, 4.6vh, 36px);
+  }
+
+  .leader-rank {
+    font-size: clamp(13px, 2.4vh, 18px);
   }
 }
 

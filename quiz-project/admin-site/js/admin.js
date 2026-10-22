@@ -4,7 +4,7 @@ import { adminApi } from './api.js';
 import { banDialog, issueCode, liftDialog } from './actions.js';
 import { openCard } from './card.js';
 import { h, toast } from './dom.js';
-import { AUDIT_LABELS, BAN_STATUS, SHARING_LEVELS, ago, counts, deviceLabel, fmtDate, shortId } from './format.js';
+import { AUDIT_LABELS, BAN_STATUS, SHARING_LEVELS, ago, deviceLabel, fmtDate, shortId } from './format.js';
 import { curtain } from './theatre.js';
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,7 @@ const $ = (id) => document.getElementById(id);
 function ledger(columns) {
   const body = h('tbody');
   const table = h('table', { class: 'ledger-table' },
-    h('thead', {}, h('tr', {}, columns.map((column) => h('th', { scope: 'col', class: column.className ?? null, text: column.title })))),
+    h('thead', {}, h('tr', {}, columns.map((column) => h('th', { scope: 'col', class: column.className ?? null, title: column.hint ?? null, text: column.title })))),
     body,
   );
   const row = (item, onOpen) => h('tr', {
@@ -26,6 +26,16 @@ function ledger(columns) {
   }, columns.map((column) => h('td', { class: column.className ?? null, dataset: { label: column.title } }, column.value(item))));
   return { table, body, row };
 }
+
+// Сколько разных IP и устройств у аккаунта: маленькая табличка «всего / сутки / неделя».
+const SPREAD_PERIODS = [['all', 'всего', 'за всё время'], ['day', 'сутки', 'за последние 24 часа'], ['week', 'неделя', 'за последние 7 дней']];
+const spread = (item) => h('div', { class: 'spread', role: 'table', 'aria-label': 'Разные IP-адреса и устройства' },
+  h('span', { class: 'spread-head', role: 'columnheader' }),
+  SPREAD_PERIODS.map(([, label]) => h('span', { class: 'spread-head', role: 'columnheader', text: label })),
+  [['ips', 'IP-адреса', 'Разных IP-адресов'], ['devices', 'Устройства', 'Разных устройств (браузеров)']].map(([key, label, long]) => [
+    h('span', { class: 'spread-label', role: 'rowheader', text: label }),
+    SPREAD_PERIODS.map(([period, , when]) => h('span', { class: 'spread-num', role: 'cell', title: `${long} ${when}: ${item[key][period]}`, text: String(item[key][period]) })),
+  ]));
 
 const banPill = (ban) => (ban
   ? h('span', { class: 'pill pill-danger', title: ban.reason, text: `блок ${ban.forever ? 'навсегда' : `до ${fmtDate(ban.endsAt)}`}` })
@@ -137,10 +147,10 @@ function sharingControls(enabled, onToggle) {
         toggle.disabled = false;
       }
     },
-  }, h('span', { class: 'switch-track', 'aria-hidden': 'true' }, h('span', { class: 'switch-knob' })), h('span', { text: 'Показывать подозрительные аккаунты' }));
+  }, h('span', { class: 'switch-track', 'aria-hidden': 'true' }, h('span', { class: 'switch-knob' })), h('span', { text: 'Искать аккаунты, которыми пользуются несколько человек' }));
   const note = h('p', { class: 'hint-note' }, enabled
-    ? 'Подсказки ничего не блокируют и пользователям не показываются — это только повод присмотреться. Оценка считается по журналу за 30 дней, когда вы открываете список.'
-    : 'Выключено: оценка не считается. Журналы заходов при этом пишутся как обычно.');
+    ? 'Включено: в таблице появилась колонка «Подсказка о шаринге» и фильтр «Подозрительные». Признаки — много разных устройств, разные города, две игры одновременно; наведите на оценку, чтобы увидеть причины. Подсказки ничего не блокируют и пользователям не показываются — это только повод присмотреться. Считаются по журналу за 30 дней.'
+    : 'Необязательная подсказка: сервер может отмечать аккаунты, которыми, похоже, пользуются несколько человек (много разных устройств, разные города, две игры одновременно). Сейчас выключено — ничего не считается, на работу сайта это не влияет.');
   const status = h('p', { class: 'hint-status muted small', 'aria-live': 'polite' });
   const recompute = enabled ? h('button', {
     class: 'btn btn-ghost btn-small',
@@ -198,9 +208,7 @@ async function accountsTab() {
       { title: 'Последний IP · устройство', value: (item) => h('div', { class: 'cell-stack' },
         h('code', { text: item.lastIp ?? '—' }),
         h('span', { class: 'cell-sub', text: deviceLabel(item) })) },
-      { title: 'Разных IP и устройств: всего · 24 ч · 7 дн', className: 'num', value: (item) => h('div', { class: 'cell-stack' },
-        h('span', {}, h('span', { class: 'cell-sub', text: 'IP ' }), counts(item.ips)),
-        h('span', {}, h('span', { class: 'cell-sub', text: 'устр. ' }), counts(item.devices))) },
+      { title: 'IP-адреса и устройства', className: 'num', hint: 'Сколько разных IP-адресов и устройств (браузеров) было у аккаунта: за всё время, за последние сутки и за неделю', value: (item) => spread(item) },
       ...(enabled ? [hintColumn] : []),
       { title: 'Действия', className: 'col-actions', value: (item) => (item.role === 'admin' ? '—' : h('div', { class: 'row-actions' },
         h('button', { class: 'btn btn-small btn-ghost', type: 'button', text: 'Выдать одноразовый код', onclick: () => issueCode(item) }),

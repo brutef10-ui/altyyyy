@@ -310,6 +310,13 @@ a.brand:hover .brand-mark {
   overflow: hidden;
 }
 
+/* Ничто на сцене (анимации, свет, кулисы) не выходит за правый край: иначе мобильный браузер
+   уменьшает масштаб страницы и вся сцена вместе с панелью кнопок «плавает». clip не мешает липкой панели. */
+html:has(> body.stage),
+body.stage {
+  overflow-x: clip;
+}
+
 .stage > main {
   flex: 1;
   min-height: 0;
