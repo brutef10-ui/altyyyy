@@ -84,6 +84,42 @@ test('после входа администратора сервер ведёт
   assert.equal((await as('198.51.100.11').session()).home, null);
 });
 
+test('учётная запись администратора — только для консоли: игры, картинки, комнаты и страницы ведущего закрыты', async () => {
+  for (const path of ['/api/quizzes', '/api/legacy']) {
+    const response = await admin.json(path);
+    assert.equal(response.status, 403, path);
+    assert.equal(response.data.code, 'ADMIN_CONSOLE_ONLY', path);
+  }
+  const created = await admin.json('/api/quizzes', { method: 'POST', body: quiz });
+  assert.equal(created.data.code, 'ADMIN_CONSOLE_ONLY');
+  const upload = await admin.fetch('/api/images', { method: 'POST', raw: true, body: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]), headers: { 'Content-Type': 'image/jpeg' } });
+  assert.equal(upload.status, 403);
+
+  const socket = await admin.socket();
+  const room = await socket.timeout(3000).emitWithAck('host:create', { quiz });
+  socket.disconnect();
+  assert.equal(room.ok, false);
+  assert.equal(room.code, 'ADMIN_CONSOLE_ONLY');
+
+  for (const page of ['/host/', '/host/index.html', '/host/account.html', '/host/editor.html']) {
+    const response = await admin.fetch(page);
+    assert.equal(response.status, 302, page);
+    assert.equal(response.headers.get('location'), '/admin/', page);
+  }
+  // Обычный ведущий работает как раньше.
+  const host = as('198.51.100.12');
+  await host.register(uniqueLogin('Regular'), 'regular-password-1');
+  assert.equal((await host.json('/api/quizzes')).status, 200);
+  assert.equal((await host.fetch('/host/')).status, 200);
+});
+
+test('в списке «Зарегистрированные» нет учётной записи администратора', async () => {
+  const { data } = await admin.json(`/api/admin/accounts?q=${encodeURIComponent(ADMIN_LOGIN)}`);
+  assert.deepEqual(data.items.filter((item) => item.role === 'admin'), []);
+  const all = await admin.json('/api/admin/accounts');
+  assert.ok(all.data.items.every((item) => item.role !== 'admin'));
+});
+
 test('гость в «Незарегистрированных»; после регистрации — в «Зарегистрированных» со своей историей', async () => {
   const { socket, code } = await hostRoom();
   const guest = as('203.0.113.10');

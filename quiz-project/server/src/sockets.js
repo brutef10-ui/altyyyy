@@ -9,7 +9,7 @@
 // Каждый запрос клиента получает ответ через acknowledgement: { ok: true, ... } или
 // { ok: false, error, code }. Если клиент не передал callback, ошибка приходит событием «error».
 import { AppError, conflict, forbidden, notFound } from './errors.js';
-import { ownerFromSocket } from './auth.js';
+import { consoleOnlyError, isConsoleOnly, ownerFromSocket } from './auth.js';
 import { ipFromSocket } from './identity/clientIp.js';
 import { PlayerRegistry } from './players.js';
 import { RateLimiter } from './rateLimit.js';
@@ -128,6 +128,7 @@ export function registerSocketHandlers(io, { rooms, quizService, images, config,
   async function requireHostAccount(socket, { maxAgeMs = 0 } = {}) {
     if (identity && socket.identity) await identity.refresh(socket.identity, { maxAgeMs });
     const owner = ownerFromSocket(socket);
+    if (!owner && isConsoleOnly(socket.identity?.account)) throw consoleOnlyError();
     if (!owner) throw new AppError('Войдите в аккаунт, чтобы продолжить.', { status: 401, code: 'UNAUTHORIZED' });
     requireNotBanned(socket);
     return owner;

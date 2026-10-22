@@ -74,7 +74,8 @@ export class AdminQueries {
            SELECT id, reason, ends_at FROM bans WHERE account_id = a.id AND ${ACTIVE_BAN}
             ORDER BY ends_at DESC NULLS FIRST LIMIT 1
          ) ban ON true
-        WHERE ($1 = '' OR a.login_normalized LIKE $1
+        WHERE a.role <> 'admin'
+          AND ($1 = '' OR a.login_normalized LIKE $1
                OR EXISTS (SELECT 1 FROM events e WHERE e.account_id = a.id AND lower(e.nickname) LIKE $1)
                OR ($2 <> '' AND EXISTS (SELECT 1 FROM events e WHERE e.account_id = a.id AND host(e.ip) LIKE $2)))
           ${ids ? 'AND a.id = ANY($5::uuid[])' : ''}

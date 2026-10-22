@@ -10,7 +10,7 @@ import { Server } from 'socket.io';
 
 import { loadConfig } from './src/config.js';
 import { AppError } from './src/errors.js';
-import { deviceOwnerFromRequest, requireOwner } from './src/auth.js';
+import { deviceOwnerFromRequest, isConsoleOnly, requireOwner } from './src/auth.js';
 import { RateLimiter } from './src/rateLimit.js';
 import { QuizService } from './src/quizzes.js';
 import { IMAGE_TYPES } from './src/images.js';
@@ -52,6 +52,12 @@ function mountSites(app, config) {
     if ((req.method === 'GET' || req.method === 'HEAD') && HOST_PAGES.has(req.path) && (!req.identity?.account || req.identity.ban)) {
       res.set('Cache-Control', 'no-store');
       res.redirect(302, `/host/login.html?next=${encodeURIComponent(req.originalUrl)}`);
+      return;
+    }
+    // Учётная запись администратора — только для админ-консоли.
+    if ((req.method === 'GET' || req.method === 'HEAD') && HOST_PAGES.has(req.path) && isConsoleOnly(req.identity.account)) {
+      res.set('Cache-Control', 'no-store');
+      res.redirect(302, '/admin/');
       return;
     }
     next();

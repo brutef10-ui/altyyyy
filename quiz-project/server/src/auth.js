@@ -26,8 +26,16 @@ export function bearerToken(header) {
   return match ? match[1] : null;
 }
 
+// Учётная запись администратора — только для админ-консоли: игр у неё нет, вести игры и открывать
+// сайт ведущего она не может. Для игр администратор входит отдельным обычным аккаунтом.
+export const isConsoleOnly = (account) => account?.role === 'admin';
+
+export function consoleOnlyError() {
+  return new AppError('Учётная запись администратора — только для админ-консоли. Для игр войдите обычным аккаунтом.', { status: 403, code: 'ADMIN_CONSOLE_ONLY' });
+}
+
 const RESOLVERS = [
-  (credentials) => (credentials.account?.id ? { id: credentials.account.id, kind: 'account' } : null),
+  (credentials) => (credentials.account?.id && !isConsoleOnly(credentials.account) ? { id: credentials.account.id, kind: 'account' } : null),
 ];
 
 export function resolveOwner(credentials) {
@@ -54,6 +62,10 @@ export function deviceOwnerFromRequest(req) {
 // Express-middleware: пропускает дальше только запросы вошедшего создателя игр.
 export function requireOwner(req, res, next) {
   const owner = ownerFromRequest(req);
+  if (!owner && isConsoleOnly(req.identity?.account)) {
+    next(consoleOnlyError());
+    return;
+  }
   if (!owner) {
     next(new AppError('Войдите в аккаунт, чтобы продолжить.', { status: 401, code: 'UNAUTHORIZED' }));
     return;

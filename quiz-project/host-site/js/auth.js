@@ -63,8 +63,13 @@ export function goToLogin(next) {
 /** Страница только для вошедших: без входа — на страницу входа. Возвращает аккаунт или null. */
 export async function requireAccount() {
   try {
-    const { account } = await loadSession();
+    const { account, home } = await loadSession();
     if (!account) goToLogin();
+    // Учётная запись администратора — только для админ-консоли (сервер всё равно не даст ей игр).
+    if (home) {
+      location.replace(`${SERVER_URL}${home}`);
+      return null;
+    }
     return account;
   } catch {
     return null; // сервер недоступен — страница сама покажет ошибку при первом запросе
