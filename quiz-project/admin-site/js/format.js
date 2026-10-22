@@ -55,6 +55,10 @@ export const AUDIT_LABELS = {
   'sharing.hide': 'Скрыт из подозрительных',
   'backup.run': 'Резервная копия вручную',
   'sharing.unhide': 'Возвращён в подозрительные',
+  'admin.device.added': 'Консоль: новое устройство',
+  'admin.device.removed': 'Консоль: устройство убрано',
+  'admin.device.denied': 'Консоль: вход с чужого устройства отклонён',
+  'admin.device.reset': 'Консоль: список устройств сброшен',
 };
 
 export const BAN_STATUS = { active: 'действует', expired: 'истекла', lifted: 'снята' };

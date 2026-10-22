@@ -7,6 +7,7 @@ import { forwardedChain } from '../identity/clientIp.js';
 import { RULES } from '../security/throttle.js';
 import { MIN_PREFIX, isUuid, parseIpTarget } from '../security/bans.js';
 import { AdminQueries } from './queries.js';
+import { parseUserAgent } from '../logs/userAgent.js';
 
 const MAX_BAN_MINUTES = 10 * 365 * 24 * 60;
 const invalid = (message) => new AppError(message, { status: 422, code: 'INVALID' });
@@ -146,6 +147,38 @@ export function adminRouter({ db, identity, audit, config, sharing, backups = nu
     await audit.record({ ...auditMeta(req), action: 'account.view', targetType: 'account', targetId: card.account.id, details: { login: card.account.login } });
     const [withHints] = (await withSharing([card.account])).items;
     res.json({ ...card, sharing: withHints.sharing ?? null, sharingEnabled: await sharing.enabled() });
+  });
+
+  // ---------- Устройства, с которых можно входить в консоль ----------
+
+  router.get('/devices', async (req, res) => {
+    const { account, visitorId } = req.identity;
+    const devices = await identity.adminDevices.list(account.id);
+    res.json({
+      max: identity.adminDevices.max,
+      devices: devices.map((row) => ({
+        id: row.visitor_id,
+        ...parseUserAgent(row.user_agent),
+        addedAt: row.added_at,
+        lastSeenAt: row.last_seen_at,
+        lastIp: row.last_ip,
+        current: row.visitor_id === visitorId,
+      })),
+    });
+  });
+
+  // Убрать устройство: на нём сразу завершается вход в консоль, место освобождается.
+  router.delete('/devices/:id', ...mutating, async (req, res) => {
+    if (!isUuid(req.params.id)) throw notFound('Устройство не найдено');
+    const { account } = req.identity;
+    const removed = await db.tx(async (tx) => {
+      const done = await identity.adminDevices.remove(account.id, req.params.id, tx);
+      if (done) await audit.record({ ...auditMeta(req), action: 'admin.device.removed', targetType: 'visitor', targetId: req.params.id }, tx);
+      return done;
+    });
+    if (!removed) throw notFound('Устройство не найдено');
+    await identity.adminDevices.load();
+    res.status(204).end();
   });
 
   // ---------- Подсказки о шаринге (только показ; сервер по ним ничего не делает) ----------

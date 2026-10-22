@@ -77,7 +77,7 @@ function mountSites(app, config) {
 
 // Админ-консоль: сервер отдаёт её файлы (HTML, скрипты, стили) только администратору.
 // Гостя — на страницу входа, остальным — 403. Данные консоли — отдельно, в /api/admin/* с той же проверкой.
-function mountAdmin(app, config) {
+function mountAdmin(app, config, identity) {
   const adminDir = path.join(config.sitesRoot, 'admin-site');
   app.use('/admin', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -91,7 +91,7 @@ function mountAdmin(app, config) {
       }
       return;
     }
-    if (account.role !== 'admin') {
+    if (!identity.isAdmin(req.identity)) {
       res.status(403).type('text/html; charset=utf-8').send('<!doctype html><meta charset="utf-8"><title>Нет доступа</title><p>Недостаточно прав.</p>');
       return;
     }
@@ -170,7 +170,7 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
   app.use((req, res, next) => (needsIdentity(req) ? identify(req, res, next) : next()));
 
   if (config.serveSites) mountSites(app, config);
-  mountAdmin(app, config);
+  mountAdmin(app, config, identity);
 
   app.get('/', (req, res) => res.json({ name: 'Luminous — сервер квиз-игры', status: 'ok' }));
   app.get('/health', async (req, res) => {
@@ -212,7 +212,7 @@ function createApp({ config, db, identity, audit, events, sharing, backups, lega
   });
 
   // ---------- Вход и аккаунт ----------
-  app.use('/api/auth', anyCors, authRouter({ identity, config, events }));
+  app.use('/api/auth', anyCors, authRouter({ identity, config, events, audit }));
 
   // ---------- Администратор ----------
   app.use('/api/admin', hostCors, adminRouter({ db, identity, audit, config, sharing, backups }));
@@ -349,6 +349,9 @@ export async function startServer(overrides = {}) {
   const identity = createIdentity({ db, config });
   const admin = await identity.accounts.ensureAdmin({ login: config.adminLogin, passwordHash: config.adminPasswordHash }, identity.sessions);
   if (!config.quiet && admin.status !== 'ok') console.log(`[admin] вход администратора: ${admin.status}`);
+  const devices = await identity.adminDevices.init({ resetToken: config.adminDeviceReset, sessions: identity.sessions });
+  if (!config.quiet && devices.bootstrapped) console.log(`[admin] доверенные устройства: запомнено ${devices.bootstrapped} (уже вошедшие)`);
+  if (devices.reset) console.log('[admin] доверенные устройства сброшены (ADMIN_DEVICE_RESET): следующие входы администратора займут места заново');
   try {
     await importLegacyData(db, { dataFile: config.dataFile, imagesDir: config.imagesDir, maxImageBytes: QUIZ_LIMITS.imageMaxBytes, log: config.quiet ? null : console.log });
   } catch (error) {
@@ -356,6 +359,7 @@ export async function startServer(overrides = {}) {
   }
   const legacy = new LegacyService(db);
   const audit = new AuditLog(db);
+  if (devices.reset) await audit.record({ admin: null, action: 'admin.device.reset' });
   const events = new EventLog(db);
   const sharing = new SharingService(db, { config: config.sharing ?? sharingConfig(), timeZone: config.sharingTimeZone });
   await identity.bans.load();

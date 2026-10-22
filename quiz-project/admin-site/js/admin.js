@@ -3,7 +3,7 @@
 import { adminApi } from './api.js';
 import { banDialog, issueCode, liftDialog } from './actions.js';
 import { openCard } from './card.js';
-import { h, toast } from './dom.js';
+import { confirmDialog, h, toast } from './dom.js';
 import { AUDIT_LABELS, BAN_STATUS, SHARING_LEVELS, ago, deviceLabel, fmtDate, shortId } from './format.js';
 import { curtain } from './theatre.js';
 
@@ -297,6 +297,65 @@ function auditDetails(entry) {
   return parts.join(' · ') || '—';
 }
 
+// ---------- Устройства, с которых можно входить в консоль ----------
+
+async function devicesTab() {
+  const root = $('panel-devices');
+  let data;
+  try {
+    data = await adminApi.devices();
+  } catch (error) {
+    root.replaceChildren(h('p', { class: 'ledger-empty muted', text: error.message }));
+    return;
+  }
+  const free = Math.max(0, data.max - data.devices.length);
+  const note = h('div', { class: 'hint-panel is-on' },
+    h('p', { class: 'hint-title', text: `Вход в консоль — только с этих устройств (не больше ${data.max})` }),
+    h('p', { class: 'hint-note', text: 'С любого другого устройства вход не пройдёт, даже с верным логином и паролем, а попытка появится в журнале аудита. '
+      + 'Чтобы войти с нового устройства, сначала уберите здесь одно из старых: свободное место займёт первое устройство, с которого вы войдёте. '
+      + 'Если очистить в браузере данные сайта (cookie), сайт будет считать его новым устройством.' }),
+    h('p', { class: 'hint-note', text: 'Потеряли все устройства? В Render → Environment задайте переменную ADMIN_DEVICE_RESET любым новым словом: после перезапуска список очистится, и места займут следующие входы.' }),
+    h('p', { class: 'hint-status', text: free ? `Свободных мест: ${free} — его займёт следующий вход администратора.` : 'Свободных мест нет.' }),
+  );
+  const { table, body, row } = ledger([
+    { title: 'Устройство', className: 'col-main', value: (device) => h('div', { class: 'cell-main' },
+      h('span', { class: 'cell-title', text: deviceLabel(device) }),
+      device.current ? h('span', { class: 'pill pill-gold', text: 'это устройство' }) : null) },
+    { title: 'Добавлено', value: (device) => fmtDate(device.addedAt) },
+    { title: 'Последний вход', value: (device) => h('span', { title: fmtDate(device.lastSeenAt), text: ago(device.lastSeenAt) }) },
+    { title: 'IP', value: (device) => h('code', { text: device.lastIp ?? '—' }) },
+    { title: 'Действия', className: 'col-actions', value: (device) => h('div', { class: 'row-actions' },
+      h('button', { class: 'btn btn-small btn-danger', type: 'button', text: 'Убрать', onclick: () => removeDevice(device) })) },
+  ]);
+  body.replaceChildren(...data.devices.map((device) => row(device)));
+  root.replaceChildren(note, h('div', { class: 'ledger programme' }, h('div', { class: 'ledger-scroll' }, table),
+    data.devices.length ? null : h('p', { class: 'ledger-empty muted', text: 'Пока ни одного устройства.' })));
+}
+
+async function removeDevice(device) {
+  const confirmed = await confirmDialog({
+    title: 'Убрать устройство?',
+    message: device.current
+      ? 'Это устройство, с которого вы сейчас в консоли: вход на нём сразу завершится. Вернуться можно, только пока есть свободное место.'
+      : `${deviceLabel(device)}: вход в консоль на нём сразу завершится, место освободится.`,
+    confirmText: 'Убрать',
+    danger: true,
+  });
+  if (!confirmed) return;
+  try {
+    await adminApi.removeDevice(device.id);
+  } catch (error) {
+    toast(error.message, 'error');
+    return;
+  }
+  if (device.current) {
+    curtain.go('/host/login.html', { replace: true });
+    return;
+  }
+  toast('Устройство убрано');
+  devicesTab();
+}
+
 function auditTab() {
   const view = listView({
     root: $('panel-audit'),
@@ -330,6 +389,7 @@ const TABS = {
   visitors: { init: visitorsTab },
   bans: { init: bansTab },
   audit: { init: auditTab },
+  devices: { init: devicesTab },
 };
 const started = new Set();
 
@@ -347,6 +407,8 @@ function selectTab(name, { focus = false } = {}) {
     TABS[key].init();
   } else if (key === 'audit') {
     refreshers.audit?.();
+  } else if (key === 'devices') {
+    devicesTab();
   }
   history.replaceState(null, '', `#${key}`);
 }
@@ -429,6 +491,7 @@ async function init() {
     }
   });
   selectTab(location.hash.slice(1));
+  window.addEventListener('hashchange', () => selectTab(location.hash.slice(1)));
 }
 
 init().catch((error) => toast(error.message, 'error'));

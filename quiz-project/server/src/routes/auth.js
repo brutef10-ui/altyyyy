@@ -11,7 +11,7 @@ import { EVENT_TYPES } from '../logs/events.js';
 
 const HOUR = 60 * 60;
 
-export function authRouter({ identity, config, events }) {
+export function authRouter({ identity, config, events, audit = null }) {
   const { accounts, sessions, throttle } = identity;
   const router = express.Router();
   router.use(express.json({ limit: '4kb' }), (req, res, next) => {
@@ -84,19 +84,33 @@ export function authRouter({ identity, config, events }) {
     const login = normalizeLogin(input.login).slice(0, 64);
     const keys = { ip: `login:ip:${ip}`, account: `login:acct:${login}`, pair: `login:acct-ip:${login}|${ip}` };
     await throttle.check(keys.ip, keys.pair, keys.account);
+    const failedAttempt = async () => {
+      const blocked = await Promise.all([
+        throttle.hit(keys.ip, RULES.loginIp),
+        throttle.hit(keys.pair, RULES.loginAccountIp),
+        throttle.hit(keys.account, RULES.loginAccount),
+      ]);
+      if (blocked.some(Boolean)) throw throttled(RULES.loginAccountIp.blockSec);
+    };
     let account;
     try {
       account = await accounts.authenticate(input.login, input.password);
     } catch (error) {
-      if (error.code === 'BAD_CREDENTIALS') {
-        const blocked = await Promise.all([
-          throttle.hit(keys.ip, RULES.loginIp),
-          throttle.hit(keys.pair, RULES.loginAccountIp),
-          throttle.hit(keys.account, RULES.loginAccount),
-        ]);
-        if (blocked.some(Boolean)) throw throttled(RULES.loginAccountIp.blockSec);
-      }
+      if (error.code === 'BAD_CREDENTIALS') await failedAttempt();
       throw error;
+    }
+    // Администратор — только с доверенного устройства. С чужого устройства ответ такой же, как при
+    // неверном пароле (не подсказываем, что пароль подошёл), а попытка видна в журнале аудита.
+    if (account.role === 'admin') {
+      const who = { visitorId: req.identity.visitorId, ip, userAgent: req.identity.userAgent };
+      const device = await identity.adminDevices.admit(account, who);
+      const meta = { admin: account, targetType: 'visitor', targetId: who.visitorId, ip, userAgent: who.userAgent };
+      if (!device.ok) {
+        await audit?.record({ ...meta, action: 'admin.device.denied' });
+        await failedAttempt();
+        throw new AppError('Неверный логин или пароль', { status: 401, code: 'BAD_CREDENTIALS' });
+      }
+      if (device.added) await audit?.record({ ...meta, action: 'admin.device.added' });
     }
     await throttle.reset(keys.pair);
     const ban = accountBan(req, account);

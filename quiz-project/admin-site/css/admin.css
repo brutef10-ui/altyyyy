@@ -115,13 +115,13 @@
 
 /* ---------- Вкладки ---------- */
 
+/* Вкладки переносятся на новую строку, а не прячутся за край: все разделы видны сразу. */
 .admin-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 18px;
-  overflow-x: auto;
   border-bottom: 1.5px solid rgba(216, 172, 76, 0.35);
-  scrollbar-width: thin;
 }
 
 .admin-tab {
@@ -978,6 +978,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.hint-title {
+  font-weight: 700;
+  color: var(--gold-light);
+}
+
+.hint-panel + .ledger {
+  margin-top: 4px;
 }
 
 .hint-note {

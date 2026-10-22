@@ -54,7 +54,7 @@ quiz-project/
 │   ├── css/theatre.css      # общая основа «Большой театр»: токены, кнопки, занавес
 │   ├── css/login.css  account.css  home.css  editor.css  lobby.css  game.css  ceremony.css   # стили экранов
 │   └── js/ config.js auth.js api.js codes.js session.js socket.js ui.js theatre.js login.js account.js home.js editor.js lobby.js game.js results.js
-├── admin-site/             # админ-консоль (сервер отдаёт её только администратору: /admin/)
+├── admin-site/             # админ-консоль (только администратору и только с запомненных устройств, не больше 2: /admin/)
 │   ├── index.html  css/admin.css  css/theatre.css
 │   └── js/ admin.js card.js actions.js api.js dom.js format.js theatre.js
 ├── player-site/

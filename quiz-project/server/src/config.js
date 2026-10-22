@@ -133,6 +133,9 @@ export function loadConfig(overrides = {}) {
     adminLogin: String(env.ADMIN_LOGIN || '').trim(),
     adminPasswordHash: String(env.ADMIN_PASSWORD_HASH || '').trim(),
     adminContact: String(env.ADMIN_CONTACT || '').trim(),
+    // С скольких устройств можно входить в админ-консоль; новое значение ADMIN_DEVICE_RESET один раз очищает список.
+    adminMaxDevices: integer(env.ADMIN_MAX_DEVICES, 2, { min: 1, max: 5 }),
+    adminDeviceReset: String(env.ADMIN_DEVICE_RESET || '').trim(),
     ...overrides,
   };
 

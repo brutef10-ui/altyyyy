@@ -6,6 +6,7 @@ import { AppError } from '../errors.js';
 import { Throttle } from '../security/throttle.js';
 import { BanService, bannedError } from '../security/bans.js';
 import { AccountService } from './accounts.js';
+import { AdminDeviceService } from './adminDevices.js';
 import { ipFromRequest, ipFromSocket } from './clientIp.js';
 import { cookieNames, cookieOptions, readCookies } from './cookies.js';
 import { RecoveryService } from './recovery.js';
@@ -33,6 +34,7 @@ export function createIdentity({ db, config }) {
   const throttle = new Throttle(db);
   const recovery = new RecoveryService(db, { accounts, sessions, codeTtlMinutes: config.recoveryCodeTtlMinutes });
   const bans = new BanService(db);
+  const adminDevices = new AdminDeviceService(db, { max: config.adminMaxDevices });
 
   /** Действующая блокировка для личности (по аккаунту, устройству и IP) или null. Только память, без БД. */
   const banFor = (who) => bans.find({ account: who?.account, visitorId: who?.visitorId, ip: who?.ip });
@@ -124,10 +126,13 @@ export function createIdentity({ db, config }) {
     }
   }
 
+  // Администратор — только с доверенного устройства (см. adminDevices.js), иначе как будто прав нет.
+  const isAdmin = (who) => who?.account?.role === 'admin' && adminDevices.isTrusted(who.account.id, who.visitorId);
+
   function requireAdmin(req, res, next) {
     const account = req.identity?.account;
     if (!account) next(unauthorized());
-    else if (account.role !== 'admin') next(new AppError('Недостаточно прав', { status: 403, code: 'FORBIDDEN' }));
+    else if (!isAdmin(req.identity)) next(new AppError('Недостаточно прав', { status: 403, code: 'FORBIDDEN' }));
     else next();
   }
 
@@ -211,6 +216,8 @@ export function createIdentity({ db, config }) {
     throttle,
     recovery,
     bans,
+    adminDevices,
+    isAdmin,
     banFor,
     checkBan,
     rejectBanned,
