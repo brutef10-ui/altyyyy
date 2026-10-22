@@ -143,13 +143,16 @@ test('чек хранится не дольше 2 суток; факт опла�
   assert.ok(!BACKUP_TABLES.some((table) => table.name === 'payments'));
 });
 
-test('аккаунты, созданные до появления оплаты, сохраняют доступ', async () => {
+test('доступ — только после чека: у любого аккаунта без оплаты, в том числе старого, доступа нет', async () => {
   const hash = await argon2.hash('legacy-password-1', { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 });
   const login = uniqueLogin('Before');
-  // Как строка, которая была в базе до миграции: столбец доступа не указан.
+  // Аккаунт, созданный в обход регистрации (как старые строки в базе): столбец доступа не указан.
   await server.db.query('INSERT INTO accounts (login, login_normalized, password_hash) VALUES ($1, lower($1), $2)', [login, hash]);
   const host = browser();
   assert.equal((await host.login(login, 'legacy-password-1')).status, 200);
+  assert.equal((await host.session()).payment.canCreate, false);
+  assert.equal((await host.json('/api/quizzes', { method: 'POST', body: quiz })).status, 402);
+  assert.equal((await upload(host, png())).status, 201);
   assert.equal((await host.session()).payment.canCreate, true);
   assert.equal((await host.json('/api/quizzes', { method: 'POST', body: quiz })).status, 201);
 });
