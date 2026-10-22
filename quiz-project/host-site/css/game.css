@@ -1105,6 +1105,50 @@
   }
 }
 
+/* Телефон боком и другие очень невысокие экраны: сцена прокручивается, как на телефоне,
+   панель с кнопкой остаётся внизу — варианты ответа и результаты не сжимаются и не налезают друг на друга. */
+@media (max-height: 480px) and (min-width: 601px) {
+  .stage {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .game,
+  .game[data-phase],
+  .game[data-type='text'],
+  .game[data-phase='results'][data-type='choice'],
+  .game.has-image[data-phase='answering'][data-type='choice'] {
+    grid-template-rows: auto;
+    grid-auto-rows: auto;
+    gap: 14px;
+    padding-top: 18px;
+  }
+
+  .results-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .timer {
+    width: 84px;
+  }
+
+  .timer-value {
+    font-size: 32px;
+  }
+
+  .stage-bar {
+    padding-top: 8px;
+    padding-bottom: calc(8px + var(--safe-bottom));
+  }
+
+  .stage-bar .action-bar-inner {
+    min-height: 0;
+  }
+}
+
 /* ---------- Анимации ---------- */
 
 @keyframes bump {
@@ -1280,11 +1324,27 @@
   }
 
   .question-banner h1 {
-    font-size: 21px;
+    font-size: 20px;
+  }
+
+  .question-banner[data-length='long'] h1 {
+    font-size: 18px;
+  }
+
+  .question-banner[data-length='xl'] h1 {
+    font-size: 16px;
   }
 
   .game[data-phase='reading'] .question-banner h1 {
-    font-size: 25px;
+    font-size: 23px;
+  }
+
+  .game[data-phase='reading'] .question-banner[data-length='long'] h1 {
+    font-size: 20px;
+  }
+
+  .game[data-phase='reading'] .question-banner[data-length='xl'] h1 {
+    font-size: 18px;
   }
 
   .question-tag {

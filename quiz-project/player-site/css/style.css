@@ -1390,7 +1390,11 @@ body[data-mood='final'] .views::before {
   -webkit-line-clamp: 3;
 }
 
-/* Длинные варианты: медальон меньше, текст помещается в три строки */
+/* Длинные варианты (до 80 символов): медальон меньше, текст — до пяти строк, чтобы вариант читался целиком */
+.has-long-answers .answer-text {
+  -webkit-line-clamp: 5;
+}
+
 .has-long-answers .answer-button {
   gap: 7px;
   padding: 10px;
@@ -2491,6 +2495,126 @@ body > .toast {
   }
 }
 
+/* ---------- Телефон: всё компактнее (примерно на 15–20 %) ---------- */
+
+@media (max-width: 600px) {
+  .screen {
+    gap: 14px;
+    padding-top: calc(12px + var(--safe-top));
+  }
+
+  .logo {
+    gap: 4px;
+    margin-top: 1.5vh;
+  }
+
+  .logo .brand-mark {
+    width: 70px;
+    height: 70px;
+  }
+
+  .logo .brand-word {
+    font-size: 31px;
+  }
+
+  .panel {
+    gap: 11px;
+    padding: 0 16px 18px;
+  }
+
+  .panel h1 {
+    font-size: 26px;
+  }
+
+  .code-input {
+    min-height: 64px;
+    font-size: 34px;
+  }
+
+  .nickname-input {
+    font-size: 21px;
+  }
+
+  .view h1 {
+    font-size: 27px;
+  }
+
+  .q-seconds {
+    font-size: 21px;
+  }
+
+  .view-question[data-phase='reading'] .q-text {
+    font-size: 21px;
+  }
+
+  .read-ring-value {
+    font-size: 34px;
+  }
+
+  .text-answer-input {
+    font-size: 21px;
+  }
+
+  #result-title {
+    font-size: 32px;
+  }
+
+  .result-points {
+    font-size: 42px;
+  }
+
+  .drum-step {
+    font-size: 20px;
+  }
+
+  .final-rank {
+    font-size: 36px;
+  }
+}
+
+/* Самые узкие телефоны: шаги входа помещаются рядом с кнопкой «назад». */
+@media (max-width: 360px) {
+  .step-header {
+    gap: 8px;
+  }
+
+  .steps {
+    gap: 5px;
+  }
+
+  .steps li {
+    gap: 5px;
+    padding: 5px 9px 5px 8px;
+    font-size: 13px;
+  }
+}
+
+/* Узкие телефоны: длинные варианты ответа — в один столбец во всю ширину, медальон слева,
+   чтобы текст варианта читался целиком. */
+@media (max-width: 420px) {
+  .answer-buttons.has-long-answers {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .answers-3.has-long-answers .answer-button:last-child {
+    grid-column: auto;
+  }
+
+  .has-long-answers .answer-button {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 64px;
+    padding: 10px 14px;
+    text-align: left;
+  }
+
+  .has-long-answers .answer-text {
+    -webkit-line-clamp: 4;
+  }
+}
+
 /* ---------- Низкий экран: телефон боком или открыта клавиатура ---------- */
 
 @media (max-height: 520px) {
@@ -2581,6 +2705,10 @@ body > .toast {
 
   .answer-text {
     -webkit-line-clamp: 2;
+  }
+
+  .has-long-answers .answer-text {
+    -webkit-line-clamp: 3;
   }
 
   .answer-shape,

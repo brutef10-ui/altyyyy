@@ -801,6 +801,25 @@
 
 /* ---------- Небольшие экраны (ноутбук, планшет) ---------- */
 
+/* Невысокий экран (ноутбук, планшет боком): надпись и портреты на пьедестале меньше,
+   чтобы «Поздравляем победителя!» не наезжала на портрет и корону. */
+@media (max-height: 680px) and (min-width: 601px) {
+  .ceremony-caption {
+    font-size: clamp(26px, min(3.8vw, 6vh), 60px);
+  }
+
+  .podium-group.size-1 { --face: clamp(60px, 13vh, 154px); }
+  .podium-group.size-few { --face: clamp(44px, 8.5vh, 92px); }
+  .podium-group.size-many { --face: clamp(38px, 6.5vh, 66px); }
+}
+
+/* Узкая колонка «Все игроки»: «верно N из M» не помещается — прячем, место и очки важнее. */
+@media (max-width: 1100px) {
+  .ranking-correct {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   .ceremony {
     grid-template-rows: none;
@@ -935,15 +954,24 @@
     display: none;
   }
 
+  /* Кнопки финала на телефоне: «На главную» отдельной строкой, остальные — рядом или с переносом,
+     текст кнопки никогда не обрезается. */
   .final-actions {
     flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .final-actions > .btn,
+  .final-actions .action-bar-buttons {
+    flex: 1 1 100%;
   }
 
   .final-actions .action-bar-buttons {
-    flex: 1;
+    gap: 8px;
   }
 
   .final-actions .btn {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: max-content;
   }
 }

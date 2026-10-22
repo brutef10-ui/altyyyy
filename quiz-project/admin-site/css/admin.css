@@ -774,6 +774,7 @@
 
 .admin-modal .modal-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -1137,4 +1138,27 @@
 .drawer .btn-ghost:hover:not(:disabled) {
   background: #fffaf0;
   border-color: var(--gold-deep);
+}
+
+/* Телефон: компактнее заголовок страницы. */
+@media (max-width: 600px) {
+  .admin-intro {
+    margin: 22px 0 14px;
+  }
+
+  .admin-intro h1 {
+    font-size: 31px;
+  }
+}
+
+/* Самые узкие телефоны (320–400 px): заголовок и шапка помещаются в ширину экрана. */
+@media (max-width: 400px) {
+  .admin-intro h1 {
+    font-size: clamp(24px, 8.6vw, 31px);
+    overflow-wrap: anywhere;
+  }
+
+  .topbar .brand-word {
+    display: none;
+  }
 }

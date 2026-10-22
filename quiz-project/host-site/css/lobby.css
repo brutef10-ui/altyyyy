@@ -437,8 +437,9 @@
   }
 
   .room-code {
-    font-size: clamp(52px, 17vw, 78px);
+    font-size: clamp(40px, 14vw, 78px);
     text-align: center;
+    white-space: nowrap;
   }
 
   .qr svg {

@@ -302,3 +302,10 @@
     font-size: 14px;
   }
 }
+
+/* Узкий телефон: короткая подпись кнопки в шапке. */
+@media (max-width: 400px) {
+  .topbar .wide-only {
+    display: none;
+  }
+}
